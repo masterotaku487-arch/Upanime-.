@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import { getAnimeById, getAnimeEpisodes, smartSearchConsumet, searchConsumetDub, getEpisodeSources } from '../services/api'
+import { getAnimeById, getAnimeEpisodes, resolveGogoanimeId, fetchEpisodeSources } from '../services/api'
 import './WatchPage.css'
 
 const openMXPlayer = (url, title) => {
@@ -35,15 +35,16 @@ export default function WatchPage() {
   const [loadingVideo, setLoadingVideo] = useState(true)
   const [loadingStatus, setLoadingStatus] = useState('🔍 Buscando anime...')
   const [error, setError] = useState(false)
-  const [consumetId, setConsumetId] = useState(null)
+  const [gogoanimeId, setGogoanimeId] = useState(null) // ID real do Gogoanime (ex: "frieren-beyond-journeys-end")
   const [hasDub, setHasDub] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [hasMoreEps, setHasMoreEps] = useState(false)
   const [epPage, setEpPage] = useState(1)
   const [copied, setCopied] = useState(false)
 
+  // Carrega info do anime + episódios
   useEffect(() => {
-    setAnime(null); setEpisodes([]); setConsumetId(null)
+    setAnime(null); setEpisodes([]); setGogoanimeId(null)
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
       if (d.status === 'fulfilled') setAnime(d.value.data)
       if (e.status === 'fulfilled') {
@@ -54,62 +55,82 @@ export default function WatchPage() {
     window.scrollTo(0, 0)
   }, [id])
 
+  // Carrega fontes de vídeo quando anime ou episódio muda
   useEffect(() => {
     if (!anime) return
     let cancelled = false
+
     const run = async () => {
       setLoadingVideo(true); setError(false); setSources(null); setCurrentSrc('')
-      try {
-        let mid = consumetId
-        if (!mid) {
-          setLoadingStatus(isDub ? '🎙️ Buscando versão dublada...' : '🔍 Buscando anime...')
-          const sr = isDub ? await searchConsumetDub(anime) : await smartSearchConsumet(anime)
-          const match = sr.results?.[0]
-          if (!match) throw new Error('Anime não encontrado nas fontes de streaming')
-          mid = match.id
-          if (!cancelled) setConsumetId(mid)
 
-          // Verifica dublagem em paralelo
+      try {
+        // ── PASSO 1: Resolve o ID do Gogoanime a partir dos títulos do anime ──
+        // O MAL ID (ex: 58788) não funciona no Gogoanime.
+        // Precisamos do slug (ex: "frieren-beyond-journeys-end")
+        let gId = gogoanimeId
+        if (!gId) {
+          setLoadingStatus(isDub ? '🎙️ Buscando versão dublada...' : '🔍 Buscando anime no servidor...')
+          gId = await resolveGogoanimeId(anime, isDub)
+          if (!gId) throw new Error('Anime não encontrado nas fontes de streaming. Tente outro título.')
+          if (!cancelled) setGogoanimeId(gId)
+
+          // Verifica dublagem em background (sem bloquear)
           if (!isDub) {
-            searchConsumetDub(anime).then(r => { if (!cancelled) setHasDub(r.results.length > 0) })
+            resolveGogoanimeId(anime, true)
+              .then(dubId => { if (!cancelled && dubId) setHasDub(true) })
+              .catch(() => {})
           }
         }
 
-        setLoadingStatus('📡 Carregando fontes...')
-        const data = await getEpisodeSources(`${mid}-episode-${epNum}`)
+        // ── PASSO 2: Busca fontes do episódio usando o ID correto ──
+        setLoadingStatus(`📡 Carregando episódio ${epNum}...`)
+        const data = await fetchEpisodeSources(gId, epNum)
         if (cancelled) return
+
         setSources(data)
-        const best = ['1080p','720p','480p','360p'].reduce((found, q) =>
+
+        // Escolhe melhor qualidade disponível
+        const priority = ['1080p', '720p', '480p', '360p']
+        const best = priority.reduce((found, q) =>
           found || data.sources?.find(s => s.quality === q), null
         ) || data.sources?.[0]
-        if (best) setCurrentSrc(best.url)
-        else throw new Error('Nenhuma fonte de vídeo encontrada')
-      } catch(e) {
-        if (!cancelled) { setError(true); setLoadingStatus('❌ ' + e.message) }
+
+        if (best) {
+          setCurrentSrc(best.url)
+          setLoadingStatus('▶️ Pronto!')
+        } else {
+          throw new Error('Nenhuma fonte de vídeo encontrada para este episódio')
+        }
+
+      } catch (e) {
+        console.error('[WatchPage]', e.message)
+        if (!cancelled) {
+          setError(true)
+          setLoadingStatus('❌ ' + e.message)
+        }
       } finally {
         if (!cancelled) setLoadingVideo(false)
       }
     }
+
     run()
     return () => { cancelled = true }
   }, [anime, epNum, isDub])
 
   const goEp = (n, dub = isDub) => {
-    setConsumetId(null)
+    setGogoanimeId(null) // força resolução do ID novamente
     setSearchParams({ ep: n, ...(dub ? { dub: '1' } : {}) })
+  }
+
+  const toggleDub = () => {
+    setGogoanimeId(null)
+    goEp(epNum, !isDub)
   }
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href)
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
-
-  const prevEp = epNum > 1 ? epNum - 1 : null
-  const nextEp = (anime?.episodes && epNum < anime.episodes) ? epNum + 1 : null
-  const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
-  const filename = `${anime?.title_english || anime?.title || 'anime'} - EP${String(epNum).padStart(2,'0')}.mp4`
-  const externalUrl = anime ? `https://gogoanime3.cc/${buildSlug(anime)}-episode-${epNum}` : '#'
-  const waText = encodeURIComponent(`🔥 ${anime?.title_english || anime?.title} - EP${epNum}\n${window.location.href}`)
 
   const loadMoreEps = async () => {
     const next = epPage + 1
@@ -118,6 +139,13 @@ export default function WatchPage() {
     setHasMoreEps(data.pagination?.has_next_page || false)
     setEpPage(next)
   }
+
+  const prevEp = epNum > 1 ? epNum - 1 : null
+  const nextEp = (anime?.episodes && epNum < anime.episodes) ? epNum + 1 : null
+  const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
+  const filename = `${anime?.title_english || anime?.title || 'anime'} - EP${String(epNum).padStart(2, '0')}.mp4`
+  const externalUrl = anime ? `https://gogoanime3.cc/${buildSlug(anime)}-episode-${epNum}` : '#'
+  const waText = encodeURIComponent(`🔥 ${anime?.title_english || anime?.title} - EP${epNum}\n${window.location.href}`)
 
   return (
     <div className="watch-page">
@@ -139,9 +167,9 @@ export default function WatchPage() {
                 <span className="error-emoji">😵</span>
                 <h3>Episódio indisponível</h3>
                 <p className="error-msg">{loadingStatus}</p>
-                <p className="error-hint">💡 Dica: O Render gratuito pode estar hibernando. Aguarde 30s e tente novamente.</p>
+                <p className="error-hint">💡 O Render gratuito pode estar hibernando. Aguarde 30s e tente novamente.</p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => { setError(false); setLoadingVideo(true); setConsumetId(null) }}>
+                  <button className="btn btn-primary" onClick={() => { setError(false); setLoadingVideo(true); setGogoanimeId(null) }}>
                     🔄 Tentar novamente
                   </button>
                   <a href={externalUrl} target="_blank" rel="noreferrer" className="btn btn-ghost">
@@ -164,13 +192,10 @@ export default function WatchPage() {
           <div className="audio-track-bar">
             <span className="audio-label">🎧 Áudio:</span>
             <div className="audio-toggle">
-              <button className={`track-btn ${!isDub ? 'active' : ''}`} onClick={() => isDub && goEp(epNum, false)}>
+              <button className={`track-btn ${!isDub ? 'active' : ''}`} onClick={() => isDub && toggleDub()}>
                 🇧🇷 Legendado
               </button>
-              <button
-                className={`track-btn ${isDub ? 'active' : ''}`}
-                onClick={() => !isDub && goEp(epNum, true)}
-              >
+              <button className={`track-btn ${isDub ? 'active' : ''}`} onClick={() => !isDub && toggleDub()}>
                 🎙️ Dublado{!hasDub && !isDub ? ' ⚠️' : ''}
               </button>
             </div>
@@ -280,4 +305,4 @@ export default function WatchPage() {
       </div>
     </div>
   )
-}
+                     }
