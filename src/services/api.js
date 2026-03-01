@@ -4,14 +4,14 @@ import axios from 'axios'
 const jikan = axios.create({ baseURL: 'https://api.jikan.moe/v4', timeout: 12000 })
 
 const CONSUMET_URL = import.meta.env.VITE_CONSUMET_URL || 'https://api.consumet.org'
-const consumet = axios.create({ baseURL: CONSUMET_URL, timeout: 20000 })
+const api = axios.create({ baseURL: CONSUMET_URL, timeout: 25000 })
 
-// Gêneros bloqueados
+// Gêneros bloqueados (hentai/erotica)
 const BLOCKED = [12, 49]
 export const isBlocked = (a) =>
   [...(a.genres || []), ...(a.explicit_genres || [])].some(g => BLOCKED.includes(g.mal_id))
 
-// ── Jikan ─────────────────────────────────────────────────
+// ── Jikan (dados) ─────────────────────────────────────────
 export const getSeasonNow = (page = 1) =>
   jikan.get(`/seasons/now?page=${page}`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
@@ -37,190 +37,165 @@ export const getSeasonUpcoming = () =>
   jikan.get('/seasons/upcoming?limit=16').then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
 // ══════════════════════════════════════════════════════════
-// STREAMING — SISTEMA DE FALLBACK EM CASCATA
+// STREAMING — NOTA IMPORTANTE SOBRE PROVEDORES
+//
+// ❌ Gogoanime: QUEBRADO (mudou para anitaku.io em 2024)
+// ✅ Zoro/Aniwatch: FUNCIONANDO (provedor principal)
+// ✅ AnimePahe: FUNCIONANDO (fallback)
+// ✅ meta/anilist: FUNCIONANDO (usa Zoro internamente)
 //
 // FLUXO:
-//   MAL ID (ex: 58505) — vem do Jikan
-//       ↓
-//   resolveGogoanimeId(anime) — busca slug no Gogoanime
-//       ↓ ex: "sousou-no-frieren"
-//   fetchEpisodeSources(slug, epNum)
-//       ↓ se falhar…
-//   tryZoro(anime, epNum) — Zoro/Aniwatch como fallback
-//       ↓ se falhar…
-//   tryAnimePahe(anime, epNum) — AnimePahe como fallback
-//       ↓ se falhar…
-//   null → UI mostra botão externo
+//   anime (Jikan) → busca títulos no Zoro → ID do Zoro
+//   → episódios do Zoro → fontes de vídeo ✅
 // ══════════════════════════════════════════════════════════
 
-// Gera lista de títulos para tentar (do mais específico ao menos)
 const getTitles = (anime) =>
   [
     anime.title_english,
     anime.title,
-    anime.title_japanese,
     ...(anime.titles || []).map(t => t.title),
-  ]
-  .filter(Boolean)
-  .filter((v, i, a) => a.indexOf(v) === i)
+    anime.title_japanese,
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
 
-// ── PROVEDOR 1: Gogoanime ─────────────────────────────────
-/**
- * Traduz títulos do Jikan para o slug do Gogoanime.
- * Testa inglês → japonês → alternativo até achar.
- * @returns {string|null} ex: "sousou-no-frieren"
- */
-export const resolveGogoanimeId = async (anime, dub = false) => {
+// ── PROVEDOR 1: Zoro / Aniwatch (Principal) ───────────────
+const zoroSearch = async (anime) => {
   const titles = getTitles(anime)
-
   for (const title of titles) {
-    const query = dub ? `${title} (Dub)` : title
     try {
-      const res = await consumet.get(`/anime/gogoanime/${encodeURIComponent(query)}`)
+      const res = await api.get(`/anime/zoro/${encodeURIComponent(title)}`)
       const results = res.data?.results || []
       if (!results.length) continue
-
-      if (dub) {
-        const found = results.find(r => r.id?.toLowerCase().includes('dub'))
-        if (found) { console.log(`[Gogoanime] Dub: ${found.id}`); return found.id }
-        continue
-      }
-
-      const found = results.find(r => !r.id?.toLowerCase().includes('dub')) || results[0]
-      console.log(`[Gogoanime] Sub: ${found.id} via "${query}"`)
-      return found.id
+      const match = results[0]
+      console.log(`[Zoro] encontrado: "${match.id}" via "${title}"`)
+      return match.id
     } catch (e) {
-      console.warn(`[Gogoanime] Falhou "${query}":`, e.message)
+      console.warn(`[Zoro] falhou "${title}":`, e.message)
     }
   }
   return null
 }
 
-/**
- * Busca fontes de vídeo no Gogoanime.
- * @param {string} gogoanimeId ex: "sousou-no-frieren"
- * @param {number} epNum
- */
-export const fetchEpisodeSources = async (gogoanimeId, epNum) => {
-  const epId = `${gogoanimeId}-episode-${epNum}`
-  console.log(`[Gogoanime] watch/${epId}`)
-  const res = await consumet.get(`/anime/gogoanime/watch/${encodeURIComponent(epId)}`)
-  if (!res.data?.sources?.length) throw new Error('Sem fontes')
-  return res.data
+const zoroEpisodes = async (zoroId) => {
+  const res = await api.get(`/anime/zoro/info?id=${encodeURIComponent(zoroId)}`)
+  return res.data?.episodes || []
 }
 
-// ── PROVEDOR 2: Zoro / Aniwatch ───────────────────────────
-const resolveZoroId = async (anime) => {
-  const titles = getTitles(anime)
-  for (const title of titles) {
-    try {
-      const res = await consumet.get(`/anime/zoro/${encodeURIComponent(title)}`)
-      const match = res.data?.results?.[0]
-      if (match) { console.log(`[Zoro] ${match.id} via "${title}"`); return match.id }
-    } catch (e) {
-      console.warn(`[Zoro] Falhou "${title}":`, e.message)
-    }
-  }
-  return null
-}
-
-const fetchZoroSources = async (zoroId, epNum) => {
-  // Primeiro pega lista de episódios do Zoro para achar o ID do ep
-  const info = await consumet.get(`/anime/zoro/info?id=${encodeURIComponent(zoroId)}`)
-  const epList = info.data?.episodes || []
-  const ep = epList.find(e => e.number === epNum) || epList[epNum - 1]
+const zoroWatch = async (zoroId, epNum) => {
+  const eps = await zoroEpisodes(zoroId)
+  const ep = eps.find(e => e.number === epNum) || eps[epNum - 1]
   if (!ep) throw new Error(`Ep ${epNum} não encontrado no Zoro`)
-
-  console.log(`[Zoro] watch/${ep.id}`)
-  const res = await consumet.get(`/anime/zoro/watch?episodeId=${encodeURIComponent(ep.id)}`)
-  if (!res.data?.sources?.length) throw new Error('Sem fontes Zoro')
-  return res.data
+  console.log(`[Zoro] watch episodeId: ${ep.id}`)
+  const res = await api.get(`/anime/zoro/watch?episodeId=${encodeURIComponent(ep.id)}`)
+  if (!res.data?.sources?.length) throw new Error('Sem fontes no Zoro')
+  return { ...res.data, provider: 'Zoro' }
 }
 
-// ── PROVEDOR 3: AnimePahe ─────────────────────────────────
-const resolveAnimePaheId = async (anime) => {
+// ── PROVEDOR 2: meta/anilist (Fallback via AniList ID) ────
+const anilistSearch = async (anime) => {
   const titles = getTitles(anime)
   for (const title of titles) {
     try {
-      const res = await consumet.get(`/anime/animepahe/${encodeURIComponent(title)}`)
-      const match = res.data?.results?.[0]
-      if (match) { console.log(`[AnimePahe] ${match.id} via "${title}"`); return match.id }
+      const res = await api.get(`/meta/anilist/${encodeURIComponent(title)}`)
+      const results = res.data?.results || []
+      if (!results.length) continue
+      const match = results[0]
+      console.log(`[AniList] encontrado: "${match.id}" via "${title}"`)
+      return match.id
     } catch (e) {
-      console.warn(`[AnimePahe] Falhou "${title}":`, e.message)
+      console.warn(`[AniList] falhou "${title}":`, e.message)
     }
   }
   return null
 }
 
-const fetchAnimePaheSources = async (paheId, epNum) => {
-  const info = await consumet.get(`/anime/animepahe/info/${encodeURIComponent(paheId)}`)
-  const epList = info.data?.episodes || []
-  const ep = epList.find(e => e.number === epNum) || epList[epNum - 1]
-  if (!ep) throw new Error(`Ep ${epNum} não encontrado no AnimePahe`)
+const anilistWatch = async (anilistId, epNum) => {
+  const res = await api.get(`/meta/anilist/info/${anilistId}?provider=zoro`)
+  const eps = res.data?.episodes || []
+  const ep = eps.find(e => e.number === epNum) || eps[epNum - 1]
+  if (!ep) throw new Error(`Ep ${epNum} não encontrado no AniList/Zoro`)
+  console.log(`[AniList] watch episodeId: ${ep.id}`)
+  const src = await api.get(`/meta/anilist/watch/${encodeURIComponent(ep.id)}?provider=zoro`)
+  if (!src.data?.sources?.length) throw new Error('Sem fontes no AniList/Zoro')
+  return { ...src.data, provider: 'AniList+Zoro' }
+}
 
-  console.log(`[AnimePahe] watch/${ep.id}`)
-  const res = await consumet.get(`/anime/animepahe/watch?episodeId=${encodeURIComponent(ep.id)}`)
-  if (!res.data?.sources?.length) throw new Error('Sem fontes AnimePahe')
-  return res.data
+// ── PROVEDOR 3: AnimePahe (Último recurso) ────────────────
+const paheSearch = async (anime) => {
+  const titles = getTitles(anime)
+  for (const title of titles) {
+    try {
+      const res = await api.get(`/anime/animepahe/${encodeURIComponent(title)}`)
+      const results = res.data?.results || []
+      if (!results.length) continue
+      const match = results[0]
+      console.log(`[AnimePahe] encontrado: "${match.id}" via "${title}"`)
+      return match.id
+    } catch (e) {
+      console.warn(`[AnimePahe] falhou "${title}":`, e.message)
+    }
+  }
+  return null
+}
+
+const paheWatch = async (paheId, epNum) => {
+  const info = await api.get(`/anime/animepahe/info/${encodeURIComponent(paheId)}`)
+  const eps = info.data?.episodes || []
+  const ep = eps.find(e => e.number === epNum) || eps[epNum - 1]
+  if (!ep) throw new Error(`Ep ${epNum} não encontrado no AnimePahe`)
+  const res = await api.get(`/anime/animepahe/watch?episodeId=${encodeURIComponent(ep.id)}`)
+  if (!res.data?.sources?.length) throw new Error('Sem fontes no AnimePahe')
+  return { ...res.data, provider: 'AnimePahe' }
 }
 
 // ── ORQUESTRADOR PRINCIPAL ────────────────────────────────
 /**
- * Tenta buscar fontes de vídeo em cascata:
- *   1. Gogoanime → 2. Zoro → 3. AnimePahe → null
+ * Tenta buscar vídeo em cascata:
+ *   1. Zoro  →  2. AniList+Zoro  →  3. AnimePahe  →  erro
  *
- * @param {object} anime - Objeto completo do Jikan
- * @param {number} epNum - Número do episódio
- * @param {boolean} dub  - Se true, busca dublado
- * @param {object} cache - { gogoanimeId, zoroId, paheId } para evitar re-busca
- * @returns {{ sources, headers, provider, ids }}
+ * @param {object} anime   - Objeto completo do Jikan (com títulos)
+ * @param {number} epNum   - Número do episódio
+ * @param {object} cache   - IDs já resolvidos { zoroId, anilistId, paheId }
+ * @returns {{ sources, headers, provider, cache }}
  */
-export const fetchSourcesWithFallback = async (anime, epNum, dub = false, cache = {}) => {
+export const fetchSourcesWithFallback = async (anime, epNum, cache = {}) => {
   const ids = { ...cache }
 
-  // ── Tentativa 1: Gogoanime ──
+  // 1️⃣ Zoro
   try {
-    if (!ids.gogoanimeId) ids.gogoanimeId = await resolveGogoanimeId(anime, dub)
-    if (ids.gogoanimeId) {
-      const data = await fetchEpisodeSources(ids.gogoanimeId, epNum)
-      return { ...data, provider: 'Gogoanime', ids }
-    }
-  } catch (e) {
-    console.warn('[Fallback] Gogoanime falhou:', e.message)
-  }
-
-  // ── Tentativa 2: Zoro ──
-  try {
-    if (!ids.zoroId) ids.zoroId = await resolveZoroId(anime)
+    if (!ids.zoroId) ids.zoroId = await zoroSearch(anime)
     if (ids.zoroId) {
-      const data = await fetchZoroSources(ids.zoroId, epNum)
-      return { ...data, provider: 'Zoro', ids }
+      const data = await zoroWatch(ids.zoroId, epNum)
+      return { ...data, cache: ids }
     }
-  } catch (e) {
-    console.warn('[Fallback] Zoro falhou:', e.message)
-  }
+  } catch (e) { console.warn('[Fallback] Zoro:', e.message) }
 
-  // ── Tentativa 3: AnimePahe ──
+  // 2️⃣ AniList + Zoro
   try {
-    if (!ids.paheId) ids.paheId = await resolveAnimePaheId(anime)
-    if (ids.paheId) {
-      const data = await fetchAnimePaheSources(ids.paheId, epNum)
-      return { ...data, provider: 'AnimePahe', ids }
+    if (!ids.anilistId) ids.anilistId = await anilistSearch(anime)
+    if (ids.anilistId) {
+      const data = await anilistWatch(ids.anilistId, epNum)
+      return { ...data, cache: ids }
     }
-  } catch (e) {
-    console.warn('[Fallback] AnimePahe falhou:', e.message)
-  }
+  } catch (e) { console.warn('[Fallback] AniList:', e.message) }
 
-  throw new Error('Nenhum provedor encontrou fontes para este episódio.')
+  // 3️⃣ AnimePahe
+  try {
+    if (!ids.paheId) ids.paheId = await paheSearch(anime)
+    if (ids.paheId) {
+      const data = await paheWatch(ids.paheId, epNum)
+      return { ...data, cache: ids }
+    }
+  } catch (e) { console.warn('[Fallback] AnimePahe:', e.message) }
+
+  throw new Error('Todos os provedores falharam. Verifique se o Consumet API está online.')
 }
 
 // Escolhe melhor qualidade disponível
 export const pickBestSource = (sources = []) => {
-  const priority = ['1080p', '720p', '480p', '360p', 'default']
-  for (const q of priority) {
+  for (const q of ['1080p', '720p', '480p', '360p', 'default']) {
     const found = sources.find(s => s.quality === q)
     if (found) return found
   }
   return sources[0] || null
-  }
-        
+    }
+  
