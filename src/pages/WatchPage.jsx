@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import {
-  getAnimeById,
-  getAnimeEpisodes,
-  fetchSourcesWithFallback,
-  pickBestSource,
-} from '../services/api'
+import { getAnimeById, getAnimeEpisodes, fetchSourcesWithFallback, pickBestSource } from '../services/api'
 import './WatchPage.css'
 
-// ── Helpers externos ──────────────────────────────────────
 const openMXPlayer = (url, title) => {
   window.location.href = `intent:${url}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(title)};end`
   setTimeout(() => window.open(url, '_blank'), 900)
@@ -22,33 +16,28 @@ const openWebVideoCast = (url) =>
   window.open(`https://www.webvideocast.com/play?url=${encodeURIComponent(url)}`, '_blank')
 
 const buildSlug = (anime) =>
-  (anime.title_english || anime.title)
-    .toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
+  (anime.title_english || anime.title).toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
 
-// ─────────────────────────────────────────────────────────
 export default function WatchPage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const epNum = parseInt(searchParams.get('ep') || '1')
-  const isDub = searchParams.get('dub') === '1'
 
   const [anime, setAnime] = useState(null)
   const [episodes, setEpisodes] = useState([])
   const [sources, setSources] = useState(null)
   const [currentSrc, setCurrentSrc] = useState('')
   const [provider, setProvider] = useState('')
-  const [idsCache, setIdsCache] = useState({})   // cache de IDs por provedor
+  const [idsCache, setIdsCache] = useState({})
   const [loadingVideo, setLoadingVideo] = useState(true)
   const [loadingStatus, setLoadingStatus] = useState('🔍 Carregando...')
   const [error, setError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-  const [hasDub, setHasDub] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [hasMoreEps, setHasMoreEps] = useState(false)
   const [epPage, setEpPage] = useState(1)
   const [copied, setCopied] = useState(false)
 
-  // Carrega info + episódios
   useEffect(() => {
     setAnime(null); setEpisodes([]); setIdsCache({})
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
@@ -61,58 +50,45 @@ export default function WatchPage() {
     window.scrollTo(0, 0)
   }, [id])
 
-  // Carrega vídeo
   useEffect(() => {
     if (!anime) return
     let cancelled = false
 
+    const statuses = [
+      '🔍 Buscando no Zoro...',
+      '📡 Conectando ao servidor...',
+      '🎬 Preparando episódio...',
+    ]
+    let si = 0
+    const ticker = setInterval(() => {
+      si = (si + 1) % statuses.length
+      if (!cancelled) setLoadingStatus(statuses[si])
+    }, 2500)
+
     const run = async () => {
       setLoadingVideo(true); setError(false); setSources(null); setCurrentSrc(''); setProvider('')
-
-      // Mensagens de progresso animadas
-      const statusSteps = [
-        '🔍 Buscando anime...',
-        '📡 Conectando ao servidor...',
-        '🎬 Carregando episódio...',
-      ]
-      let step = 0
-      const stepTimer = setInterval(() => {
-        step = (step + 1) % statusSteps.length
-        if (!cancelled) setLoadingStatus(statusSteps[step])
-      }, 2500)
+      setLoadingStatus('🔍 Buscando no Zoro...')
 
       try {
-        setLoadingStatus(isDub ? '🎙️ Buscando versão dublada...' : '🔍 Buscando anime...')
-
-        // ── CHAMADA PRINCIPAL: tenta Gogoanime → Zoro → AnimePahe ──
-        const result = await fetchSourcesWithFallback(anime, epNum, isDub, idsCache)
+        // ── Busca vídeo com fallback automático ──
+        // Cache de IDs para não refazer busca ao trocar episódio
+        const result = await fetchSourcesWithFallback(anime, epNum, idsCache)
 
         if (cancelled) return
-        clearInterval(stepTimer)
+        clearInterval(ticker)
 
-        // Salva IDs em cache para não ter que re-buscar ao mudar episódio
-        setIdsCache(result.ids || {})
+        setIdsCache(result.cache || {})
         setProvider(result.provider || '')
         setSources(result)
 
         const best = pickBestSource(result.sources || [])
         if (best) {
           setCurrentSrc(best.url)
-          setLoadingStatus(`▶️ ${result.provider} — ${best.quality || 'Auto'}`)
         } else {
-          throw new Error('Nenhuma fonte encontrada nos provedores.')
+          throw new Error('Nenhuma fonte de vídeo disponível')
         }
-
-        // Verifica dublagem em background
-        if (!isDub) {
-          fetchSourcesWithFallback(anime, 1, true, {})
-            .then(() => { if (!cancelled) setHasDub(true) })
-            .catch(() => {})
-        }
-
       } catch (e) {
-        clearInterval(stepTimer)
-        console.error('[WatchPage]', e.message)
+        clearInterval(ticker)
         if (!cancelled) {
           setError(true)
           setErrorMsg(e.message)
@@ -123,18 +99,10 @@ export default function WatchPage() {
     }
 
     run()
-    return () => { cancelled = true }
-  }, [anime, epNum, isDub])
+    return () => { cancelled = true; clearInterval(ticker) }
+  }, [anime, epNum])
 
-  const goEp = (n, dub = isDub) => {
-    // Mantém o cache de IDs para não re-buscar o slug
-    setSearchParams({ ep: n, ...(dub ? { dub: '1' } : {}) })
-  }
-
-  const toggleDub = () => {
-    setIdsCache({}) // limpa cache de dub/sub
-    setSearchParams({ ep: epNum, ...(!isDub ? { dub: '1' } : {}) })
-  }
+  const goEp = (n) => setSearchParams({ ep: n })
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href)
@@ -149,6 +117,8 @@ export default function WatchPage() {
     setEpPage(next)
   }
 
+  const retry = () => { setError(false); setLoadingVideo(true); setIdsCache({}) }
+
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
@@ -159,9 +129,9 @@ export default function WatchPage() {
   return (
     <div className="watch-page">
       <div className="watch-layout">
-
-        {/* ══ PLAYER ══ */}
         <div className="watch-main">
+
+          {/* Player */}
           <div className="player-wrap">
             {loadingVideo ? (
               <div className="player-loading">
@@ -175,16 +145,12 @@ export default function WatchPage() {
                 <h3>Episódio indisponível</h3>
                 <p className="error-msg">{errorMsg}</p>
                 <p className="error-hint">
-                  💡 Tentamos Gogoanime, Zoro e AnimePahe — todos falharam.<br/>
-                  O Render gratuito hiberna após 15min. Aguarde 30s e tente novamente.
+                  💡 Tentamos Zoro, AniList e AnimePahe sem sucesso.<br/>
+                  Verifique se o Consumet API no Render está online.
                 </p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => { setError(false); setLoadingVideo(true); setIdsCache({}) }}>
-                    🔄 Tentar novamente
-                  </button>
-                  <a href={externalUrl} target="_blank" rel="noreferrer" className="btn btn-ghost">
-                    🌐 GogoAnime
-                  </a>
+                  <button className="btn btn-primary" onClick={retry}>🔄 Tentar novamente</button>
+                  <a href={externalUrl} target="_blank" rel="noreferrer" className="btn btn-ghost">🌐 GogoAnime</a>
                 </div>
               </div>
             ) : currentSrc ? (
@@ -198,35 +164,22 @@ export default function WatchPage() {
             ) : null}
           </div>
 
-          {/* Provedor ativo */}
+          {/* Badge do provedor */}
           {provider && !loadingVideo && !error && (
-            <div className="provider-tag">✅ Via {provider}</div>
+            <div className="provider-tag">✅ Streaming via {provider}</div>
           )}
 
-          {/* Dub / Leg */}
-          <div className="audio-track-bar">
-            <span className="audio-label">🎧 Áudio:</span>
-            <div className="audio-toggle">
-              <button className={`track-btn ${!isDub ? 'active' : ''}`} onClick={() => isDub && toggleDub()}>
-                🇧🇷 Legendado
-              </button>
-              <button className={`track-btn ${isDub ? 'active' : ''}`} onClick={() => !isDub && toggleDub()}>
-                🎙️ Dublado{!hasDub && !isDub ? ' ⚠️' : ''}
-              </button>
+          {/* Qualidade */}
+          {sources?.sources?.length > 1 && (
+            <div className="audio-track-bar">
+              <span className="audio-label">📺 Qualidade:</span>
+              <select className="quality-select" value={currentSrc} onChange={e => setCurrentSrc(e.target.value)}>
+                {sources.sources.map(s => (
+                  <option key={s.url} value={s.url}>{s.quality || 'Auto'}</option>
+                ))}
+              </select>
             </div>
-
-            {/* Qualidade */}
-            {sources?.sources?.length > 1 && (
-              <div className="quality-wrap">
-                <span>📺</span>
-                <select className="quality-select" value={currentSrc} onChange={e => setCurrentSrc(e.target.value)}>
-                  {sources.sources.map(s => (
-                    <option key={s.url} value={s.url}>{s.quality || 'Auto'}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Ações */}
           <div className="ext-actions">
@@ -249,7 +202,7 @@ export default function WatchPage() {
             </div>
           </div>
 
-          {/* Nav episódios */}
+          {/* Navegação */}
           <div className="ep-navigator">
             <button className="ep-nav-btn" disabled={!prevEp} onClick={() => prevEp && goEp(prevEp)}>
               <FiChevronLeft /> {prevEp ? `EP ${prevEp}` : '—'}
@@ -269,10 +222,10 @@ export default function WatchPage() {
               <Link to={`/anime/${id}`} className="back-link">← {anime.title_english || anime.title}</Link>
               <h1 className="watch-anime-title">{anime.title_english || anime.title}</h1>
               <div className="watch-badges">
-                {isDub ? <span className="wbadge dub">🎙️ Dublado</span> : <span className="wbadge sub">🇧🇷 Legendado</span>}
                 {anime.score && <span className="wbadge">⭐ {anime.score.toFixed(1)}</span>}
                 {anime.status === 'Currently Airing' && <span className="wbadge live">🔴 Em Exibição</span>}
                 {anime.type && <span className="wbadge">{anime.type}</span>}
+                {anime.episodes && <span className="wbadge">📺 {anime.episodes} eps</span>}
               </div>
               {anime.synopsis && (
                 <p className="watch-synopsis">{anime.synopsis.slice(0, 300)}{anime.synopsis.length > 300 ? '...' : ''}</p>
@@ -281,7 +234,7 @@ export default function WatchPage() {
           )}
         </div>
 
-        {/* ══ SIDEBAR ══ */}
+        {/* Sidebar */}
         <aside className="ep-sidebar">
           <div className="sidebar-head">
             <span>📋 Episódios</span>
@@ -310,5 +263,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-            }
-        
+                  }
+  
