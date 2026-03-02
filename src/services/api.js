@@ -95,6 +95,19 @@ export async function getAnimeByGenre(genreId) {
   }
 }
 // ===============================
+// 📚 LISTAR GÊNEROS
+// ===============================
+export async function getGenres() {
+  try {
+    const res = await fetch(`${JIKAN_BASE}/genres/anime`);
+    const data = await res.json();
+    return data.data || [];
+  } catch (err) {
+    console.error("Erro getGenres:", err);
+    return [];
+  }
+}
+// ===============================
 // 🎬 EPISÓDIOS POR TÍTULO
 // ===============================
 export async function getEpisodes(title) {
