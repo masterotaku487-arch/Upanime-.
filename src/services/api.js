@@ -60,7 +60,7 @@ export async function searchAnime(query) {
 }
 
 // ===============================
-// 📖 DETALHES
+// 📖 DETALHES (principal)
 // ===============================
 export async function getAnimeDetails(id) {
   try {
@@ -74,7 +74,14 @@ export async function getAnimeDetails(id) {
 }
 
 // ===============================
-// 🎬 EPISÓDIOS (GOGOANIME)
+// 📖 COMPATIBILIDADE
+// ===============================
+export async function getAnimeById(id) {
+  return await getAnimeDetails(id);
+}
+
+// ===============================
+// 🎬 EPISÓDIOS POR TÍTULO
 // ===============================
 export async function getEpisodes(title) {
   try {
@@ -84,7 +91,7 @@ export async function getEpisodes(title) {
     const data = await res.json();
 
     if (!data.results || data.results.length === 0) {
-      throw new Error("Nenhum resultado");
+      return [];
     }
 
     const animeId = data.results[0].id;
@@ -99,6 +106,13 @@ export async function getEpisodes(title) {
     console.error("Erro getEpisodes:", err);
     return [];
   }
+}
+
+// ===============================
+// 🎬 COMPATIBILIDADE
+// ===============================
+export async function getAnimeEpisodes(title) {
+  return await getEpisodes(title);
 }
 
 // ===============================
@@ -120,4 +134,4 @@ export async function getStreamingLink(episodeId) {
     console.error("Erro getStreamingLink:", err);
     return null;
   }
-}
+      }
