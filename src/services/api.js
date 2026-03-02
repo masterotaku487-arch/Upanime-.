@@ -1,172 +1,200 @@
 import axios from 'axios'
 
-// ── Clientes HTTP ─────────────────────────────────────────
+// ── Jikan ────────────────────────────────────────────────────
 const jikan = axios.create({ baseURL: 'https://api.jikan.moe/v4', timeout: 12000 })
 
-// Gêneros bloqueados (hentai/erotica)
 const BLOCKED = [12, 49]
 export const isBlocked = (a) =>
   [...(a.genres || []), ...(a.explicit_genres || [])].some(g => BLOCKED.includes(g.mal_id))
 
-// ── Jikan (dados do anime) ────────────────────────────────
-export const getSeasonNow = (page = 1) =>
+export const getSeasonNow      = (page = 1) =>
   jikan.get(`/seasons/now?page=${page}`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
-export const getTopAnime = (filter = 'airing', page = 1) =>
+export const getTopAnime       = (filter = 'airing', page = 1) =>
   jikan.get(`/top/anime?filter=${filter}&page=${page}&limit=24&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
-export const searchAnime = (q, page = 1) =>
+export const searchAnime       = (q, page = 1) =>
   jikan.get(`/anime?q=${encodeURIComponent(q)}&page=${page}&limit=20&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
-export const getAnimeById = (id) =>
-  jikan.get(`/anime/${id}/full`).then(r => r.data)
+export const getAnimeById      = (id) => jikan.get(`/anime/${id}/full`).then(r => r.data)
+export const getAnimeEpisodes  = (id, page = 1) => jikan.get(`/anime/${id}/episodes?page=${page}`).then(r => r.data)
+export const getGenres         = () => jikan.get('/genres/anime?filter=genres').then(r => ({ ...r.data, data: (r.data.data||[]).filter(g=>!BLOCKED.includes(g.mal_id)) }))
+export const getAnimeByGenre   = (genreId, page = 1) => jikan.get(`/anime?genres=${genreId}&page=${page}&limit=20&order_by=score&sort=desc&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
+export const getSeasonUpcoming = () => jikan.get('/seasons/upcoming?limit=16').then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
-export const getAnimeEpisodes = (id, page = 1) =>
-  jikan.get(`/anime/${id}/episodes?page=${page}`).then(r => r.data)
-
-export const getGenres = () =>
-  jikan.get('/genres/anime?filter=genres').then(r => ({ ...r.data, data: (r.data.data||[]).filter(g=>!BLOCKED.includes(g.mal_id)) }))
-
-export const getAnimeByGenre = (genreId, page = 1) =>
-  jikan.get(`/anime?genres=${genreId}&page=${page}&limit=20&order_by=score&sort=desc&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
-
-export const getSeasonUpcoming = () =>
-  jikan.get('/seasons/upcoming?limit=16').then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
-
-// ══════════════════════════════════════════════════════════
-// STREAMING — AnimeFire via Vercel Proxy
-//
-// Fluxo:
-//   anime (Jikan) → buildSlugs() → busca no AnimeFire
-//   → slug correto → MP4 direto ✅
-//
-// Proxy: /api/animefire (sem Render, sem Consumet)
-// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// STREAMING — AnimeFire via Vercel proxy (/api/animefire)
+// Domínio atual: animefire.io (confirmado 2026)
+// ══════════════════════════════════════════════════════════════
 
 const AF_PROXY = '/api/animefire'
 
-// Busca no proxy local (Vercel function)
+// Chama o proxy Vercel
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
   const res = await fetch(`${AF_PROXY}?${qs}`)
-  if (!res.ok) throw new Error(`AnimeFire proxy ${res.status}: ${res.statusText}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Proxy ${res.status}`)
+  }
   return res.json()
 }
 
-// Gera variações de slug a partir do título do anime (Jikan)
-const buildSlugs = (anime, dub = false) => {
-  const base = (anime.title_portuguese || anime.title_english || anime.title || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
-    .replace(/[^a-z0-9\s-]/g, '')                       // só letras, números, espaços, hífens
+// Converte título em slug no padrão AnimeFire
+const slugify = (s) =>
+  s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // remove acentos
+    .replace(/['":`]/g, '')                               // remove aspas, dois pontos
+    .replace(/[^a-z0-9\s-]/g, ' ')                       // caracteres especiais → espaço
     .trim()
-    .replace(/\s+/g, '-')
+    .replace(/\s+/g, '-')                                 // espaços → hífens
+    .replace(/-+/g, '-')                                  // hífens duplos → um
 
-  const suffix = dub ? 'dublado-todos-os-episodios' : 'todos-os-episodios'
-
-  return [
-    `${base}-${suffix}`,
-    `${base}-${dub ? 'dublado' : 'legendado'}-todos-os-episodios`,
-    `${base}`,
-    // Título japonês romanizado como fallback
-    ...(anime.title ? [
-      anime.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '-') + `-${suffix}`
-    ] : []),
+// Gera todas as variações de slug possíveis para um anime
+// Usa título romaji (title) como prioridade — é o que AnimeFire usa nos slugs
+const buildSlugs = (anime, dub = false) => {
+  const titles = [
+    anime.title,                    // Romaji — maior prioridade
+    anime.title_english,
+    anime.title_portuguese,
+    ...(anime.titles || []).map(t => t.title),
   ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
+
+  const slugs = []
+  for (const t of titles) {
+    const base = slugify(t)
+    if (!base || base.length < 2) continue
+    // AnimeFire NÃO usa sufixo "-todos-os-episodios" nos slugs — só o nome
+    slugs.push(base)
+    if (dub) slugs.push(base + '-dublado')
+  }
+
+  return [...new Set(slugs)]
 }
 
-// Encontra o slug correto no AnimeFire (busca + match)
-const findSlug = async (anime, dub = false) => {
-  const titles = [
-    anime.title_portuguese,
-    anime.title_english,
-    anime.title,
-    ...(anime.titles || []).map(t => t.title),
-  ].filter(Boolean)
+// Extrai termos de busca curtos (AnimeFire funciona melhor com queries simples)
+const buildSearchQueries = (anime, dub = false) => {
+  const queries = []
 
-  // 1. Tentar slugs diretos (info)
+  // Romaji simples (ex: "sousou no frieren" — sem "2nd season")
+  const romaji = (anime.title || '').toLowerCase()
+  if (romaji) {
+    // Remove sufixos de temporada da busca para achar mais resultados
+    const simplified = romaji
+      .replace(/\d+(st|nd|rd|th)\s*season/gi, '')
+      .replace(/season\s*\d+/gi, '')
+      .replace(/part\s*\d+/gi, '')
+      .trim()
+    queries.push(simplified || romaji)
+    queries.push(romaji)
+  }
+
+  // Inglês simplificado
+  if (anime.title_english) {
+    const eng = anime.title_english.toLowerCase()
+      .replace(/season\s*\d+/gi, '').replace(/:\s*.+$/, '').trim()
+    if (eng) queries.push(eng)
+  }
+
+  const q = queries.map(q => dub ? q + ' dublado' : q)
+  return [...new Set(q)].filter(Boolean)
+}
+
+// Tenta slug direto via action=info
+const trySlugDirect = async (slug) => {
+  try {
+    const data = await afFetch({ action: 'info', slug })
+    if (data.episodes?.length > 0) {
+      console.log(`[AnimeFire] slug direto ✅ ${slug}`)
+      return slug
+    }
+  } catch (e) { /* sem resultado */ }
+  return null
+}
+
+// Busca slug via pesquisa
+const trySearch = async (query, dub = false) => {
+  try {
+    const data = await afFetch({ action: 'search', q: query })
+    const results = data.results || []
+    if (!results.length) return null
+
+    const match = dub
+      ? results.find(r => r.slug.includes('dublado')) || (results[0]?.slug.includes('legendado') ? null : results[0])
+      : results.find(r => !r.slug.includes('dublado')) || results[0]
+
+    if (match) {
+      console.log(`[AnimeFire] encontrado via busca "${query}" → ${match.slug}`)
+      return match.slug
+    }
+  } catch (e) {
+    console.warn(`[AnimeFire] busca "${query}" falhou:`, e.message)
+  }
+  return null
+}
+
+// Resolve o slug correto do AnimeFire para um anime do Jikan
+const resolveSlug = async (anime, dub = false) => {
+  // 1. Slugs diretos (mais rápido)
   const candidates = buildSlugs(anime, dub)
   for (const slug of candidates) {
-    try {
-      const data = await afFetch({ action: 'info', slug })
-      if (data.episodes?.length > 0) {
-        console.log(`[AnimeFire] slug direto: ${slug}`)
-        return slug
-      }
-    } catch (e) { /* continua */ }
+    const found = await trySlugDirect(slug)
+    if (found) return found
   }
 
-  // 2. Buscar por título
-  for (const title of titles.slice(0, 3)) {
-    try {
-      const searchQ = dub ? `${title} dublado` : title
-      const data = await afFetch({ action: 'search', q: searchQ })
-      const results = data.results || []
-      if (results.length > 0) {
-        // Pegar o primeiro resultado que contém "dublado" se dub=true
-        const match = dub
-          ? results.find(r => r.slug.includes('dublado')) || results[0]
-          : results.find(r => !r.slug.includes('dublado')) || results[0]
-        console.log(`[AnimeFire] encontrado via busca: ${match.slug}`)
-        return match.slug
-      }
-    } catch (e) {
-      console.warn(`[AnimeFire] busca falhou para "${title}":`, e.message)
-    }
+  // 2. Busca por texto
+  const queries = buildSearchQueries(anime, dub)
+  for (const q of queries) {
+    const found = await trySearch(q, dub)
+    if (found) return found
   }
 
-  throw new Error(`Anime não encontrado no AnimeFire: ${anime.title}`)
+  throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
-// ── Funções públicas de streaming ─────────────────────────
+// ── API pública ──────────────────────────────────────────────
 
 /**
- * Busca episódio no AnimeFire.
- * @param {object} anime  - Objeto Jikan com title, title_english, etc.
+ * Busca sources de vídeo no AnimeFire.
+ * @param {object} anime  - Objeto Jikan completo
  * @param {number} epNum  - Número do episódio (1-based)
- * @param {boolean} dub   - true para dublado PT-BR, false para legendado
+ * @param {boolean} dub   - true para dublado, false para legendado
  * @param {object} cache  - { afSlug? } para evitar rebusca
- * @returns {{ sources, provider, cache }}
  */
 export const fetchSourcesWithFallback = async (anime, epNum, dub = false, cache = {}) => {
   const ids = { ...cache }
 
-  try {
-    // Resolver slug se não temos cache
-    if (!ids.afSlug) {
-      ids.afSlug = await findSlug(anime, dub)
-    }
+  if (!ids.afSlug) {
+    ids.afSlug = await resolveSlug(anime, dub)
+  }
 
-    const data = await afFetch({ action: 'video', slug: ids.afSlug, ep: epNum })
+  const data = await afFetch({ action: 'video', slug: ids.afSlug, ep: epNum })
 
-    if (!data.sources?.length) throw new Error('Nenhuma source retornada')
+  if (!data.sources?.length)
+    throw new Error(`Ep ${epNum} sem sources no AnimeFire (slug: ${ids.afSlug})`)
 
-    return {
-      sources: data.sources,
-      headers: { Referer: data.domain || 'https://animefire.plus/' },
-      provider: data.provider || '🇧🇷 AnimeFire',
-      cache: ids,
-    }
-  } catch (e) {
-    console.error('[fetchSources]', e.message)
-    throw new Error(`AnimeFire: ${e.message}`)
+  return {
+    sources: data.sources,
+    headers: { Referer: data.domain + '/' },
+    provider: data.provider || '🇧🇷 AnimeFire',
+    cache: ids,
   }
 }
 
-// Escolhe a melhor qualidade disponível
+// Escolhe a melhor qualidade
 export const pickBestSource = (sources = []) => {
-  const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360', 'auto']
-  const sorted = [...sources].sort((a, b) => {
-    const ai = order.findIndex(o => (a.label || a.quality || '').toLowerCase().includes(o))
-    const bi = order.findIndex(o => (b.label || b.quality || '').toLowerCase().includes(o))
+  const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360']
+  return [...sources].sort((a, b) => {
+    const ai = order.findIndex(o => (a.label || '').toLowerCase().includes(o))
+    const bi = order.findIndex(o => (b.label || '').toLowerCase().includes(o))
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-  })
-  return sorted[0] || sources[0] || null
+  })[0] || sources[0] || null
 }
 
-// Retorna lista de episódios disponíveis para um anime
-export const getAnimeFireEpisodes = async (anime, dub = false) => {
-  const slug = await findSlug(anime, dub)
+// Retorna episódios disponíveis no AnimeFire
+export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null) => {
+  const slug = cachedSlug || await resolveSlug(anime, dub)
   const data = await afFetch({ action: 'info', slug })
-  return { slug, episodes: data.episodes || [], title: data.title }
-}
+  return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
+  }
+  
