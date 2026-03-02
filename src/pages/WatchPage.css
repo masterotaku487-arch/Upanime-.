@@ -195,5 +195,37 @@
 @media (max-width: 600px) {
   .ext-btn span { display: none; }
   .ext-btn { padding: 7px 9px; }
-  }
-  
+}
+
+/* Additions for new WatchPage */
+.loading-sub {
+  font-size: 0.72rem; color: #555;
+  text-align: center; padding: 0 20px; margin-top: 4px;
+}
+.provider-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 14px;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.provider-tag {
+  font-size: 0.78rem; font-weight: 700;
+  color: #5ddb80;
+  background: rgba(0,200,100,0.08);
+  border: 1px solid rgba(0,200,100,0.2);
+  padding: 3px 10px; border-radius: 20px;
+}
+.quality-wrap {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.8rem; color: var(--text-dim); margin-left: auto;
+}
+.quality-select {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px;
+  padding: 4px 8px; font-size: 0.78rem; font-family: inherit; cursor: pointer;
+}
+.error-msg { font-size: 0.8rem; color: var(--red); }
+code {
+  background: var(--surface); padding: 1px 6px;
+  border-radius: 4px; font-size: 0.78rem; color: #f5c518;
+              }
