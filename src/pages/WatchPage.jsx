@@ -5,89 +5,87 @@ import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
-// STREAMING via AnimeFire (proxy Vercel /api/animefire)
-// Sem Consumet, sem Render — 100% no próprio Vercel!
+// STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
 // ─────────────────────────────────────────────────────────
 
-const AF = '/api/animefire'   // rota serverless do Vercel
+const AF = '/api/animefire'
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
-  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(15000) })
-  if (!r.ok) throw new Error(`Proxy retornou ${r.status}`)
+  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
+  if (!r.ok) throw new Error(`Proxy ${r.status}`)
   return r.json()
 }
 
-// Gera variações de slug para o AnimeFire a partir do título
-const buildSlugs = (anime) => {
-  const base = [
-    anime.title,
-    anime.title_english,
-    ...(anime.titles || []).map(t => t.title),
-  ]
-  .filter(Boolean)
-  .map(t => t.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
-    .replace(/[^a-z0-9\s]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-  )
-  .filter((v, i, a) => a.indexOf(v) === i)
+// Converte título em slug no padrão AnimeFire
+const slugify = (s) =>
+  s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/['":`]/g, '')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .trim().replace(/\s+/g, '-').replace(/-+/g, '-')
 
-  // Adiciona variação "-todos-os-episodios" que o AnimeFire usa
-  const withSuffix = base.map(s => `${s}-todos-os-episodios`)
-  return [...withSuffix, ...base]
-}
+// Remove sufixos de temporada
+const stripSeason = (s) =>
+  s.replace(/\s*[-–:]\s*(season|parte?|part|cour)\s*\d*/gi, '')
+   .replace(/\s+\d+(st|nd|rd|th)\s*(season|cour)/gi, '')
+   .replace(/\s+(the\s+)?(final|last|new)\s+season/gi, '')
+   .replace(/\s+(season|parte?|part)\s*\d*/gi, '')
+   .replace(/\s+\d+$/g, '').trim()
 
-// Busca o slug correto no AnimeFire usando a search API
-const findAnimefireSlug = async (anime, isDub) => {
+const stripSubtitle = (s) => s.replace(/\s*[:–]\s*.+$/, '').trim()
+
+// Gera candidatos de slug — SEM usar busca, testa diretamente
+const buildSlugCandidates = (anime, dub = false) => {
   const titles = [
     anime.title,
     anime.title_english,
+    anime.title_portuguese,
     ...(anime.titles || []).map(t => t.title),
   ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
 
-  for (const title of titles) {
-    try {
-      const query = isDub ? `${title} dublado` : title
-      const { results = [] } = await afFetch({ action: 'search', q: query })
-      if (!results.length) continue
-
-      // Prefere slug com "dublado" se pedido dub
-      const match = isDub
-        ? results.find(r => r.slug.includes('dublado')) || results[0]
-        : results.find(r => !r.slug.includes('dublado')) || results[0]
-
-      console.log(`[AnimeFire] slug: ${match.slug} via "${query}"`)
-      return match.slug
-    } catch(e) {
-      console.warn('[AnimeFire search]', e.message)
+  const variants = new Set()
+  for (const t of titles) {
+    const noSeason   = stripSeason(t)
+    const noSubtitle = stripSubtitle(noSeason)
+    for (const v of [noSeason, noSubtitle, t]) {
+      const s = slugify(v)
+      if (s && s.length > 1) variants.add(s)
     }
   }
+
+  const list = [...variants]
+  if (!dub) return list
+  return [...list.map(s => s + '-dublado'), ...list]
+}
+
+// Testa se slug existe no AnimeFire
+const probeSlug = async (slug) => {
+  try {
+    const data = await afFetch({ action: 'info', slug })
+    if (data.episodes?.length > 0 || data.title) return slug
+  } catch { /* não existe */ }
   return null
 }
 
-// Busca URL de vídeo de um episódio
-const getVideoSources = async (slug, epNum) => {
-  const data = await afFetch({ action: 'video', slug, ep: epNum })
-  // AnimeFire retorna: { data: [{src, label}] } ou { "360p": "url", "720p": "url" }
-  const sources = data.data || []
-  if (!sources.length && typeof data === 'object') {
-    // Formato alternativo: chaves são as qualidades
-    return Object.entries(data)
-      .filter(([k]) => k.match(/\d+p|hd|sd/i))
-      .map(([label, url]) => ({ label, url: typeof url === 'string' ? url : url.src || url.url }))
+// Resolve slug correto testando candidatos
+const resolveSlug = async (anime, dub = false) => {
+  const candidates = buildSlugCandidates(anime, dub)
+  console.log('[AnimeFire] testando slugs:', candidates.join(', '))
+  for (const slug of candidates) {
+    const found = await probeSlug(slug)
+    if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
-  return sources.map(s => ({ label: s.label || s.resolution || 'Auto', url: s.src || s.url }))
+  throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
 const bestQuality = (sources = []) => {
-  const order = ['1080p', '720p', '480p', '360p', 'hd', 'sd']
-  for (const q of order) {
-    const f = sources.find(s => (s.label || '').toLowerCase().includes(q.replace('p', '')))
-    if (f) return f
-  }
-  return sources[0]
+  const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360']
+  return [...sources].sort((a, b) => {
+    const ai = order.findIndex(o => (a.label || '').toLowerCase().includes(o))
+    const bi = order.findIndex(o => (b.label || '').toLowerCase().includes(o))
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })[0] || sources[0]
 }
 
 const openMXPlayer = (url, title) => {
@@ -113,7 +111,7 @@ export default function WatchPage() {
 
   const [sources, setSources] = useState([])
   const [currentSrc, setCurrentSrc] = useState('')
-  const [afSlug, setAfSlug] = useState(null)    // cache do slug AnimeFire
+  const [afSlug, setAfSlug] = useState(null)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
@@ -121,7 +119,6 @@ export default function WatchPage() {
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Carrega dados do anime
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
@@ -134,31 +131,28 @@ export default function WatchPage() {
     window.scrollTo(0, 0)
   }, [id])
 
-  // Carrega vídeo
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
     setLoading(true); setError(false); setSources([]); setCurrentSrc('')
 
     try {
-      // Passo 1: descobre slug no AnimeFire
       let slug = cachedSlug
       if (!slug) {
-        setStatus('🔍 Buscando no AnimeFire...')
-        slug = await findAnimefireSlug(animeObj, dub)
-        if (!slug) throw new Error('Anime não encontrado no AnimeFire. Tente o botão externo.')
+        setStatus('🔍 Localizando no AnimeFire...')
+        slug = await resolveSlug(animeObj, dub)
         setAfSlug(slug)
       }
 
-      // Passo 2: busca URLs de vídeo
       setStatus(`📡 Carregando EP${ep}...`)
-      const srcs = await getVideoSources(slug, ep)
-      if (!srcs.length) throw new Error(`EP${ep} não disponível no AnimeFire para "${slug}"`)
+      const data = await afFetch({ action: 'video', slug, ep })
+      const srcs = (data.sources || [])
+      if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
       setSources(srcs)
       const best = bestQuality(srcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
-    } catch(e) {
+    } catch (e) {
       console.error('[WatchPage]', e)
       setError(true)
       setErrorMsg(e.message)
@@ -185,11 +179,11 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const afExternal = afSlug
     ? `https://animefire.plus/animes/${afSlug}`
-    : `https://animefire.plus/pesquisar/${encodeURIComponent(anime?.title || '')}/1`
+    : `https://animefire.plus`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
-  const filename = `${title} - EP${String(epNum).padStart(2,'0')}.mp4`
+  const filename = `${title} - EP${String(epNum).padStart(2, '0')}.mp4`
 
   return (
     <div className="watch-page">
@@ -203,7 +197,7 @@ export default function WatchPage() {
                 <div className="loading-ring" />
                 <img src="/logo.png" className="loading-logo" alt="" />
                 <p className="loading-text">{status}</p>
-                <p className="loading-sub">Fonte: 🇧🇷 AnimeFire — sem Consumet, sem Render</p>
+                <p className="loading-sub">Fonte: 🇧🇷 AnimeFire via Cloudflare</p>
               </div>
             ) : error ? (
               <div className="player-error">
@@ -253,7 +247,7 @@ export default function WatchPage() {
               </div>
             )}
             {afSlug && !loading && !error && (
-              <span className="provider-tag" style={{marginLeft:'auto'}}>✅ AnimeFire</span>
+              <span className="provider-tag" style={{ marginLeft: 'auto' }}>✅ AnimeFire</span>
             )}
           </div>
 
@@ -348,5 +342,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-}
-  
+    }
+    
