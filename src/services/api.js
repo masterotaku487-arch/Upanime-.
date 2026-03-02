@@ -1,3 +1,4 @@
+// src/services/api.js
 import axios from 'axios'
 
 // ── Jikan ─────────────────────────────────────────────────────
@@ -22,17 +23,18 @@ export const getSeasonUpcoming = () => jikan.get('/seasons/upcoming?limit=16').t
 // ══════════════════════════════════════════════════════════════
 // STREAMING — AnimeFire via Vercel proxy (/api/animefire)
 //
-// Documentação AnimeFire:
-//   Página anime:    /animes/<slug>
-//   Página ep:       /animes/<slug>/<numero-ep>
-//   JSON vídeo:      /video/<slug>/<numero-ep>
+// Documentação AnimeFire (observações):
+//   - search: /api/animefire?action=search&q=...
+//   - info:   /api/animefire?action=info&slug=...
+//   - video:  /api/animefire?action=video&slug=...&ep=1
 //
-// Slug = slugify(anime.title romaji), sem sufixo de temporada
-//   "Sousou no Frieren 2nd Season" → "sousou-no-frieren"
+// Slug = slugify(anime.title romaji), sem sufixo de temporada.
+// Ex.: "Sousou no Frieren 2nd Season" → "sousou-no-frieren"
 // ══════════════════════════════════════════════════════════════
 
-const AF_PROXY = '/api/animefire'
+const AF_PROXY = '/api/animefire' // endpoint serverless que você deve ter (arquivo acima)
 
+// faz chamada para o proxy e trata erros
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
   const res = await fetch(`${AF_PROXY}?${qs}`)
@@ -43,7 +45,7 @@ const afFetch = async (params) => {
   return res.json()
 }
 
-// Converte string em slug
+// slug helpers (mantive seu conjunto de regras robustas)
 const slugify = (s) =>
   s.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -51,7 +53,6 @@ const slugify = (s) =>
     .replace(/[^a-z0-9\s-]/g, ' ')
     .trim().replace(/\s+/g, '-').replace(/-+/g, '-')
 
-// Remove sufixos de temporada ("2nd Season", "Season 7", "The Final Season", etc.)
 const stripSeason = (s) =>
   s.replace(/\s*[-–:]\s*(season|parte?|part|cour)\s*\d*/gi, '')
    .replace(/\s+\d+(st|nd|rd|th)\s*(season|cour)/gi, '')
@@ -60,14 +61,11 @@ const stripSeason = (s) =>
    .replace(/\s+\d+$/g, '')
    .trim()
 
-// Remove subtítulo após ':' ou '–' (ex: ": The Final Season" → "")
 const stripSubtitle = (s) => s.replace(/\s*[:–]\s*.+$/, '').trim()
 
-// Gera candidatos de slug em ordem de probabilidade
-// AnimeFire usa slug curto sem temporada: "sousou-no-frieren"
 const buildSlugCandidates = (anime, dub = false) => {
   const titles = [
-    anime.title,              // Romaji — é o que AnimeFire usa nos slugs
+    anime.title,
     anime.title_english,
     anime.title_portuguese,
     ...(anime.titles || []).map(t => t.title),
@@ -88,35 +86,28 @@ const buildSlugCandidates = (anime, dub = false) => {
   return [...list.map(s => s + '-dublado'), ...list]
 }
 
-// Testa se um slug existe no AnimeFire
 const probeSlug = async (slug) => {
   try {
     const data = await afFetch({ action: 'info', slug })
-    // Considera válido se retornou episódios OU se o título veio (page existe)
     if (data.episodes?.length > 0 || data.title) {
       console.log(`[AnimeFire] ✅ ${slug}`)
       return slug
     }
-  } catch { /* slug inválido, tenta próximo */ }
+  } catch { /* slug inválido */ }
   return null
 }
 
-// Resolve slug testando candidatos em sequência
 const resolveSlug = async (anime, dub = false) => {
   const candidates = buildSlugCandidates(anime, dub)
-  console.log(`[AnimeFire] testando slugs:`, candidates.join(', '))
-
+  console.log(`[AnimeFire] testando slugs:`, candidates.slice(0,6).join(', '))
   for (const slug of candidates) {
     const found = await probeSlug(slug)
     if (found) return found
   }
-
-  throw new Error(
-    `"${anime.title}" não encontrado no AnimeFire. Slugs tentados: ${candidates.slice(0,3).join(', ')}`
-  )
+  throw new Error(`"${anime.title}" não encontrado no AnimeFire. Slugs tentados: ${candidates.slice(0,6).join(', ')}`)
 }
 
-// ── API pública ──────────────────────────────────────────────
+// API pública usada pelo frontend
 
 /**
  * Busca sources de vídeo no AnimeFire.
@@ -145,7 +136,6 @@ export const fetchSourcesWithFallback = async (anime, epNum, dub = false, cache 
   }
 }
 
-// Escolhe a melhor qualidade disponível
 export const pickBestSource = (sources = []) => {
   const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360']
   return [...sources].sort((a, b) => {
@@ -155,10 +145,8 @@ export const pickBestSource = (sources = []) => {
   })[0] || sources[0] || null
 }
 
-// Retorna episódios + slug resolvido (para cache no componente)
 export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null) => {
   const slug = cachedSlug || await resolveSlug(anime, dub)
   const data = await afFetch({ action: 'info', slug })
   return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
   }
-      
