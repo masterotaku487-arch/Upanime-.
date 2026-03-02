@@ -79,7 +79,21 @@ export async function getAnimeDetails(id) {
 export async function getAnimeById(id) {
   return await getAnimeDetails(id);
 }
-
+// ===============================
+// 🎭 ANIMES POR GÊNERO
+// ===============================
+export async function getAnimeByGenre(genreId) {
+  try {
+    const res = await fetch(
+      `${JIKAN_BASE}/anime?genres=${genreId}&order_by=score&sort=desc`
+    );
+    const data = await res.json();
+    return data.data || [];
+  } catch (err) {
+    console.error("Erro getAnimeByGenre:", err);
+    return [];
+  }
+}
 // ===============================
 // 🎬 EPISÓDIOS POR TÍTULO
 // ===============================
