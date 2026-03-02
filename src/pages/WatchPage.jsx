@@ -36,6 +36,7 @@ const stripSeason = (s) =>
 const stripSubtitle = (s) => s.replace(/\s*[:–]\s*.+$/, '').trim()
 
 // Gera candidatos de slug — SEM usar busca, testa diretamente
+// Padrão AnimeFire: {slug}-todos-os-episodios (leg) | {slug}-dublado-todos-os-episodios (dub)
 const buildSlugCandidates = (anime, dub = false) => {
   const titles = [
     anime.title,
@@ -44,19 +45,27 @@ const buildSlugCandidates = (anime, dub = false) => {
     ...(anime.titles || []).map(t => t.title),
   ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
 
-  const variants = new Set()
+  const bases = new Set()
   for (const t of titles) {
     const noSeason   = stripSeason(t)
     const noSubtitle = stripSubtitle(noSeason)
     for (const v of [noSeason, noSubtitle, t]) {
       const s = slugify(v)
-      if (s && s.length > 1) variants.add(s)
+      if (s && s.length > 1) bases.add(s)
     }
   }
 
-  const list = [...variants]
-  if (!dub) return list
-  return [...list.map(s => s + '-dublado'), ...list]
+  const result = []
+  for (const base of bases) {
+    if (dub) {
+      result.push(base + '-dublado-todos-os-episodios')
+      result.push(base + '-dublado')
+    } else {
+      result.push(base + '-todos-os-episodios')
+    }
+    result.push(base) // fallback sem sufixo
+  }
+  return [...new Set(result)]
 }
 
 // Testa se slug existe no AnimeFire
@@ -342,5 +351,4 @@ export default function WatchPage() {
       </div>
     </div>
   )
-    }
-    
+}
