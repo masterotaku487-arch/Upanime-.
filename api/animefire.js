@@ -1,14 +1,6 @@
+// /api/animefire.js
 // Vercel Serverless Function — Proxy AnimeFire (multi-domínio com fallback)
-// Arquivo: /api/animefire.js  (raiz do projeto, NÃO dentro de src/)
-//
-// Ações suportadas:
-//   action=search  &q=naruto           → busca animes
-//   action=video   &slug=...&ep=1      → retorna MP4 sources
-//   action=info    &slug=...           → lista episódios disponíveis
-//
-// Domínios: tenta animefire.plus → animesfire.online → animefire.net em cascata
 
-// ─── Domínios em ordem de prioridade ───────────────────────────────────────
 const AF_DOMAINS = [
   'https://animefire.plus',
   'https://animesfire.online',
@@ -21,7 +13,6 @@ const BASE_HEADERS = {
   'Accept': 'text/html,application/xhtml+xml,application/json,*/*;q=0.8',
 }
 
-// ─── Fetch com fallback automático de domínio ──────────────────────────────
 async function afFetch(path, extraHeaders = {}, expectJson = false) {
   const headers = { ...BASE_HEADERS, ...extraHeaders }
   let lastError = null
@@ -53,11 +44,12 @@ async function afFetch(path, extraHeaders = {}, expectJson = false) {
   )
 }
 
-// ─── Handler principal ─────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   const { action, q, slug, ep } = req.query
@@ -67,7 +59,8 @@ export default async function handler(req, res) {
     if (action === 'search') {
       if (!q) return res.status(400).json({ error: 'Parâmetro q obrigatório' })
 
-      const path = `/pesquisar/${encodeURIComponent(q.toLowerCase().trim())}/1`
+      // <-- sem /1 no final (ajuste importante)
+      const path = `/pesquisar/${encodeURIComponent(q.toLowerCase().trim())}`
       const { body: html, domain } = await afFetch(path)
 
       const slugs = [...html.matchAll(/href="\/animes\/([a-z0-9\-]+)"/g)]
@@ -96,32 +89,72 @@ export default async function handler(req, res) {
       const epNum = parseInt(ep, 10)
       if (isNaN(epNum) || epNum < 1) return res.status(400).json({ error: 'ep deve ser número >= 1' })
 
-      const path = `/video/${slug}/${epNum}`
-      const { body: data, domain } = await afFetch(path, { Accept: 'application/json' }, true)
+      // Tenta primeiro endpoint /video (JSON)
+      try {
+        const path = `/video/${slug}/${epNum}`
+        const { body: data, domain } = await afFetch(path, { Accept: 'application/json' }, true)
 
-      // AnimeFire retorna: { data: [{ label, src }] }
-      const raw = data.data || data.sources || data.links || []
-      const sources = raw
-        .map((s) => ({
-          label: s.label || s.resolution || s.quality || 'Auto',
-          url:   s.src   || s.url       || s.file    || s.link || '',
-          source: 'animefire',
-          domain,
-        }))
-        .filter((s) => s.url)
+        const raw = data.data || data.sources || data.links || []
+        let sources = raw
+          .map((s) => ({
+            label: s.label || s.resolution || s.quality || 'Auto',
+            url:   s.src   || s.url       || s.file    || s.link || '',
+            source: 'animefire',
+            domain,
+          }))
+          .filter((s) => s.url)
 
-      // Ordenar: Full HD > HD > SD
-      const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360', 'auto']
-      sources.sort((a, b) => {
-        const ai = order.findIndex((o) => a.label.toLowerCase().includes(o))
-        const bi = order.findIndex((o) => b.label.toLowerCase().includes(o))
-        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-      })
+        // Ordenar por qualidade (FullHD > HD > SD)
+        const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360', 'auto']
+        sources.sort((a, b) => {
+          const ai = order.findIndex((o) => a.label.toLowerCase().includes(o))
+          const bi = order.findIndex((o) => b.label.toLowerCase().includes(o))
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+        })
 
-      if (!sources.length)
-        return res.status(404).json({ error: 'Nenhuma source encontrada', raw: data })
+        if (!sources.length) {
+          // cair pro fallback (vai tentar extrair do HTML abaixo)
+          throw new Error('Sem sources no JSON, tentando fallback HTML')
+        }
 
-      return res.json({ sources, provider: '🇧🇷 AnimeFire', domain, episode: epNum })
+        return res.json({ sources, provider: '🇧🇷 AnimeFire', domain, episode: epNum })
+      } catch (e) {
+        // fallback: busca a página do anime e tenta extrair referências a /video/ e construir sources simples
+        try {
+          const path = `/animes/${slug}`
+          const { body: html, domain } = await afFetch(path)
+
+          // extrai ocorrências de /video/<slug>/<num> e tenta chamar /video para cada uma
+          const matches = [...html.matchAll(/\/video\/([a-z0-9\-]+)\/(\d+)/g)]
+            .map(m => ({ s: m[1], n: parseInt(m[2], 10) }))
+            .filter(Boolean)
+
+          // se não achar, responde 404
+          if (!matches.length) {
+            return res.status(404).json({ error: 'Nenhuma referência de video encontrada na página HTML', hint: e.message })
+          }
+
+          // entra no primeiro que bater com epNum
+          const candidate = matches.find(m => m.n === epNum) || matches[0]
+          // tenta buscar JSON desse candidate
+          const { body: altData, domain: altDomain } = await afFetch(`/video/${candidate.s}/${candidate.n}`, { Accept: 'application/json' }, true)
+          const raw2 = altData.data || altData.sources || altData.links || []
+          const sources = raw2
+            .map((s) => ({
+              label: s.label || s.resolution || s.quality || 'Auto',
+              url:   s.src   || s.url       || s.file    || s.link || '',
+              source: 'animefire',
+              domain: altDomain,
+            }))
+            .filter((s) => s.url)
+
+          if (!sources.length) return res.status(404).json({ error: 'Fallback sem sources', raw: altData })
+
+          return res.json({ sources, provider: '🇧🇷 AnimeFire (fallback)', domain: altDomain, episode: candidate.n })
+        } catch (e2) {
+          return res.status(502).json({ error: 'video fallback falhou', cause: e2.message })
+        }
+      }
     }
 
     // ── INFO ─────────────────────────────────────────────────────────────────
@@ -170,4 +203,4 @@ export default async function handler(req, res) {
       domains_tried: AF_DOMAINS,
     })
   }
-}
+          }
