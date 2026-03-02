@@ -4,7 +4,49 @@ const JIKAN_BASE = "https://api.jikan.moe/v4";
 const CONSUMET_BASE = "https://api.consumet.org";
 
 // ===============================
-// 🔥 Buscar animes (dados gerais)
+// 🔥 TEMPORADA ATUAL
+// ===============================
+export async function getSeasonNow() {
+  try {
+    const res = await fetch(`${JIKAN_BASE}/seasons/now`);
+    const data = await res.json();
+    return data.data || [];
+  } catch (err) {
+    console.error("Erro getSeasonNow:", err);
+    return [];
+  }
+}
+
+// ===============================
+// ⭐ TOP ANIMES
+// ===============================
+export async function getTopAnime() {
+  try {
+    const res = await fetch(`${JIKAN_BASE}/top/anime`);
+    const data = await res.json();
+    return data.data || [];
+  } catch (err) {
+    console.error("Erro getTopAnime:", err);
+    return [];
+  }
+}
+
+// ===============================
+// 🚀 PRÓXIMA TEMPORADA
+// ===============================
+export async function getSeasonUpcoming() {
+  try {
+    const res = await fetch(`${JIKAN_BASE}/seasons/upcoming`);
+    const data = await res.json();
+    return data.data || [];
+  } catch (err) {
+    console.error("Erro getSeasonUpcoming:", err);
+    return [];
+  }
+}
+
+// ===============================
+// 🔍 BUSCAR ANIME
 // ===============================
 export async function searchAnime(query) {
   try {
@@ -12,13 +54,13 @@ export async function searchAnime(query) {
     const data = await res.json();
     return data.data || [];
   } catch (err) {
-    console.error("Erro ao buscar anime:", err);
+    console.error("Erro searchAnime:", err);
     return [];
   }
 }
 
 // ===============================
-// 📺 Detalhes do anime
+// 📖 DETALHES
 // ===============================
 export async function getAnimeDetails(id) {
   try {
@@ -26,13 +68,13 @@ export async function getAnimeDetails(id) {
     const data = await res.json();
     return data.data;
   } catch (err) {
-    console.error("Erro ao buscar detalhes:", err);
+    console.error("Erro getAnimeDetails:", err);
     return null;
   }
 }
 
 // ===============================
-// 🎬 Buscar episódios (Gogoanime)
+// 🎬 EPISÓDIOS (GOGOANIME)
 // ===============================
 export async function getEpisodes(title) {
   try {
@@ -42,7 +84,7 @@ export async function getEpisodes(title) {
     const data = await res.json();
 
     if (!data.results || data.results.length === 0) {
-      throw new Error("Nenhum resultado no Gogoanime");
+      throw new Error("Nenhum resultado");
     }
 
     const animeId = data.results[0].id;
@@ -54,35 +96,13 @@ export async function getEpisodes(title) {
 
     return epData.episodes || [];
   } catch (err) {
-    console.warn("Gogoanime falhou, tentando Animepahe...");
-
-    try {
-      const res = await fetch(
-        `${CONSUMET_BASE}/anime/animepahe/${encodeURIComponent(title)}`
-      );
-      const data = await res.json();
-
-      if (!data.results || data.results.length === 0) {
-        throw new Error("Nenhum resultado no Animepahe");
-      }
-
-      const animeId = data.results[0].id;
-
-      const epRes = await fetch(
-        `${CONSUMET_BASE}/anime/animepahe/info/${animeId}`
-      );
-      const epData = await epRes.json();
-
-      return epData.episodes || [];
-    } catch (err2) {
-      console.error("Todos os provedores falharam:", err2);
-      return [];
-    }
+    console.error("Erro getEpisodes:", err);
+    return [];
   }
 }
 
 // ===============================
-// ▶️ Buscar link do player
+// ▶️ STREAM
 // ===============================
 export async function getStreamingLink(episodeId) {
   try {
@@ -95,9 +115,9 @@ export async function getStreamingLink(episodeId) {
       return data.sources[0].url;
     }
 
-    throw new Error("Sem fontes disponíveis");
+    return null;
   } catch (err) {
-    console.error("Erro ao buscar streaming:", err);
+    console.error("Erro getStreamingLink:", err);
     return null;
   }
 }
