@@ -170,5 +170,4 @@ export default async function handler(req, res) {
       domains_tried: AF_DOMAINS,
     })
   }
-        }
-    
+                }
