@@ -4,146 +4,87 @@ import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import './WatchPage.css'
 
-const CONSUMET = import.meta.env.VITE_CONSUMET_URL || 'https://api.consumet.org'
-
 // ─────────────────────────────────────────────────────────
-// SISTEMA DE STREAMING — AnimeFire (PT-BR) + Fallbacks
+// STREAMING via AnimeFire (proxy Vercel /api/animefire)
+// Sem Consumet, sem Render — 100% no próprio Vercel!
 // ─────────────────────────────────────────────────────────
 
-const log = (...a) => console.log('[Watch]', ...a)
-const warn = (...a) => console.warn('[Watch]', ...a)
+const AF = '/api/animefire'   // rota serverless do Vercel
 
-// Gera variações de título para busca
-const getTitles = (anime) => [
-  anime.title,                          // japonês/romaji
-  anime.title_english,                  // inglês
-  ...(anime.titles || []).map(t => t.title),
-].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
-
-// GET com timeout e retorno null em falha
-const safeFetch = async (url, timeout = 15000) => {
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(timeout) })
-    if (!r.ok) { warn(`HTTP ${r.status}`, url); return null }
-    return await r.json()
-  } catch(e) { warn('fetch error:', e.message, url); return null }
+const afFetch = async (params) => {
+  const qs = new URLSearchParams(params).toString()
+  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(15000) })
+  if (!r.ok) throw new Error(`Proxy retornou ${r.status}`)
+  return r.json()
 }
 
-// ── PROVEDOR 1: AnimeFire (Consumet) — PT-BR ──────────────
-const tryAnimeFire = async (anime, epNum, setStatus) => {
-  const titles = getTitles(anime)
-  setStatus('🇧🇷 Buscando no AnimeFire...')
+// Gera variações de slug para o AnimeFire a partir do título
+const buildSlugs = (anime) => {
+  const base = [
+    anime.title,
+    anime.title_english,
+    ...(anime.titles || []).map(t => t.title),
+  ]
+  .filter(Boolean)
+  .map(t => t.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+  )
+  .filter((v, i, a) => a.indexOf(v) === i)
+
+  // Adiciona variação "-todos-os-episodios" que o AnimeFire usa
+  const withSuffix = base.map(s => `${s}-todos-os-episodios`)
+  return [...withSuffix, ...base]
+}
+
+// Busca o slug correto no AnimeFire usando a search API
+const findAnimefireSlug = async (anime, isDub) => {
+  const titles = [
+    anime.title,
+    anime.title_english,
+    ...(anime.titles || []).map(t => t.title),
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
 
   for (const title of titles) {
-    const search = await safeFetch(`${CONSUMET}/anime/animefire/${encodeURIComponent(title)}`)
-    const match = search?.results?.[0]
-    if (!match) continue
+    try {
+      const query = isDub ? `${title} dublado` : title
+      const { results = [] } = await afFetch({ action: 'search', q: query })
+      if (!results.length) continue
 
-    log('AnimeFire match:', match.id, 'via', title)
-    setStatus(`📡 AnimeFire: carregando EP${epNum}...`)
+      // Prefere slug com "dublado" se pedido dub
+      const match = isDub
+        ? results.find(r => r.slug.includes('dublado')) || results[0]
+        : results.find(r => !r.slug.includes('dublado')) || results[0]
 
-    const info = await safeFetch(`${CONSUMET}/anime/animefire/info?id=${encodeURIComponent(match.id)}`)
-    const eps = info?.episodes || []
-    const ep = eps.find(e => e.number === epNum) || eps[epNum - 1]
-    if (!ep) continue
-
-    const src = await safeFetch(`${CONSUMET}/anime/animefire/watch?episodeId=${encodeURIComponent(ep.id)}`)
-    if (src?.sources?.length) {
-      log('AnimeFire OK!', src.sources.length, 'fontes')
-      return { ...src, provider: '🇧🇷 AnimeFire' }
+      console.log(`[AnimeFire] slug: ${match.slug} via "${query}"`)
+      return match.slug
+    } catch(e) {
+      console.warn('[AnimeFire search]', e.message)
     }
   }
   return null
 }
 
-// ── PROVEDOR 2: meta/anilist → gogoanime ──────────────────
-const tryAnilistGogo = async (anime, epNum, setStatus) => {
-  const titles = getTitles(anime)
-  setStatus('🔍 Buscando via AniList+Gogoanime...')
-
-  for (const title of titles) {
-    const search = await safeFetch(`${CONSUMET}/meta/anilist/${encodeURIComponent(title)}`)
-    const aid = search?.results?.[0]?.id
-    if (!aid) continue
-
-    const info = await safeFetch(`${CONSUMET}/meta/anilist/info/${aid}?provider=gogoanime`)
-    const ep = (info?.episodes || []).find(e => e.number === epNum) || (info?.episodes || [])[epNum - 1]
-    if (!ep) continue
-
-    setStatus('📡 AniList+GogoAnime: carregando...')
-    const src = await safeFetch(`${CONSUMET}/meta/anilist/watch/${encodeURIComponent(ep.id)}?provider=gogoanime`)
-    if (src?.sources?.length) {
-      log('AniList+Gogo OK!')
-      return { ...src, provider: '🌐 GogoAnime' }
-    }
+// Busca URL de vídeo de um episódio
+const getVideoSources = async (slug, epNum) => {
+  const data = await afFetch({ action: 'video', slug, ep: epNum })
+  // AnimeFire retorna: { data: [{src, label}] } ou { "360p": "url", "720p": "url" }
+  const sources = data.data || []
+  if (!sources.length && typeof data === 'object') {
+    // Formato alternativo: chaves são as qualidades
+    return Object.entries(data)
+      .filter(([k]) => k.match(/\d+p|hd|sd/i))
+      .map(([label, url]) => ({ label, url: typeof url === 'string' ? url : url.src || url.url }))
   }
-  return null
+  return sources.map(s => ({ label: s.label || s.resolution || 'Auto', url: s.src || s.url }))
 }
 
-// ── PROVEDOR 3: meta/anilist → zoro ──────────────────────
-const tryAnilistZoro = async (anime, epNum, setStatus) => {
-  const titles = getTitles(anime)
-  setStatus('🔍 Buscando via AniList+Zoro...')
-
-  for (const title of titles) {
-    const search = await safeFetch(`${CONSUMET}/meta/anilist/${encodeURIComponent(title)}`)
-    const aid = search?.results?.[0]?.id
-    if (!aid) continue
-
-    const info = await safeFetch(`${CONSUMET}/meta/anilist/info/${aid}?provider=zoro`)
-    const ep = (info?.episodes || []).find(e => e.number === epNum) || (info?.episodes || [])[epNum - 1]
-    if (!ep) continue
-
-    setStatus('📡 AniList+Zoro: carregando...')
-    const src = await safeFetch(`${CONSUMET}/meta/anilist/watch/${encodeURIComponent(ep.id)}?provider=zoro`)
-    if (src?.sources?.length) {
-      log('AniList+Zoro OK!')
-      return { ...src, provider: '⚔️ Zoro' }
-    }
-  }
-  return null
-}
-
-// ── PROVEDOR 4: AnimePahe ─────────────────────────────────
-const tryAnimePahe = async (anime, epNum, setStatus) => {
-  const titles = getTitles(anime)
-  setStatus('🔍 Buscando no AnimePahe...')
-
-  for (const title of titles) {
-    const search = await safeFetch(`${CONSUMET}/anime/animepahe/${encodeURIComponent(title)}`)
-    const match = search?.results?.[0]
-    if (!match) continue
-
-    const info = await safeFetch(`${CONSUMET}/anime/animepahe/info/${encodeURIComponent(match.id)}`)
-    const ep = (info?.episodes || []).find(e => e.number === epNum) || (info?.episodes || [])[epNum - 1]
-    if (!ep) continue
-
-    setStatus('📡 AnimePahe: carregando...')
-    const src = await safeFetch(`${CONSUMET}/anime/animepahe/watch?episodeId=${encodeURIComponent(ep.id)}`)
-    if (src?.sources?.length) {
-      log('AnimePahe OK!')
-      return { ...src, provider: '🎌 AnimePahe' }
-    }
-  }
-  return null
-}
-
-// ── ORQUESTRADOR ──────────────────────────────────────────
-const loadSources = async (anime, epNum, setStatus) => {
-  // Tenta em ordem de preferência
-  const result =
-    await tryAnimeFire(anime, epNum, setStatus) ||
-    await tryAnilistGogo(anime, epNum, setStatus) ||
-    await tryAnilistZoro(anime, epNum, setStatus) ||
-    await tryAnimePahe(anime, epNum, setStatus)
-
-  if (!result) throw new Error('Nenhum provedor funcionou. Render pode estar offline.')
-  return result
-}
-
-const bestSource = (sources = []) => {
-  for (const q of ['1080p', '720p', '480p', '360p', 'default']) {
-    const f = sources.find(s => s.quality === q)
+const bestQuality = (sources = []) => {
+  const order = ['1080p', '720p', '480p', '360p', 'hd', 'sd']
+  for (const q of order) {
+    const f = sources.find(s => (s.label || '').toLowerCase().includes(q.replace('p', '')))
     if (f) return f
   }
   return sources[0]
@@ -163,23 +104,26 @@ export default function WatchPage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const epNum = parseInt(searchParams.get('ep') || '1')
+  const isDub = searchParams.get('dub') === '1'
 
   const [anime, setAnime] = useState(null)
   const [episodes, setEpisodes] = useState([])
   const [hasMoreEps, setHasMoreEps] = useState(false)
   const [epPage, setEpPage] = useState(1)
 
-  const [result, setResult] = useState(null)
+  const [sources, setSources] = useState([])
   const [currentSrc, setCurrentSrc] = useState('')
+  const [afSlug, setAfSlug] = useState(null)    // cache do slug AnimeFire
   const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState('🔍 Iniciando...')
+  const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Carrega dados do anime
   useEffect(() => {
-    setAnime(null); setEpisodes([])
+    setAnime(null); setEpisodes([]); setAfSlug(null)
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
       if (d.status === 'fulfilled') setAnime(d.value.data)
       if (e.status === 'fulfilled') {
@@ -190,17 +134,45 @@ export default function WatchPage() {
     window.scrollTo(0, 0)
   }, [id])
 
-  const doLoad = (animeObj, ep) => {
-    setLoading(true); setError(false); setResult(null); setCurrentSrc('')
-    loadSources(animeObj, ep, setStatus)
-      .then(r => { setResult(r); setCurrentSrc(bestSource(r.sources)?.url || '') })
-      .catch(e => { setError(true); setErrorMsg(e.message) })
-      .finally(() => setLoading(false))
+  // Carrega vídeo
+  const doLoad = async (animeObj, ep, dub, cachedSlug) => {
+    setLoading(true); setError(false); setSources([]); setCurrentSrc('')
+
+    try {
+      // Passo 1: descobre slug no AnimeFire
+      let slug = cachedSlug
+      if (!slug) {
+        setStatus('🔍 Buscando no AnimeFire...')
+        slug = await findAnimefireSlug(animeObj, dub)
+        if (!slug) throw new Error('Anime não encontrado no AnimeFire. Tente o botão externo.')
+        setAfSlug(slug)
+      }
+
+      // Passo 2: busca URLs de vídeo
+      setStatus(`📡 Carregando EP${ep}...`)
+      const srcs = await getVideoSources(slug, ep)
+      if (!srcs.length) throw new Error(`EP${ep} não disponível no AnimeFire para "${slug}"`)
+
+      setSources(srcs)
+      const best = bestQuality(srcs)
+      setCurrentSrc(best?.url || '')
+      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+
+    } catch(e) {
+      console.error('[WatchPage]', e)
+      setError(true)
+      setErrorMsg(e.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { if (anime) doLoad(anime, epNum) }, [anime, epNum])
+  useEffect(() => {
+    if (anime) doLoad(anime, epNum, isDub, afSlug)
+  }, [anime, epNum, isDub])
 
-  const goEp = (n) => setSearchParams({ ep: n })
+  const goEp = (n) => setSearchParams({ ep: n, ...(isDub ? { dub: '1' } : {}) })
+  const toggleDub = () => { setAfSlug(null); setSearchParams({ ep: epNum, ...(!isDub ? { dub: '1' } : {}) }) }
 
   const loadMoreEps = async () => {
     const next = epPage + 1
@@ -211,8 +183,9 @@ export default function WatchPage() {
   }
 
   const title = anime?.title_english || anime?.title || ''
-  const slug = title.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '-')
-  const externalUrl = `https://animefire.plus/pesquisar/${encodeURIComponent(anime?.title || '')}`
+  const afExternal = afSlug
+    ? `https://animefire.plus/animes/${afSlug}`
+    : `https://animefire.plus/pesquisar/${encodeURIComponent(anime?.title || '')}/1`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
@@ -230,19 +203,19 @@ export default function WatchPage() {
                 <div className="loading-ring" />
                 <img src="/logo.png" className="loading-logo" alt="" />
                 <p className="loading-text">{status}</p>
-                <p className="loading-sub">Testando AnimeFire → GogoAnime → Zoro → AnimePahe</p>
+                <p className="loading-sub">Fonte: 🇧🇷 AnimeFire — sem Consumet, sem Render</p>
               </div>
             ) : error ? (
               <div className="player-error">
                 <span className="error-emoji">😵</span>
-                <h3>Todos os provedores falharam</h3>
+                <h3>Episódio indisponível</h3>
                 <p className="error-msg">{errorMsg}</p>
-                <p className="error-hint">💡 Verifique se o Render está online e o <code>VITE_CONSUMET_URL</code> está no Vercel.</p>
+                <p className="error-hint">💡 O AnimeFire pode não ter este anime. Tente no site diretamente.</p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum)}>
+                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null)}>
                     🔄 Tentar novamente
                   </button>
-                  <a href={externalUrl} target="_blank" rel="noreferrer" className="btn btn-ghost">
+                  <a href={afExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
                     🇧🇷 AnimeFire
                   </a>
                 </div>
@@ -253,29 +226,38 @@ export default function WatchPage() {
                 src={currentSrc}
                 controls autoPlay playsInline
                 className="video-player"
-                onError={() => { setError(true); setErrorMsg('Erro ao reproduzir o vídeo.') }}
+                onError={() => { setError(true); setErrorMsg('Erro ao reproduzir. Link pode ter expirado.') }}
               />
             ) : null}
           </div>
 
-          {/* Info provedor + qualidade */}
-          {!loading && !error && result && (
-            <div className="provider-bar">
-              <span className="provider-tag">✅ {result.provider}</span>
-              {result.sources?.length > 1 && (
-                <div className="quality-wrap">
-                  <span>📺 Qualidade:</span>
-                  <select className="quality-select" value={currentSrc} onChange={e => setCurrentSrc(e.target.value)}>
-                    {result.sources.map(s => (
-                      <option key={s.url} value={s.url}>{s.quality || 'Auto'}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+          {/* Dub / Leg + Qualidade */}
+          <div className="audio-track-bar">
+            <span className="audio-label">🎧 Áudio:</span>
+            <div className="audio-toggle">
+              <button className={`track-btn ${!isDub ? 'active' : ''}`} onClick={() => isDub && toggleDub()}>
+                🇧🇷 Legendado
+              </button>
+              <button className={`track-btn ${isDub ? 'active' : ''}`} onClick={() => !isDub && toggleDub()}>
+                🎙️ Dublado
+              </button>
             </div>
-          )}
+            {sources.length > 1 && (
+              <div className="quality-wrap">
+                <span>📺</span>
+                <select className="quality-select" value={currentSrc} onChange={e => setCurrentSrc(e.target.value)}>
+                  {sources.map(s => (
+                    <option key={s.url} value={s.url}>{s.label || 'Auto'}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {afSlug && !loading && !error && (
+              <span className="provider-tag" style={{marginLeft:'auto'}}>✅ AnimeFire</span>
+            )}
+          </div>
 
-          {/* Botões ação */}
+          {/* Ações */}
           <div className="ext-actions">
             {currentSrc && (
               <>
@@ -286,24 +268,26 @@ export default function WatchPage() {
                 <button className="ext-btn" onClick={() => openADM(currentSrc, filename)}>
                   ⬇️<span>Baixar</span>
                 </button>
-                <button className="ext-btn" onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
+                <button className="ext-btn"
+                  onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
                   🎬<span>MX Player</span>
                 </button>
               </>
             )}
-            <a href={externalUrl} target="_blank" rel="noreferrer" className="ext-btn">
+            <a href={afExternal} target="_blank" rel="noreferrer" className="ext-btn">
               🇧🇷<span>AnimeFire</span>
             </a>
             <div className="share-container">
               <button className="ext-btn" onClick={() => setShowShare(o => !o)}>🔗<span>Share</span></button>
               {showShare && (
                 <div className="share-dropdown">
-                  <button onClick={() => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000) }}>
-                    {copied ? '✅ Copiado!' : '📋 Copiar link'}
-                  </button>
-                  <a href={`https://wa.me/?text=${encodeURIComponent(`🔥 ${title} - EP${epNum}\n${window.location.href}`)}`} target="_blank" rel="noreferrer">
-                    💬 WhatsApp
-                  </a>
+                  <button onClick={() => {
+                    navigator.clipboard.writeText(window.location.href)
+                    setCopied(true); setTimeout(() => setCopied(false), 2000)
+                  }}>{copied ? '✅ Copiado!' : '📋 Copiar link'}</button>
+                  <a href={`https://wa.me/?text=${encodeURIComponent(`🔥 ${title} EP${epNum}\n${window.location.href}`)}`}
+                    target="_blank" rel="noreferrer">💬 WhatsApp</a>
+                  <a href={afExternal} target="_blank" rel="noreferrer">🇧🇷 AnimeFire</a>
                 </div>
               )}
             </div>
@@ -329,10 +313,10 @@ export default function WatchPage() {
               <Link to={`/anime/${id}`} className="back-link">← {title}</Link>
               <h1 className="watch-anime-title">{title}</h1>
               <div className="watch-badges">
+                {isDub ? <span className="wbadge dub">🎙️ Dublado</span> : <span className="wbadge sub">🇧🇷 Legendado</span>}
                 {anime.score && <span className="wbadge">⭐ {anime.score.toFixed(1)}</span>}
                 {anime.status === 'Currently Airing' && <span className="wbadge live">🔴 Em Exibição</span>}
                 {anime.type && <span className="wbadge">{anime.type}</span>}
-                {anime.episodes && <span className="wbadge">📺 {anime.episodes} eps</span>}
               </div>
               {anime.synopsis && (
                 <p className="watch-synopsis">{anime.synopsis.slice(0, 300)}{anime.synopsis.length > 300 ? '...' : ''}</p>
@@ -364,5 +348,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-              }
-                                                                        
+}
+  
