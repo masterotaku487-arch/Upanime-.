@@ -7,6 +7,7 @@ import WatchPage from './pages/WatchPage'
 import SearchPage from './pages/SearchPage'
 import CategoryPage from './pages/CategoryPage'
 import GenresPage from './pages/GenresPage'
+import LegalPage from './pages/LegalPage'
 
 export default function App() {
   return (
@@ -21,6 +22,8 @@ export default function App() {
           <Route path="/category/:type" element={<CategoryPage />} />
           <Route path="/genres" element={<GenresPage />} />
           <Route path="/genres/:genreId" element={<CategoryPage />} />
+          <Route path="/termos" element={<LegalPage />} />
+          <Route path="/privacidade" element={<LegalPage />} />
         </Routes>
       </main>
       <Footer />
