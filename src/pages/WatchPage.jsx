@@ -11,6 +11,10 @@ import './WatchPage.css'
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
+// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
+const proxyUrl = (url) =>
+  `/api/proxy?url=${encodeURIComponent(url)}`
+
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
   const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
@@ -166,8 +170,10 @@ export default function WatchPage() {
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      setSources(srcs)
-      const best = bestQuality(srcs)
+      // Usa URL proxiada para garantir Referer correto
+      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+      setSources(proxiedSrcs)
+      const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
@@ -244,7 +250,15 @@ export default function WatchPage() {
                 src={currentSrc}
                 controls autoPlay playsInline
                 className="video-player"
-                onError={() => { setError(true) }}
+                onError={(e) => {
+                  // Tenta URL direta como fallback se proxy falhar
+                  const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
+                  if (directUrl && currentSrc !== directUrl) {
+                    setCurrentSrc(directUrl)
+                  } else {
+                    setError(true)
+                  }
+                }}
               />
             ) : null}
           </div>
@@ -367,4 +381,5 @@ export default function WatchPage() {
     </div>
   )
   }
+
         
