@@ -29,6 +29,11 @@ export default function Footer() {
             <Link to="/category/ova">OVAs</Link>
             <Link to="/category/special">Especiais</Link>
           </div>
+          <div className="footer-col">
+            <h4>Legal</h4>
+            <Link to="/termos">Termos de Uso</Link>
+            <Link to="/privacidade">Privacidade</Link>
+          </div>
         </div>
       </div>
 
