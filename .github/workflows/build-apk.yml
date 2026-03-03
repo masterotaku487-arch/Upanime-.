@@ -120,6 +120,7 @@ jobs:
                   release {
                       storeFile file("upanime.keystore")
                       storePassword "upanime2026"
+                      storeType "PKCS12"
                       keyAlias "upanime"
                       keyPassword "upanime2026"
                   }
