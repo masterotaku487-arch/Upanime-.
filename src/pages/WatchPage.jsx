@@ -77,11 +77,11 @@ const buildSlugCandidates = (anime, dub = false) => {
   return [...new Set([...withSeason, ...withoutSeason])]
 }
 
-// Testa se slug existe no AnimeFire
+// Testa se slug existe E tem episódios no AnimeFire
 const probeSlug = async (slug) => {
   try {
     const data = await afFetch({ action: 'info', slug })
-    if (data.episodes?.length > 0 || data.title) return slug
+    if (data.episodes?.length > 0) return slug  // só aceita se tiver episódios reais
   } catch { /* não existe */ }
   return null
 }
@@ -360,5 +360,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-                                             }
-      
+      }
+    
