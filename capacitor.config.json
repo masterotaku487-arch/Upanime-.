@@ -1,0 +1,14 @@
+{
+  "appId": "io.upanime.app",
+  "appName": "UpAnime+",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "backgroundColor": "#000000"
+    }
+  }
+}
