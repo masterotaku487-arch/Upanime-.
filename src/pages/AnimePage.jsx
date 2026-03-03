@@ -13,6 +13,7 @@ export default function AnimePage() {
   const [loading, setLoading] = useState(true)
   const [epPage, setEpPage] = useState(1)
   const [showMore, setShowMore] = useState(false)
+  const synopsis = useTranslatedSynopsis(anime?.synopsis)
 
   useEffect(() => {
     setLoading(true)
@@ -55,7 +56,6 @@ export default function AnimePage() {
   )
 
   const banner = anime.images?.jpg?.large_image_url
-  const synopsis = useTranslatedSynopsis(anime.synopsis)
   const genres = anime.genres || []
   const themes = anime.themes || []
   const studios = anime.studios || []
@@ -175,4 +175,4 @@ export default function AnimePage() {
       </div>
     </div>
   )
-                  }
+            }
