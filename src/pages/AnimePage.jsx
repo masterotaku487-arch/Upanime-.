@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { FiStar, FiPlay, FiClock, FiTv, FiCalendar, FiChevronDown, FiChevronUp } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
+import { useTranslatedSynopsis } from '../services/translate'
 import './AnimePage.css'
 
 export default function AnimePage() {
@@ -54,7 +55,7 @@ export default function AnimePage() {
   )
 
   const banner = anime.images?.jpg?.large_image_url
-  const synopsis = anime.synopsis
+  const synopsis = useTranslatedSynopsis(anime.synopsis)
   const genres = anime.genres || []
   const themes = anime.themes || []
   const studios = anime.studios || []
@@ -174,4 +175,4 @@ export default function AnimePage() {
       </div>
     </div>
   )
-}
+                  }
