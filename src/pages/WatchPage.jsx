@@ -219,12 +219,16 @@ export default function WatchPage() {
               </div>
             ) : error ? (
               <div className="player-error">
-                <span className="error-emoji">😵</span>
-                <h3>Episódio indisponível</h3>
-                <p className="error-msg">{errorMsg}</p>
-                <p className="error-hint">💡 O AnimeFire pode não ter este anime. Tente no site diretamente.</p>
+                <span className="error-emoji">🎬</span>
+                <h3>Abra no MX Player</h3>
+                <p className="error-hint">O vídeo está disponível! Use o botão abaixo para assistir.</p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null)}>
+                  {currentSrc && (
+                    <button className="btn btn-primary" onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
+                      🎬 Abrir MX Player
+                    </button>
+                  )}
+                  <button className="btn btn-ghost" onClick={() => doLoad(anime, epNum, isDub, null)}>
                     🔄 Tentar novamente
                   </button>
                   <a href={afExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
@@ -238,7 +242,7 @@ export default function WatchPage() {
                 src={currentSrc}
                 controls autoPlay playsInline
                 className="video-player"
-                onError={() => { setError(true); setErrorMsg('Erro ao reproduzir. Link pode ter expirado.') }}
+                onError={() => { setError(true) }}
               />
             ) : null}
           </div>
@@ -360,5 +364,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-      }
-    
+    }
+              
