@@ -55,17 +55,26 @@ const buildSlugCandidates = (anime, dub = false) => {
     }
   }
 
-  const result = []
+  // Prioridade: título com season > título sem season
+  // Ex: sousou-no-frieren-2nd-season antes de sousou-no-frieren
+  // Isso evita que a T1 seja usada no lugar da T2
+  const withSeason = []
+  const withoutSeason = []
+
   for (const base of bases) {
+    const isFull = [...bases].some(b => b !== base && base.startsWith(b))
+    const target = isFull ? withSeason : withoutSeason
+
     if (dub) {
-      result.push(base + '-dublado-todos-os-episodios')
-      result.push(base + '-dublado')
+      target.push(base + '-dublado-todos-os-episodios')
+      target.push(base + '-dublado')
     } else {
-      result.push(base + '-todos-os-episodios')
+      target.push(base + '-todos-os-episodios')
     }
-    result.push(base) // fallback sem sufixo
+    target.push(base)
   }
-  return [...new Set(result)]
+
+  return [...new Set([...withSeason, ...withoutSeason])]
 }
 
 // Testa se slug existe no AnimeFire
@@ -351,5 +360,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-      }
-    
+                                             }
+      
