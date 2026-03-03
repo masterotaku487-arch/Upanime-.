@@ -133,6 +133,22 @@ jobs:
           }
           GRADLE
 
+      - name: Fix Kotlin stdlib duplicado
+        run: |
+          # Força versão única do Kotlin para evitar duplicate class error
+          cat >> android/build.gradle << 'GRADLE'
+
+          subprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+                      force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22"
+                      force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+                  }
+              }
+          }
+          GRADLE
+
       - name: Build APK Release (assinado)
         run: |
           cd android
