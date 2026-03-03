@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://upanime-nine.vercel.app/sitemap.xml
