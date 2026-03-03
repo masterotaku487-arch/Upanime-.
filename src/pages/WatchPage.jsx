@@ -8,7 +8,7 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
 // ─────────────────────────────────────────────────────────
 
-const AF = '/api/animefire'
+const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -351,4 +351,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-}
+      }
+    
