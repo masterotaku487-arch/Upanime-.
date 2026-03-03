@@ -58,7 +58,14 @@ export default function Home() {
 
   return (
     <div className="home">
+
+      {/* H1 principal para SEO */}
+      <h1 style={{ display: "none" }}>
+        Up Anime+ - Assistir Animes Online Grátis em HD
+      </h1>
+
       <Hero animes={heroAnimes} />
+
       <div className="container">
         <AnimeRow
           title={<>Temporada <span>Atual</span></>}
