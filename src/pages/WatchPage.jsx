@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
+import { useTranslatedSynopsis } from '../services/translate'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
@@ -195,6 +196,7 @@ export default function WatchPage() {
   }
 
   const title = anime?.title_english || anime?.title || ''
+  const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
     ? `https://animefire.plus/animes/${afSlug}`
     : `https://animefire.plus`
@@ -334,8 +336,8 @@ export default function WatchPage() {
                 {anime.status === 'Currently Airing' && <span className="wbadge live">🔴 Em Exibição</span>}
                 {anime.type && <span className="wbadge">{anime.type}</span>}
               </div>
-              {anime.synopsis && (
-                <p className="watch-synopsis">{anime.synopsis.slice(0, 300)}{anime.synopsis.length > 300 ? '...' : ''}</p>
+              {synopsis && (
+                <p className="watch-synopsis">{synopsis.slice(0, 300)}{synopsis.length > 300 ? '...' : ''}</p>
               )}
             </div>
           )}
@@ -364,5 +366,5 @@ export default function WatchPage() {
       </div>
     </div>
   )
-    }
-              
+  }
+        
