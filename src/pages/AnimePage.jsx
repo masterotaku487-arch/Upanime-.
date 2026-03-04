@@ -122,9 +122,9 @@ export default function AnimePage() {
             )}
 
             <div className="anime-actions">
-              {episodes.length > 0 || anime.type === 'Movie' ? (
+              {episodes.length > 0 || ['Movie','OVA','Special','TV Special','Music'].includes(anime.type) ? (
                 <Link to={`/watch/${id}?ep=1`} className="btn btn-primary">
-                  <FiPlay /> {anime.type === 'Movie' ? 'Assistir Filme' : 'Assistir Episódio 1'}
+                  <FiPlay /> {anime.type === 'Movie' ? 'Assistir Filme' : ['OVA','Special','TV Special'].includes(anime.type) ? 'Assistir' : 'Assistir Episódio 1'}
                 </Link>
               ) : (
                 <button className="btn btn-primary" disabled style={{ opacity: 0.5 }}>
@@ -176,4 +176,5 @@ export default function AnimePage() {
     </div>
   )
                   }
-                  
+
+                                                                           
