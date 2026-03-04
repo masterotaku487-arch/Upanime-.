@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Java 17
+      - name: Setup Java 17 (Correção de Versão)
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -37,34 +37,45 @@ jobs:
         env:
           VITE_CONSUMET_URL: ${{ secrets.VITE_CONSUMET_URL }}
 
-      - name: Inicializar Android
+      - name: Inicializar Capacitor
         run: |
           npx cap add android || true
           npx cap sync android
 
-      - name: Configurar Estilos Fullscreen
+      - name: Configurar Estilos (Fix NoActionBarLaunch)
         run: |
+          # Cria as pastas de recursos caso não existam
           mkdir -p android/app/src/main/res/values
-          cat > android/app/src/main/res/values/styles.xml << 'XML'
+          mkdir -p android/app/src/main/res/values-night
+          
+          # Conteúdo do arquivo de estilos
+          cat > styles.xml << 'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
                   <item name="android:windowFullscreen">true</item>
-                  <item name="android:windowContentOverlay">@null</item>
                   <item name="android:statusBarColor">@android:color/transparent</item>
                   <item name="android:navigationBarColor">@android:color/black</item>
               </style>
+              <style name="AppTheme.NoActionBarLaunch" parent="AppTheme">
+                  <item name="android:background">@null</item>
+              </style>
           </resources>
           XML
+          
+          # Copia para ambos os locais para garantir que o build encontre
+          cp styles.xml android/app/src/main/res/values/styles.xml
+          cp styles.xml android/app/src/main/res/values-night/styles.xml
 
       - name: Decodificar Keystore
         run: |
-          # O parâmetro --ignore-garbage ajuda se o segredo no GitHub tiver espaços ou quebras de linha
+          # O --ignore-garbage evita erros se o segredo base64 tiver quebras de linha
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode --ignore-garbage > android/app/upanime.keystore
 
-      - name: Configurar Assinatura
+      - name: Configurar Assinatura no Gradle
         run: |
-          # Reescreve o bloco de assinatura para garantir que não haja duplicatas
+          # Limpa configurações de assinatura antigas para evitar duplicatas
+          sed -i '/signingConfigs {/,$d' android/app/build.gradle
           cat >> android/app/build.gradle << 'GRADLE'
           android {
               signingConfigs {
@@ -78,6 +89,7 @@ jobs:
               buildTypes {
                   release {
                       signingConfig signingConfigs.release
+                      minifyEnabled false
                   }
               }
           }
