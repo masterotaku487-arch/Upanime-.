@@ -3,7 +3,6 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
-import VideoPlayer from '../components/VideoPlayer'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
@@ -156,7 +155,6 @@ export default function WatchPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
-  const [useFallback, setUseFallback] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -174,7 +172,7 @@ export default function WatchPage() {
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
-    setLoading(true); setError(false); setUseFallback(false); setSources([]); setCurrentSrc('')
+    setLoading(true); setError(false); setSources([]); setCurrentSrc('')
 
     try {
       let slug = cachedSlug
@@ -246,20 +244,17 @@ export default function WatchPage() {
               </div>
             ) : error ? (
               <div className="player-error">
-                <span className="error-emoji">⚠️</span>
-                <h3>Erro ao carregar vídeo</h3>
-                <p className="error-hint">{errorMsg || 'Não foi possível carregar o vídeo.'}</p>
+                <span className="error-emoji">🎬</span>
+                <h3>Abra no MX Player</h3>
+                <p className="error-hint">O vídeo está disponível! Use o botão abaixo para assistir.</p>
                 <div className="error-btns">
                   {currentSrc && (
                     <button className="btn btn-primary" onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
                       🎬 Abrir MX Player
                     </button>
                   )}
-                  <button className="btn btn-ghost" onClick={() => { setError(false); setUseFallback(true) }}>
-                    🔄 Tentar com player padrão
-                  </button>
                   <button className="btn btn-ghost" onClick={() => doLoad(anime, epNum, isDub, null)}>
-                    ↩ Tentar novamente
+                    🔄 Tentar novamente
                   </button>
                   <a href={afExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
                     🇧🇷 AnimeFire
@@ -267,34 +262,22 @@ export default function WatchPage() {
                 </div>
               </div>
             ) : currentSrc ? (
-              useFallback ? (
-                // Player padrão nativo — usa URL direta sem proxy
-                <video
-                  key={currentSrc + '-fallback'}
-                  src={sources.find(s => s.url === currentSrc)?.directUrl || currentSrc}
-                  controls
-                  autoPlay
-                  playsInline
-                  style={{ width: '100%', height: '100%', background: '#000' }}
-                  onError={() => setError(true)}
-                />
-              ) : (
-                <VideoPlayer
-                  key={currentSrc}
-                  src={currentSrc}
-                  title={`${title} EP${epNum}`}
-                  sources={sources}
-                  onQualityChange={(url) => setCurrentSrc(url)}
-                  onError={() => {
-                    const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
-                    if (directUrl && currentSrc !== directUrl) {
-                      setCurrentSrc(directUrl)
-                    } else {
-                      setError(true)
-                    }
-                  }}
-                />
-              )
+              <video
+                key={currentSrc}
+                src={currentSrc}
+                controls
+                autoPlay
+                playsInline
+                style={{ width: '100%', height: '100%', background: '#000' }}
+                onError={() => {
+                  const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
+                  if (directUrl && currentSrc !== directUrl) {
+                    setCurrentSrc(directUrl)
+                  } else {
+                    setError(true)
+                  }
+                }}
+              />
             ) : null}
           </div>
 
@@ -418,4 +401,4 @@ export default function WatchPage() {
   }
 
 
-        
+    
