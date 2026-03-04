@@ -68,43 +68,62 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upanime.keystore
 
-      - name: Configurar assinatura
+      - name: Configurar assinatura no gradle.properties
         run: |
-          # Adiciona signingConfigs só se ainda não existir
-          if ! grep -q "signingConfigs" android/app/build.gradle; then
-            cat >> android/app/build.gradle << 'GRADLE'
-          android {
-            signingConfigs {
-              release {
-                storeFile file("upanime.keystore")
-                storePassword "upanime2026"
-                keyAlias "upanime"
-                keyPassword "upanime2026"
-                storeType "PKCS12"
+          cat >> android/gradle.properties << 'EOF'
+          RELEASE_STORE_FILE=upanime.keystore
+          RELEASE_STORE_PASSWORD=upanime2026
+          RELEASE_KEY_ALIAS=upanime
+          RELEASE_KEY_PASSWORD=upanime2026
+          EOF
+
+      - name: Injetar signingConfig no app/build.gradle
+        run: |
+          python3 << 'PYEOF'
+          import re
+
+          with open('android/app/build.gradle', 'r') as f:
+              content = f.read()
+
+          signing = """
+              signingConfigs {
+                  release {
+                      storeFile file(RELEASE_STORE_FILE)
+                      storePassword RELEASE_STORE_PASSWORD
+                      keyAlias RELEASE_KEY_ALIAS
+                      keyPassword RELEASE_KEY_PASSWORD
+                  }
               }
-            }
-            buildTypes {
-              release {
-                signingConfig signingConfigs.release
-                minifyEnabled false
-              }
-            }
-          }
-          GRADLE
-          fi
+          """
+
+          # Adiciona signingConfigs dentro do bloco android{}
+          if 'signingConfigs' not in content:
+              content = content.replace('android {', 'android {' + signing, 1)
+
+          # Configura release para usar o signingConfig
+          content = re.sub(
+              r'(release\s*\{)',
+              r'\1\n            signingConfig signingConfigs.release',
+              content,
+              count=1
+          )
+
+          with open('android/app/build.gradle', 'w') as f:
+              f.write(content)
+
+          print("✅ build.gradle atualizado")
+          PYEOF
 
       - name: Build APK Release
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tail -50
+          ./gradlew assembleRelease --no-daemon
 
       - name: Renomear APK
         run: |
-          find android/app/build/outputs/apk/ -name "*.apk" 
-          cp android/app/build/outputs/apk/release/app-release.apk upanime-plus.apk || \
-          cp android/app/build/outputs/apk/release/app-release-unsigned.apk upanime-plus.apk || \
-          cp $(find android/app/build/outputs/apk -name "*.apk" | head -1) upanime-plus.apk
+          find android/app/build/outputs/apk/ -name "*.apk" -type f
+          cp android/app/build/outputs/apk/release/app-release.apk upanime-plus.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
