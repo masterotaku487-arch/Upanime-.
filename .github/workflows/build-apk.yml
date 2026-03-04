@@ -28,39 +28,43 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Instalar dependências
-        run: npm install
-
-      # 1. CRIAR CONFIGURAÇÃO PRIMEIRO
-      - name: Configurar capacitor.config.json
         run: |
-          cat > capacitor.config.json << 'JSON'
-          {
-            "appId": "io.upanime.app",
-            "appName": "UpAnime+",
-            "webDir": "dist",
-            "server": { "androidScheme": "https" }
-          }
-          JSON
+          npm install
+          npm install @capacitor/core @capacitor/cli @capacitor/android
 
       - name: Build web (Vite)
         run: npm run build
         env:
           VITE_CONSUMET_URL: ${{ secrets.VITE_CONSUMET_URL }}
 
-      # 2. SINCRONIZAR ANDROID
-      - name: Inicializar Capacitor Android
+      - name: Inicializar Android
         run: |
-          npm install @capacitor/android
           npx cap add android || true
           npx cap sync android
 
-      # 3. CONFIGURAR ASSINATURA E KEYSTORE
+      - name: Configurar Estilos Fullscreen
+        run: |
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/styles.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:windowContentOverlay">@null</item>
+                  <item name="android:statusBarColor">@android:color/transparent</item>
+                  <item name="android:navigationBarColor">@android:color/black</item>
+              </style>
+          </resources>
+          XML
+
       - name: Decodificar Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upanime.keystore
+          # O parâmetro --ignore-garbage ajuda se o segredo no GitHub tiver espaços ou quebras de linha
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode --ignore-garbage > android/app/upanime.keystore
 
-      - name: Configurar build.gradle
+      - name: Configurar Assinatura
         run: |
+          # Reescreve o bloco de assinatura para garantir que não haja duplicatas
           cat >> android/app/build.gradle << 'GRADLE'
           android {
               signingConfigs {
@@ -69,19 +73,16 @@ jobs:
                       storePassword "upanime2026"
                       keyAlias "upanime"
                       keyPassword "upanime2026"
-                      storeType "PKCS12"
                   }
               }
               buildTypes {
                   release {
                       signingConfig signingConfigs.release
-                      minifyEnabled false
                   }
               }
           }
           GRADLE
 
-      # 4. BUILD DO APK
       - name: Build APK Release
         run: |
           cd android
