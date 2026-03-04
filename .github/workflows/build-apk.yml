@@ -101,9 +101,10 @@ jobs:
 
       - name: Renomear APK
         run: |
-          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          cp "$APK" upanime-plus.apk
-          echo "APK: $APK"
+          find android/app/build/outputs/apk/ -name "*.apk" 
+          cp android/app/build/outputs/apk/release/app-release.apk upanime-plus.apk || \
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk upanime-plus.apk || \
+          cp $(find android/app/build/outputs/apk -name "*.apk" | head -1) upanime-plus.apk
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
