@@ -30,57 +30,7 @@ jobs:
       - name: Instalar dependências
         run: npm install
 
-      - name: Build web (Vite)
-        run: npm run build
-        env:
-          VITE_CONSUMET_URL: ${{ secrets.VITE_CONSUMET_URL }}
-
-      - name: Instalar Capacitor
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-
-      - name: Inicializar Android
-        run: |
-          npx cap add android || true
-          npx cap sync android
-
-      - name: Configurar tela cheia no Android
-        run: |
-          # Tema fullscreen imersivo
-          cat > android/app/src/main/res/values/styles.xml << 'XML'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
-                  <item name="android:windowFullscreen">true</item>
-                  <item name="android:windowContentOverlay">@null</item>
-                  <item name="android:statusBarColor">@android:color/transparent</item>
-                  <item name="android:navigationBarColor">@android:color/black</item>
-                  <item name="colorPrimary">#E53935</item>
-                  <item name="colorPrimaryDark">#B71C1C</item>
-                  <item name="colorAccent">#E53935</item>
-              </style>
-              <style name="AppTheme.NoActionBarLaunch" parent="AppTheme">
-                  <item name="android:background">@null</item>
-              </style>
-          </resources>
-          XML
-
-          # Modo imersivo total no MainActivity
-          MAIN="android/app/src/main/java/io/upanime/app/MainActivity.java"
-          if [ -f "$MAIN" ]; then
-            sed -i '/import com.getcapacitor.BridgeActivity/a import android.os.Build;\nimport android.view.View;\nimport android.view.WindowInsets;\nimport android.view.WindowInsetsController;\nimport android.view.WindowManager;' "$MAIN"
-            sed -i '/super.onCreate/a \
-              // Tela cheia imersiva\
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {\
-                getWindow().getInsetsController().hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());\
-                getWindow().getInsetsController().setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);\
-              } else {\
-                getWindow().getDecorView().setSystemUiVisibility(\
-                  View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION\
-                );\
-              }' "$MAIN"
-          fi
-
+      # 1. CRIAR CONFIGURAÇÃO PRIMEIRO
       - name: Configurar capacitor.config.json
         run: |
           cat > capacitor.config.json << 'JSON'
@@ -88,41 +38,38 @@ jobs:
             "appId": "io.upanime.app",
             "appName": "UpAnime+",
             "webDir": "dist",
-            "server": {
-              "androidScheme": "https"
-            },
-            "android": {
-              "buildOptions": {
-                "keystorePath": "upanime.keystore",
-                "keystoreAlias": "upanime",
-                "keystorePassword": "upanime2026",
-                "keystoreAliasPassword": "upanime2026"
-              }
-            },
-            "plugins": {
-              "SplashScreen": {
-                "launchShowDuration": 0
-              }
-            }
+            "server": { "androidScheme": "https" }
           }
           JSON
 
+      - name: Build web (Vite)
+        run: npm run build
+        env:
+          VITE_CONSUMET_URL: ${{ secrets.VITE_CONSUMET_URL }}
+
+      # 2. SINCRONIZAR ANDROID
+      - name: Inicializar Capacitor Android
+        run: |
+          npm install @capacitor/android
+          npx cap add android || true
+          npx cap sync android
+
+      # 3. CONFIGURAR ASSINATURA E KEYSTORE
       - name: Decodificar Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upanime.keystore
 
-      - name: Configurar assinatura no build.gradle
+      - name: Configurar build.gradle
         run: |
           cat >> android/app/build.gradle << 'GRADLE'
-
           android {
               signingConfigs {
                   release {
                       storeFile file("upanime.keystore")
                       storePassword "upanime2026"
-                      storeType "PKCS12"
                       keyAlias "upanime"
                       keyPassword "upanime2026"
+                      storeType "PKCS12"
                   }
               }
               buildTypes {
@@ -134,50 +81,16 @@ jobs:
           }
           GRADLE
 
-      - name: Fix Kotlin stdlib duplicado
-        run: |
-          # Força versão única do Kotlin para evitar duplicate class error
-          cat >> android/build.gradle << 'GRADLE'
-
-          subprojects {
-              configurations.all {
-                  resolutionStrategy {
-                      force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
-                      force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22"
-                      force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
-                  }
-              }
-          }
-          GRADLE
-
-      - name: Build APK Release (assinado)
+      # 4. BUILD DO APK
+      - name: Build APK Release
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Renomear APK
-        run: |
-          mv android/app/build/outputs/apk/release/app-release.apk upanime-plus.apk
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: upanime-plus-apk
-          path: upanime-plus.apk
-          retention-days: 30
-
-      - name: Criar Release automático
-        uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main'
-        with:
-          tag_name: v${{ github.run_number }}
-          name: "UpAnime+ v${{ github.run_number }}"
-          files: upanime-plus.apk
-          body: |
-            ## UpAnime+ APK
-            APK assinado e pronto para instalar.
-            Baixe o arquivo `upanime-plus.apk` abaixo.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: android/app/build/outputs/apk/release/app-release.apk
           
