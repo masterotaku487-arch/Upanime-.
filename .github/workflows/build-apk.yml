@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Java 17 (Obrigatório para evitar erro 65)
+      - name: Setup Java 17 (OBRIGATÓRIO)
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -42,12 +42,9 @@ jobs:
           npx cap add android || true
           npx cap sync android
 
-      - name: Configurar Estilos (Fix NoActionBarLaunch)
+      - name: Configurar Estilos (Fix Launch Theme)
         run: |
-          # Garante que as pastas de recursos existem
           mkdir -p android/app/src/main/res/values
-          
-          # Cria o ficheiro de estilos com o tema que o Android está a pedir
           cat > android/app/src/main/res/values/styles.xml << 'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -62,17 +59,14 @@ jobs:
           </resources>
           XML
 
-      - name: Decodificar Keystore (Fix Tag Number 30)
+      - name: Decodificar Keystore (Método Seguro)
         run: |
-          # O parâmetro --ignore-garbage é vital para evitar corrupção de binários
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode --ignore-garbage > android/app/upanime.keystore
+          # O tr -d limpa espaços e quebras de linha que corrompem a chave
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n ' | base64 --decode > android/app/upanime.keystore
 
-      - name: Configurar Assinatura no Gradle
+      - name: Configurar Assinatura
         run: |
-          # Remove blocos de assinatura antigos para evitar duplicados
           sed -i '/signingConfigs {/,$d' android/app/build.gradle
-          
-          # Adiciona a configuração limpa
           cat >> android/app/build.gradle << 'GRADLE'
           android {
               signingConfigs {
