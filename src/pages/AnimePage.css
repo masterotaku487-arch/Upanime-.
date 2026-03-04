@@ -142,3 +142,18 @@
   .anime-info { padding-top: 0; }
   .anime-banner { height: 250px; }
 }
+
+/* ── Trailer ── */
+.trailer-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.trailer-iframe {
+  width: 100%; height: 100%;
+  border: none; display: block;
+}
