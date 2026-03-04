@@ -52,7 +52,6 @@ export default function LoginModal({ onClose }) {
         <button
           onClick={login}
           style={{
-            display: 'none', // fica escondido, só aparece se o botão do Google falhar
             width: '100%', padding: '12px 20px',
             background: '#fff', color: '#111', borderRadius: 8,
             border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer',
