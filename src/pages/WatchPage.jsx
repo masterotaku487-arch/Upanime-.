@@ -84,20 +84,37 @@ const buildSlugCandidates = (anime, dub = false) => {
 }
 
 // Testa se slug existe E tem episódios no AnimeFire
-const probeSlug = async (slug) => {
+const probeSlug = async (slug, isMovie = false) => {
   try {
     const data = await afFetch({ action: 'info', slug })
-    if (data.episodes?.length > 0) return slug  // só aceita se tiver episódios reais
+    // Filmes/OVAs podem ter 0 episódios listados mas ainda assim ter vídeo
+    if (data.episodes?.length > 0) return slug
+    if (isMovie && data.slug) return slug  // aceita para filmes mesmo sem eps listados
   } catch { /* não existe */ }
   return null
 }
 
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
+  const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
+
+  // Para filmes, tenta direto action=video ep=1 em vez de info
+  if (isMovie) {
+    for (const slug of candidates) {
+      try {
+        const data = await afFetch({ action: 'video', slug, ep: 1 })
+        if (data.sources?.length > 0) {
+          console.log('[AnimeFire] ✅ (movie/ova direct)', slug)
+          return slug
+        }
+      } catch { /* tenta próximo */ }
+    }
+  }
+
   for (const slug of candidates) {
-    const found = await probeSlug(slug)
+    const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
@@ -383,4 +400,4 @@ export default function WatchPage() {
   )
   }
 
-  
+    
