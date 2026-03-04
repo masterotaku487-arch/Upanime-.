@@ -68,20 +68,32 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/upanime.keystore
 
-      - name: Build APK Release (assinado)
+      - name: Build APK (não assinado)
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=$HOME/upanime.keystore \
-            -Pandroid.injected.signing.store.password=upanime2026 \
-            -Pandroid.injected.signing.key.alias=upanime \
-            -Pandroid.injected.signing.key.password=upanime2026
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Renomear APK
+      - name: Assinar APK com apksigner
         run: |
-          find android/app/build/outputs/apk/ -name "*.apk" -type f
-          cp android/app/build/outputs/apk/release/app-release.apk upanime-plus.apk
+          # Encontra o apksigner no Android SDK
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name "apksigner" -type f | sort -V | tail -1)
+          echo "Usando: $APKSIGNER"
+
+          # Encontra o APK gerado
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          echo "APK encontrado: $APK"
+
+          # Assina
+          $APKSIGNER sign \
+            --ks $HOME/upanime.keystore \
+            --ks-key-alias upanime \
+            --ks-pass pass:upanime2026 \
+            --key-pass pass:upanime2026 \
+            --out upanime-plus.apk \
+            "$APK"
+
+          $APKSIGNER verify upanime-plus.apk && echo "✅ APK assinado com sucesso!"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
