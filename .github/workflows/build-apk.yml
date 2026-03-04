@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Java 17 (Correção de Versão)
+      - name: Setup Java 17 (Obrigatório para evitar erro 65)
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -44,12 +44,11 @@ jobs:
 
       - name: Configurar Estilos (Fix NoActionBarLaunch)
         run: |
-          # Cria as pastas de recursos caso não existam
+          # Garante que as pastas de recursos existem
           mkdir -p android/app/src/main/res/values
-          mkdir -p android/app/src/main/res/values-night
           
-          # Conteúdo do arquivo de estilos
-          cat > styles.xml << 'XML'
+          # Cria o ficheiro de estilos com o tema que o Android está a pedir
+          cat > android/app/src/main/res/values/styles.xml << 'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
@@ -62,20 +61,18 @@ jobs:
               </style>
           </resources>
           XML
-          
-          # Copia para ambos os locais para garantir que o build encontre
-          cp styles.xml android/app/src/main/res/values/styles.xml
-          cp styles.xml android/app/src/main/res/values-night/styles.xml
 
-      - name: Decodificar Keystore
+      - name: Decodificar Keystore (Fix Tag Number 30)
         run: |
-          # O --ignore-garbage evita erros se o segredo base64 tiver quebras de linha
+          # O parâmetro --ignore-garbage é vital para evitar corrupção de binários
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode --ignore-garbage > android/app/upanime.keystore
 
       - name: Configurar Assinatura no Gradle
         run: |
-          # Limpa configurações de assinatura antigas para evitar duplicatas
+          # Remove blocos de assinatura antigos para evitar duplicados
           sed -i '/signingConfigs {/,$d' android/app/build.gradle
+          
+          # Adiciona a configuração limpa
           cat >> android/app/build.gradle << 'GRADLE'
           android {
               signingConfigs {
