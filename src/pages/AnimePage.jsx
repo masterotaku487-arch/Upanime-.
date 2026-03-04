@@ -149,12 +149,12 @@ export default function AnimePage() {
         )}
 
         {/* Trailer */}
-        {anime.trailer?.youtube_id && (
+        {(anime.trailer?.youtube_id || anime.trailer?.embed_url) && (
           <div className="anime-section">
             <h2 className="section-title">Trailer</h2>
             <div className="trailer-wrap">
               <iframe
-                src={`https://www.youtube.com/embed/${anime.trailer.youtube_id}?rel=0&modestbranding=1`}
+                src={anime.trailer?.embed_url || `https://www.youtube.com/embed/${anime.trailer?.youtube_id}?rel=0&modestbranding=1`}
                 title="Trailer"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -193,4 +193,3 @@ export default function AnimePage() {
   )
                   }
 
-                  
