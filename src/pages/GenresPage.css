@@ -1,27 +1,39 @@
-.genres-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+.genres-page { padding: 80px 0 100px; }
+.genres-title {
+  font-size: 1.6rem; font-weight: 800;
+  margin-bottom: 28px; color: var(--text);
 }
-.genre-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  text-align: center;
-  transition: all var(--transition);
-  animation: fadeInUp 0.4s ease forwards;
-  opacity: 0;
+
+.filter-section { margin-bottom: 28px; }
+.filter-section h2 {
+  font-size: 1rem; font-weight: 700;
+  color: var(--text); margin-bottom: 14px;
 }
-.genre-card:hover {
-  background: rgba(232,0,28,0.1);
-  border-color: rgba(232,0,28,0.35);
-  transform: translateY(-3px);
+
+.filter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip {
+  padding: 8px 16px; border-radius: 99px;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  background: transparent; color: var(--text);
+  font-size: 0.82rem; font-weight: 500;
+  cursor: pointer; transition: all .18s;
+  white-space: nowrap;
 }
-.genre-emoji { font-size: 1.8rem; }
-.genre-name { font-size: 0.88rem; font-weight: 600; }
-.genre-count { font-size: 0.72rem; color: var(--text-dim); }
+.chip:hover { border-color: rgba(255,255,255,0.5); }
+.chip.active {
+  background: var(--red); border-color: var(--red);
+  color: #fff; font-weight: 700;
+}
+.chip-more { color: var(--red); border-color: var(--red); }
+.chip-more:hover { background: rgba(229,57,53,.1); }
+
+.apply-btn {
+  width: 100%; padding: 16px;
+  background: var(--red); border: none;
+  border-radius: 10px; color: #fff;
+  font-size: 1rem; font-weight: 700;
+  cursor: pointer; margin-top: 8px;
+  transition: opacity .2s;
+}
+.apply-btn:hover { opacity: .88; }
