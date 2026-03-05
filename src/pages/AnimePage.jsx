@@ -182,6 +182,38 @@ export default function AnimePage() {
           </div>
         )}
 
+        {/* ── Coleção — Temporadas e relacionados ── */}
+        {anime.relations?.length > 0 && (() => {
+          // Agrupa por tipo de relação relevante
+          const relevant = anime.relations.filter(r =>
+            ['Sequel', 'Prequel', 'Parent story', 'Side story', 'Alternative version', 'Summary', 'Full story', 'Spin-off', 'Other'].includes(r.relation)
+          )
+          if (!relevant.length) return null
+
+          const labelPT = {
+            'Sequel': 'Continuação', 'Prequel': 'Anterior',
+            'Parent story': 'História principal', 'Side story': 'História paralela',
+            'Alternative version': 'Versão alternativa', 'Summary': 'Resumo',
+            'Full story': 'História completa', 'Spin-off': 'Spin-off', 'Other': 'Relacionado',
+          }
+
+          return (
+            <div className="anime-section">
+              <h2 className="section-title">🗂 Coleção</h2>
+              <div className="collection-grid">
+                {relevant.map(rel =>
+                  rel.entry.filter(e => e.type === 'anime').map(entry => (
+                    <Link key={entry.mal_id} to={`/anime/${entry.mal_id}`} className="collection-card">
+                      <span className="collection-badge">{labelPT[rel.relation] || rel.relation}</span>
+                      <span className="collection-title">{entry.name}</span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Episodes */}
         {episodes.length > 0 && (
           <div className="anime-section">
@@ -211,4 +243,5 @@ export default function AnimePage() {
   )
                   }
 
-    
+
+            
