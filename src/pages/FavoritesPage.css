@@ -1,0 +1,77 @@
+.favs-login {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px;
+  min-height: 60vh; text-align: center; padding: 40px 20px;
+}
+.favs-icon { color: var(--red); opacity: .7; }
+.favs-login h2 { font-family: var(--font-display); font-size: 1.8rem; }
+.favs-login p  { color: var(--text-dim); max-width: 340px; line-height: 1.6; }
+
+.favs-page { padding: 80px 0 60px; }
+.favs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.favs-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  display: flex; align-items: center; gap: 10px;
+  color: var(--red);
+}
+.favs-count {
+  font-size: .8rem; color: var(--text-dim);
+  background: var(--surface); padding: 4px 12px; border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+.favs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.fav-card {
+  background: var(--bg2); border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--border);
+  transition: transform .2s;
+}
+.fav-card:hover { transform: translateY(-3px); }
+
+.fav-poster {
+  display: block; position: relative;
+  aspect-ratio: 2/3; overflow: hidden;
+}
+.fav-poster img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform .3s;
+}
+.fav-card:hover .fav-poster img { transform: scale(1.04); }
+.fav-no-img {
+  width: 100%; height: 100%; display: flex;
+  align-items: center; justify-content: center;
+  background: var(--surface); font-size: 2rem;
+}
+.fav-badges {
+  position: absolute; top: 8px; left: 8px;
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+
+.fav-info { padding: 10px 10px 12px; }
+.fav-title {
+  display: block; font-size: .8rem; font-weight: 700;
+  color: var(--text); line-height: 1.4; margin-bottom: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fav-title:hover { color: var(--red); }
+.fav-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  font-size: .7rem; color: var(--text-dim); margin-bottom: 8px;
+}
+.fav-remove {
+  display: flex; align-items: center; gap: 5px;
+  font-size: .7rem; color: var(--text-dim);
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.fav-remove:hover { color: var(--red); border-color: var(--red); }
