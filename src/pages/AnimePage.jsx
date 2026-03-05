@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { FiStar, FiPlay, FiClock, FiTv, FiCalendar, FiChevronDown, FiChevronUp, FiHeart } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
+import { getAniListByMalId, formatNextEp } from '../services/anilist'
 import { useFavorites } from '../context/FavoritesContext'
 import { useAuth } from '../context/AuthContext'
 import './AnimePage.css'
@@ -15,6 +16,7 @@ export default function AnimePage() {
   const [loading, setLoading] = useState(true)
   const [epPage, setEpPage] = useState(1)
   const [showMore, setShowMore] = useState(false)
+  const [alData, setAlData] = useState(null)
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const { toggle, isFav } = useFavorites()
   const { user, openLogin } = useAuth()
@@ -35,7 +37,11 @@ export default function AnimePage() {
           getAnimeById(id),
           getAnimeEpisodes(id, 1),
         ])
-        if (data.status === 'fulfilled') setAnime(data.value.data)
+        if (data.status === 'fulfilled') {
+          setAnime(data.value.data)
+          // Carrega AniList em paralelo (não bloqueia)
+          getAniListByMalId(id).then(al => setAlData(al)).catch(() => {})
+        }
         if (eps.status === 'fulfilled') setEpisodes(eps.value.data || [])
       } finally {
         setLoading(false)
@@ -131,6 +137,17 @@ export default function AnimePage() {
               <p className="anime-studio">Estúdio: {studios.map(s => s.name).join(', ')}</p>
             )}
 
+            {/* Próximo episódio via AniList */}
+            {(() => {
+              const next = alData ? formatNextEp(alData.nextAiringEpisode) : null
+              if (!next) return null
+              return (
+                <div className="next-ep-badge">
+                  📅 EP {next.ep} — {next.label} <span>({next.date})</span>
+                </div>
+              )
+            })()}
+
             <div className="anime-actions">
               {episodes.length > 0 || ['Movie','OVA','Special','TV Special','Music'].includes(anime.type) ? (
                 <Link to={`/watch/${id}?ep=1`} className="btn btn-primary">
@@ -181,38 +198,6 @@ export default function AnimePage() {
             </div>
           </div>
         )}
-
-        {/* ── Coleção — Temporadas e relacionados ── */}
-        {anime.relations?.length > 0 && (() => {
-          // Agrupa por tipo de relação relevante
-          const relevant = anime.relations.filter(r =>
-            ['Sequel', 'Prequel', 'Parent story', 'Side story', 'Alternative version', 'Summary', 'Full story', 'Spin-off', 'Other'].includes(r.relation)
-          )
-          if (!relevant.length) return null
-
-          const labelPT = {
-            'Sequel': 'Continuação', 'Prequel': 'Anterior',
-            'Parent story': 'História principal', 'Side story': 'História paralela',
-            'Alternative version': 'Versão alternativa', 'Summary': 'Resumo',
-            'Full story': 'História completa', 'Spin-off': 'Spin-off', 'Other': 'Relacionado',
-          }
-
-          return (
-            <div className="anime-section">
-              <h2 className="section-title">🗂 Coleção</h2>
-              <div className="collection-grid">
-                {relevant.map(rel =>
-                  rel.entry.filter(e => e.type === 'anime').map(entry => (
-                    <Link key={entry.mal_id} to={`/anime/${entry.mal_id}`} className="collection-card">
-                      <span className="collection-badge">{labelPT[rel.relation] || rel.relation}</span>
-                      <span className="collection-title">{entry.name}</span>
-                    </Link>
-                  ))
-                )}
-              </div>
-            </div>
-          )
-        })()}
 
         {/* Episodes */}
         {episodes.length > 0 && (
