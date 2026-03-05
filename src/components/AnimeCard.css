@@ -121,3 +121,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Continue Watching Bar ── */
+.card-progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.15);
+}
+.card-progress-bar {
+  height: 100%;
+  background: #e53935;
+  border-radius: 0 2px 2px 0;
+  transition: width 0.3s ease;
+  min-width: 4px;
+}
