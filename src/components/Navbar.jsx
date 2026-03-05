@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { FiSearch, FiX, FiMenu, FiLogOut, FiUser } from 'react-icons/fi'
+import { FiSearch, FiX, FiMenu, FiLogOut, FiUser, FiHeart } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
 import LoginModal from './LoginModal'
 import './Navbar.css'
@@ -120,6 +120,9 @@ export default function Navbar() {
                         <span>{user.email}</span>
                       </div>
                     </div>
+                    <Link to="/favoritos" className="user-dropdown-item" onClick={() => setShowUserMenu(false)}>
+                      <FiHeart /> Meus Favoritos
+                    </Link>
                     <button className="user-dropdown-item" onClick={() => { logout(); setShowUserMenu(false) }}>
                       <FiLogOut /> Sair
                     </button>
@@ -143,4 +146,4 @@ export default function Navbar() {
     </>
   )
   }
-                
+
