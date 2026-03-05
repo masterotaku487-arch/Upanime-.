@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { FiStar, FiPlay, FiClock, FiTv, FiCalendar, FiChevronDown, FiChevronUp } from 'react-icons/fi'
+import { FiStar, FiPlay, FiClock, FiTv, FiCalendar, FiChevronDown, FiChevronUp, FiHeart } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
+import { useFavorites } from '../context/FavoritesContext'
+import { useAuth } from '../context/AuthContext'
+import { useFavorites } from '../context/FavoritesContext'
 import './AnimePage.css'
 
 export default function AnimePage() {
@@ -14,6 +17,14 @@ export default function AnimePage() {
   const [epPage, setEpPage] = useState(1)
   const [showMore, setShowMore] = useState(false)
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
+  const { toggle, isFav } = useFavorites()
+  const { user, openLogin } = useAuth()
+  const favorited = anime ? isFav(anime.mal_id) : false
+
+  const handleFav = () => {
+    if (!user) { openLogin(); return }
+    toggle(anime)
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -131,6 +142,14 @@ export default function AnimePage() {
                   <FiPlay /> Sem episódios
                 </button>
               )}
+              <button
+                className={`btn btn-fav ${favorited ? 'favorited' : ''}`}
+                onClick={handleFav}
+                title={favorited ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+              >
+                <FiHeart fill={favorited ? 'currentColor' : 'none'} />
+                {favorited ? 'Favoritado' : 'Favoritar'}
+              </button>
             </div>
           </div>
         </div>
@@ -193,3 +212,4 @@ export default function AnimePage() {
   )
                   }
 
+                  
