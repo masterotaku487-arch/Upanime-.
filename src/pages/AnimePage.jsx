@@ -5,7 +5,6 @@ import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
 import { useFavorites } from '../context/FavoritesContext'
 import { useAuth } from '../context/AuthContext'
-import { useFavorites } from '../context/FavoritesContext'
 import './AnimePage.css'
 
 export default function AnimePage() {
@@ -212,4 +211,4 @@ export default function AnimePage() {
   )
                   }
 
-                  
+    
