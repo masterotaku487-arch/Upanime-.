@@ -3,7 +3,7 @@ import axios from 'axios'
 // ── Jikan ─────────────────────────────────────────────────────
 const jikan = axios.create({ baseURL: 'https://api.jikan.moe/v4', timeout: 12000 })
 
-const BLOCKED = [12, 49]
+const BLOCKED = [12] // 49=Erotica liberado, apenas Hentai bloqueado
 export const isBlocked = (a) =>
   [...(a.genres || []), ...(a.explicit_genres || [])].some(g => BLOCKED.includes(g.mal_id))
 
@@ -162,3 +162,4 @@ export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null
   return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
 }
 
+        
