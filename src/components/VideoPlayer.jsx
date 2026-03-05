@@ -1,9 +1,4 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import {
-  Play, Pause, Volume2, VolumeX, Volume1,
-  SkipBack, SkipForward, Maximize, Minimize,
-  Settings
-} from 'lucide-react'
 import './VideoPlayer.css'
 
 const fmt = (s) => {
@@ -13,34 +8,69 @@ const fmt = (s) => {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-const INTRO_END = 85 // segundos — duração típica de abertura
+const INTRO_END = 85
 
-export default function VideoPlayer({ src, title, onError, sources = [], onQualityChange }) {
-  const videoRef    = useRef(null)
+// Salva progresso no localStorage
+const saveProgress = (animeId, ep, current, duration) => {
+  if (!animeId || !ep || !duration) return
+  const key = `progress_${animeId}_${ep}`
+  localStorage.setItem(key, JSON.stringify({ current, duration, ts: Date.now() }))
+}
+
+const loadProgress = (animeId, ep) => {
+  try {
+    const d = localStorage.getItem(`progress_${animeId}_${ep}`)
+    return d ? JSON.parse(d) : null
+  } catch { return null }
+}
+
+export const getAnimeProgress = (animeId, totalEps) => {
+  // Retorna % do episódio mais recente assistido
+  for (let ep = totalEps; ep >= 1; ep--) {
+    try {
+      const d = localStorage.getItem(`progress_${animeId}_${ep}`)
+      if (d) {
+        const { current, duration } = JSON.parse(d)
+        if (duration > 0) return { ep, pct: current / duration }
+      }
+    } catch { }
+  }
+  return null
+}
+
+export default function VideoPlayer({ src, title, animeId, epNum, onError, sources = [], onQualityChange }) {
+  const videoRef     = useRef(null)
   const containerRef = useRef(null)
-  const progressRef = useRef(null)
-  const hideTimer   = useRef(null)
+  const seekRef      = useRef(null)
+  const hideTimer    = useRef(null)
 
   const [playing, setPlaying]           = useState(false)
   const [currentTime, setCurrentTime]   = useState(0)
   const [duration, setDuration]         = useState(0)
+  const [buffered, setBuffered]         = useState(0)
   const [volume, setVolume]             = useState(1)
   const [muted, setMuted]               = useState(false)
   const [fullscreen, setFullscreen]     = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [showSkip, setShowSkip]         = useState(false)
-  const [buffered, setBuffered]         = useState(0)
   const [showVolume, setShowVolume]     = useState(false)
-  const [showQuality, setShowQuality]   = useState(false)
-  const [seeking, setSeeking]           = useState(false)
+
+  // Restaurar progresso ao carregar
+  useEffect(() => {
+    const saved = loadProgress(animeId, epNum)
+    if (saved && saved.current > 10 && saved.current < saved.duration - 10) {
+      const restore = () => {
+        if (videoRef.current) videoRef.current.currentTime = saved.current
+      }
+      videoRef.current?.addEventListener('loadedmetadata', restore, { once: true })
+    }
+  }, [src, animeId, epNum])
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true)
     clearTimeout(hideTimer.current)
-    if (playing && !seeking) {
-      hideTimer.current = setTimeout(() => setShowControls(false), 3500)
-    }
-  }, [playing, seeking])
+    if (playing) hideTimer.current = setTimeout(() => setShowControls(false), 3500)
+  }, [playing])
 
   useEffect(() => { resetHideTimer() }, [playing])
 
@@ -57,12 +87,12 @@ export default function VideoPlayer({ src, title, onError, sources = [], onQuali
   // Atalhos de teclado
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return
-      if (e.code === 'Space') { e.preventDefault(); togglePlay() }
+      if (['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return
+      if (e.code === 'Space')      { e.preventDefault(); togglePlay() }
       if (e.code === 'ArrowRight') skip(10)
       if (e.code === 'ArrowLeft')  skip(-10)
-      if (e.code === 'ArrowUp')    changeVolumeBy(0.1)
-      if (e.code === 'ArrowDown')  changeVolumeBy(-0.1)
+      if (e.code === 'ArrowUp')    { e.preventDefault(); changeVol(0.1) }
+      if (e.code === 'ArrowDown')  { e.preventDefault(); changeVol(-0.1) }
       if (e.code === 'KeyF')       toggleFullscreen()
       if (e.code === 'KeyM')       toggleMute()
     }
@@ -71,201 +101,169 @@ export default function VideoPlayer({ src, title, onError, sources = [], onQuali
   }, [playing, volume])
 
   const togglePlay = () => {
-    const v = videoRef.current
-    if (!v) return
+    const v = videoRef.current; if (!v) return
     v.paused ? v.play() : v.pause()
   }
 
-  const skip = (sec) => {
-    if (videoRef.current) videoRef.current.currentTime += sec
-  }
+  const skip = (s) => { if (videoRef.current) videoRef.current.currentTime += s }
 
-  const skipIntro = () => {
-    if (videoRef.current) videoRef.current.currentTime = INTRO_END
-  }
+  const skipIntro = () => { if (videoRef.current) videoRef.current.currentTime = INTRO_END }
 
   const toggleMute = () => {
-    const v = videoRef.current
-    if (!v) return
-    v.muted = !v.muted
-    setMuted(v.muted)
+    const v = videoRef.current; if (!v) return
+    v.muted = !v.muted; setMuted(v.muted)
   }
 
-  const changeVolumeBy = (delta) => {
-    const newVol = Math.min(1, Math.max(0, volume + delta))
-    setVolume(newVol)
-    if (videoRef.current) { videoRef.current.volume = newVol; videoRef.current.muted = false }
-    setMuted(false)
+  const changeVol = (delta) => {
+    const v = videoRef.current; if (!v) return
+    const nv = Math.min(1, Math.max(0, volume + delta))
+    v.volume = nv; setVolume(nv)
   }
 
   const handleVolumeChange = (e) => {
-    const v = parseFloat(e.target.value)
-    setVolume(v)
-    if (videoRef.current) { videoRef.current.volume = v; videoRef.current.muted = v === 0 }
-    setMuted(v === 0)
+    const val = parseFloat(e.target.value)
+    setVolume(val)
+    if (videoRef.current) { videoRef.current.volume = val; videoRef.current.muted = val === 0 }
+    setMuted(val === 0)
   }
 
   const toggleFullscreen = () => {
-    const el = containerRef.current
-    if (!document.fullscreenElement) el.requestFullscreen?.()
-    else document.exitFullscreen?.()
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen()
+    else document.exitFullscreen()
   }
 
+  // Seek ao clicar na barra
   const seekTo = (e) => {
-    const rect = progressRef.current.getBoundingClientRect()
+    const rect = seekRef.current.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     if (videoRef.current) videoRef.current.currentTime = ratio * duration
   }
 
+  // Seek touch (mobile)
+  const seekTouch = (e) => {
+    const rect = seekRef.current.getBoundingClientRect()
+    const touch = e.touches[0]
+    const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width))
+    if (videoRef.current) videoRef.current.currentTime = ratio * duration
+  }
+
+  const onTimeUpdate = () => {
+    const v = videoRef.current; if (!v) return
+    setCurrentTime(v.currentTime)
+    if (v.buffered.length) setBuffered(v.buffered.end(v.buffered.length - 1))
+    // Salva progresso a cada 5s
+    if (Math.round(v.currentTime) % 5 === 0) saveProgress(animeId, epNum, v.currentTime, v.duration)
+  }
+
   const progress    = duration ? (currentTime / duration) * 100 : 0
   const bufferedPct = duration ? (buffered  / duration) * 100 : 0
-
-  const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
+  const VolumeEmoji = muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'
 
   return (
     <div
       ref={containerRef}
-      className={`vp-container ${showControls ? 'controls-visible' : ''} ${fullscreen ? 'vp-fullscreen' : ''}`}
+      className={`vp-wrap ${showControls ? 'show-ctrl' : ''} ${fullscreen ? 'vp-fs' : ''}`}
       onMouseMove={resetHideTimer}
       onTouchStart={resetHideTimer}
     >
-      {/* Vídeo */}
       <video
         ref={videoRef}
         src={src}
         className="vp-video"
+        autoPlay playsInline
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onTimeUpdate={() => {
-          const v = videoRef.current
-          if (!v) return
-          setCurrentTime(v.currentTime)
-          if (v.buffered.length) setBuffered(v.buffered.end(v.buffered.length - 1))
-        }}
+        onTimeUpdate={onTimeUpdate}
         onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+        onEnded={() => saveProgress(animeId, epNum, duration, duration)}
         onError={onError}
-        playsInline
-        autoPlay
       />
 
-      {/* Clique central play/pause */}
-      <div className="vp-clickzone" onClick={togglePlay} />
+      {/* Clique central */}
+      <div className="vp-click" onClick={togglePlay} />
 
-      {/* Ícone central ao pausar */}
+      {/* Ícone central */}
       {!playing && (
-        <div className="vp-center-icon" onClick={togglePlay}>
-          <Play size={52} fill="white" strokeWidth={0} />
-        </div>
+        <div className="vp-center-icon" onClick={togglePlay}>▶</div>
       )}
 
-      {/* Botão Skip Intro */}
+      {/* Skip intro */}
       {showSkip && (
-        <button className="vp-skip-intro" onClick={skipIntro}>
-          <SkipForward size={14} strokeWidth={2.5} />
-          Pular Abertura
+        <button className="vp-skip" onClick={skipIntro}>
+          ⏭ Pular Abertura
         </button>
       )}
 
-      {/* Gradiente inferior */}
-      <div className="vp-gradient" />
+      {/* Gradiente */}
+      <div className="vp-grad" />
 
       {/* Controles */}
       <div className="vp-controls">
 
-        {/* Barra de progresso */}
+        {/* ── SEEKBAR ── */}
         <div
           className="vp-seekbar"
-          ref={progressRef}
+          ref={seekRef}
           onClick={seekTo}
-          onMouseDown={() => setSeeking(true)}
-          onMouseUp={() => setSeeking(false)}
+          onTouchMove={seekTouch}
         >
           <div className="vp-track">
-            <div className="vp-buffered" style={{ width: `${bufferedPct}%` }} />
-            <div className="vp-progress" style={{ width: `${progress}%` }}>
-              <div className="vp-handle" />
+            <div className="vp-buf" style={{ width: `${bufferedPct}%` }} />
+            <div className="vp-prog" style={{ width: `${progress}%` }}>
+              <div className="vp-thumb" />
             </div>
+          </div>
+          {/* Tempo */}
+          <div className="vp-time">
+            {fmt(currentTime)} / {fmt(duration)}
           </div>
         </div>
 
-        {/* Barra de botões */}
-        <div className="vp-toolbar">
-
-          {/* Esquerda */}
-          <div className="vp-group">
-            <button className="vp-btn" onClick={togglePlay} title={playing ? 'Pausar (Space)' : 'Reproduzir (Space)'}>
-              {playing ? <Pause size={20} fill="white" strokeWidth={0} /> : <Play size={20} fill="white" strokeWidth={0} />}
+        {/* ── BOTÕES ── */}
+        <div className="vp-bar">
+          <div className="vp-left">
+            <button className="vp-btn" onClick={togglePlay}>
+              {playing ? '⏸' : '▶'}
             </button>
+            <button className="vp-btn" onClick={() => skip(-10)}>⏪</button>
+            <button className="vp-btn" onClick={() => skip(10)}>⏩</button>
 
-            <button className="vp-btn" onClick={() => skip(-10)} title="Voltar 10s (←)">
-              <SkipBack size={18} strokeWidth={2} />
-            </button>
-
-            <button className="vp-btn" onClick={() => skip(10)} title="Avançar 10s (→)">
-              <SkipForward size={18} strokeWidth={2} />
-            </button>
-
-            {/* Volume */}
             <div
-              className="vp-volume-group"
+              className="vp-vol-wrap"
               onMouseEnter={() => setShowVolume(true)}
               onMouseLeave={() => setShowVolume(false)}
             >
-              <button className="vp-btn" onClick={toggleMute} title="Mudo (M)">
-                <VolumeIcon size={18} strokeWidth={2} />
-              </button>
-              <div className={`vp-volume-slider-wrap ${showVolume ? 'visible' : ''}`}>
+              <button className="vp-btn" onClick={toggleMute}>{VolumeEmoji}</button>
+              {showVolume && (
                 <input
-                  type="range" min={0} max={1} step={0.02}
+                  type="range" min={0} max={1} step={0.05}
                   value={muted ? 0 : volume}
                   onChange={handleVolumeChange}
-                  className="vp-volume-range"
+                  className="vp-vol-slider"
                 />
-              </div>
+              )}
             </div>
-
-            <span className="vp-time-label">
-              {fmt(currentTime)} <span className="vp-time-sep">/</span> {fmt(duration)}
-            </span>
           </div>
 
-          {/* Direita */}
-          <div className="vp-group">
-            {/* Qualidade */}
+          <div className="vp-right">
             {sources.length > 1 && (
-              <div className="vp-quality-wrap">
-                <button className="vp-btn vp-quality-btn" onClick={() => setShowQuality(o => !o)}>
-                  <Settings size={16} strokeWidth={2} />
-                  <span className="vp-quality-label">
-                    {sources.find(s => s.url === src)?.label || 'Auto'}
-                  </span>
-                </button>
-                {showQuality && (
-                  <div className="vp-quality-menu">
-                    {sources.map(s => (
-                      <button
-                        key={s.url}
-                        className={`vp-quality-item ${s.url === src ? 'active' : ''}`}
-                        onClick={() => { onQualityChange?.(s.url); setShowQuality(false) }}
-                      >
-                        {s.label || 'Auto'}
-                        {s.url === src && <span className="vp-quality-check">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <select
+                className="vp-quality"
+                value={src}
+                onChange={e => onQualityChange?.(e.target.value)}
+              >
+                {sources.map(s => (
+                  <option key={s.url} value={s.url}>{s.label || 'Auto'}</option>
+                ))}
+              </select>
             )}
-
-            <button className="vp-btn" onClick={toggleFullscreen} title="Tela cheia (F)">
-              {fullscreen
-                ? <Minimize size={18} strokeWidth={2} />
-                : <Maximize size={18} strokeWidth={2} />
-              }
+            <button className="vp-btn" onClick={toggleFullscreen}>
+              {fullscreen ? '🗗' : '⛶'}
             </button>
           </div>
         </div>
       </div>
     </div>
   )
-          }
+      }
+                
