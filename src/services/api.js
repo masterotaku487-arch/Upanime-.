@@ -10,13 +10,13 @@ export const isBlocked = (a) =>
 export const getSeasonNow      = (page = 1) =>
   jikan.get(`/seasons/now?page=${page}`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 export const getTopAnime       = (filter = 'airing', page = 1) =>
-  jikan.get(`/top/anime?filter=${filter}&page=${page}&limit=24&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
+  jikan.get(`/top/anime?filter=${filter}&page=${page}&limit=24`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 export const searchAnime       = (q, page = 1) =>
-  jikan.get(`/anime?q=${encodeURIComponent(q)}&page=${page}&limit=20&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
+  jikan.get(`/anime?q=${encodeURIComponent(q)}&page=${page}&limit=20`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 export const getAnimeById      = (id) => jikan.get(`/anime/${id}/full`).then(r => r.data)
 export const getAnimeEpisodes  = (id, page = 1) => jikan.get(`/anime/${id}/episodes?page=${page}`).then(r => r.data)
 export const getGenres         = () => jikan.get('/genres/anime?filter=genres').then(r => ({ ...r.data, data: (r.data.data||[]).filter(g=>!BLOCKED.includes(g.mal_id)) }))
-export const getAnimeByGenre   = (genreId, page = 1) => jikan.get(`/anime?genres=${genreId}&page=${page}&limit=20&order_by=score&sort=desc&sfw=true`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
+export const getAnimeByGenre   = (genreId, page = 1) => jikan.get(`/anime?genres=${genreId}&page=${page}&limit=20&order_by=score&sort=desc`).then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 export const getSeasonUpcoming = () => jikan.get('/seasons/upcoming?limit=16').then(r => ({ ...r.data, data: (r.data.data||[]).filter(a=>!isBlocked(a)) }))
 
 // ══════════════════════════════════════════════════════════════
@@ -161,4 +161,4 @@ export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null
   const data = await afFetch({ action: 'info', slug })
   return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
 }
-  
+
