@@ -1,0 +1,71 @@
+.config-page { padding: 80px 0 120px; max-width: 500px; }
+
+.config-profile {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding: 20px;
+  background: var(--bg2); border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.config-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
+.config-avatar-placeholder {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--surface); display: flex;
+  align-items: center; justify-content: center;
+  color: var(--text-dim); flex-shrink: 0;
+}
+.config-name { font-size: 1.1rem; font-weight: 700; }
+.config-email { font-size: .78rem; color: var(--text-dim); margin-top: 2px; }
+
+.config-stats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.stat-num { font-size: 1.6rem; font-weight: 800; color: var(--red); }
+.stat-label { font-size: .75rem; color: var(--text-dim); }
+
+.config-menu { display: flex; flex-direction: column; gap: 2px; }
+
+.config-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px; border-radius: 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); font-size: .9rem; font-weight: 500;
+  text-decoration: none; cursor: pointer;
+  transition: background .15s, border-color .15s;
+  position: relative;
+}
+.config-item:hover { background: var(--surface); border-color: rgba(255,255,255,.15); }
+.config-badge {
+  margin-left: auto; background: var(--red);
+  color: #fff; font-size: .7rem; font-weight: 700;
+  padding: 2px 8px; border-radius: 99px;
+}
+
+/* Toggle */
+.config-toggle {
+  margin-left: auto; width: 44px; height: 24px;
+  border-radius: 99px; background: rgba(255,255,255,.15);
+  position: relative; transition: background .2s;
+  flex-shrink: 0;
+}
+.config-toggle::after {
+  content: ''; position: absolute;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; top: 3px; left: 3px;
+  transition: transform .2s;
+}
+.config-toggle.on { background: var(--red); }
+.config-toggle.on::after { transform: translateX(20px); }
+
+.config-logout { color: #e57373; margin-top: 8px; }
+.config-logout:hover { border-color: #e57373; }
+
+.config-version {
+  text-align: center; color: var(--text-dim);
+  font-size: .72rem; margin-top: 32px;
+}

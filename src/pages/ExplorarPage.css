@@ -1,0 +1,19 @@
+.explorar-page { padding: 80px 0 80px; }
+.explorar-title {
+  font-size: 1.6rem; font-weight: 800;
+  margin-bottom: 24px; display: flex;
+  align-items: center; gap: 12px;
+}
+.explorar-title span {
+  font-size: .8rem; font-weight: 500;
+  color: var(--text-dim);
+  background: var(--surface); padding: 4px 12px;
+  border-radius: 20px; border: 1px solid var(--border);
+}
+.explorar-empty {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 12px;
+  padding: 60px 0; color: var(--text-dim);
+  font-size: 1rem;
+}
+.explorar-empty span { font-size: 3rem; }
