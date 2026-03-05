@@ -64,9 +64,19 @@ jobs:
             sed -i '/super.onCreate/a \        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {\n            getWindow().getInsetsController().hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());\n            getWindow().getInsetsController().setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);\n        }' "$MAIN"
           fi
 
-      - name: Decodificar Keystore
+      - name: Gerar Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/upanime.keystore
+          keytool -genkeypair \
+            -storetype PKCS12 \
+            -keystore $HOME/upanime.keystore \
+            -alias upanime \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass upanime2026 \
+            -keypass upanime2026 \
+            -dname "CN=UpAnime, OU=App, O=UpAnime, L=Brasil, ST=SP, C=BR"
+          echo "✅ Keystore gerado no runner"
 
       - name: Build APK (não assinado)
         run: |
@@ -76,15 +86,10 @@ jobs:
 
       - name: Assinar APK com apksigner
         run: |
-          # Encontra o apksigner no Android SDK
           APKSIGNER=$(find $ANDROID_HOME/build-tools -name "apksigner" -type f | sort -V | tail -1)
-          echo "Usando: $APKSIGNER"
-
-          # Encontra o APK gerado
           APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          echo "APK encontrado: $APK"
-
-          # Assina
+          echo "apksigner: $APKSIGNER"
+          echo "APK: $APK"
           $APKSIGNER sign \
             --ks $HOME/upanime.keystore \
             --ks-key-alias upanime \
@@ -92,8 +97,7 @@ jobs:
             --key-pass pass:upanime2026 \
             --out upanime-plus.apk \
             "$APK"
-
-          $APKSIGNER verify upanime-plus.apk && echo "✅ APK assinado com sucesso!"
+          $APKSIGNER verify upanime-plus.apk && echo "✅ Assinado!"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
