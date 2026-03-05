@@ -3,7 +3,7 @@ import axios from 'axios'
 // ── Jikan ─────────────────────────────────────────────────────
 const jikan = axios.create({ baseURL: 'https://api.jikan.moe/v4', timeout: 12000 })
 
-const BLOCKED = [12] // 49=Erotica liberado, apenas Hentai bloqueado
+const BLOCKED = [12, 49]
 export const isBlocked = (a) =>
   [...(a.genres || []), ...(a.explicit_genres || [])].some(g => BLOCKED.includes(g.mal_id))
 
@@ -162,4 +162,29 @@ export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null
   return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
 }
 
-        
+
+// ── Filtro avançado (Explorar) ───────────────────────────────
+export const searchAnimeFilter = ({ genres = [], type, year, sort, page = 1 }) => {
+  const params = new URLSearchParams()
+  params.set('page', page)
+  params.set('limit', '24')
+  if (genres.length) params.set('genres', genres.join(','))
+  if (type)  params.set('type', type.toUpperCase())
+  if (year)  params.set('start_date', `${year}-01-01`), params.set('end_date', `${year}-12-31`)
+
+  // Ordenação
+  const sortMap = {
+    bypopularity: { order_by: 'popularity', sort: 'asc' },
+    favorite:     { order_by: 'score',      sort: 'desc' },
+    airing:       { order_by: 'start_date', sort: 'desc', status: 'airing' },
+    upcoming:     { order_by: 'start_date', sort: 'desc', status: 'upcoming' },
+  }
+  const s = sortMap[sort] || sortMap.bypopularity
+  params.set('order_by', s.order_by)
+  params.set('sort', s.sort)
+  if (s.status) params.set('status', s.status)
+
+  return jikan.get(`/anime?${params.toString()}`)
+    .then(r => ({ ...r.data, data: (r.data.data || []).filter(a => !isBlocked(a)) }))
+                                                                                           }
+  
