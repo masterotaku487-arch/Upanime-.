@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
+import VideoPlayer from '../components/VideoPlayer'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
@@ -262,13 +263,14 @@ export default function WatchPage() {
                 </div>
               </div>
             ) : currentSrc ? (
-              <video
+              <VideoPlayer
                 key={currentSrc}
                 src={currentSrc}
-                controls
-                autoPlay
-                playsInline
-                style={{ width: '100%', height: '100%', background: '#000' }}
+                title={`${title} EP${epNum}`}
+                animeId={id}
+                epNum={epNum}
+                sources={sources}
+                onQualityChange={(url) => setCurrentSrc(url)}
                 onError={() => {
                   const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
                   if (directUrl && currentSrc !== directUrl) {
@@ -401,4 +403,4 @@ export default function WatchPage() {
   }
 
 
-    
+        
