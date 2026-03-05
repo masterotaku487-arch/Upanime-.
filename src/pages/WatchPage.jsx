@@ -196,9 +196,35 @@ export default function WatchPage() {
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
     } catch (e) {
-      console.error('[WatchPage]', e)
-      setError(true)
-      setErrorMsg(e.message)
+      console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
+
+      // ── Fallback: fontes BR alternativas ──
+      try {
+        const titleQuery = animeObj.title_english || animeObj.title
+        setStatus('🔄 Tentando fontes alternativas...')
+        const r = await fetch(
+          `/api/altsources?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
+        )
+        const data = await r.json()
+        const hit = data.results?.[0]
+
+        if (hit?.videoSrc) {
+          // Tem URL direta de vídeo
+          setSources([{ url: hit.videoSrc, label: 'Auto', directUrl: hit.videoSrc }])
+          setCurrentSrc(hit.videoSrc)
+          setStatus(`✅ ${hit.source} — ${hit.videoSrc.includes('m3u8') ? 'HLS' : 'MP4'}`)
+        } else if (hit?.pageUrl) {
+          // Tem página com player embed — abre como iframe fallback
+          setCurrentSrc('__embed__')
+          setErrorMsg(hit.pageUrl)
+          setStatus(`✅ ${hit.source} (embed)`)
+        } else {
+          throw new Error('sem fontes')
+        }
+      } catch {
+        setError(true)
+        setErrorMsg(e.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -262,6 +288,14 @@ export default function WatchPage() {
                   </a>
                 </div>
               </div>
+            ) : currentSrc === '__embed__' ? (
+              <iframe
+                src={errorMsg}
+                className="video-iframe"
+                allowFullScreen
+                allow="autoplay; fullscreen"
+                style={{ width: '100%', height: '100%', border: 'none' }}
+              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
@@ -403,4 +437,5 @@ export default function WatchPage() {
   }
 
 
-        
+
+    
