@@ -3,7 +3,7 @@ import axios from 'axios'
 // ── Jikan ─────────────────────────────────────────────────────
 const jikan = axios.create({ baseURL: 'https://api.jikan.moe/v4', timeout: 12000 })
 
-const BLOCKED = [12, 49]
+const BLOCKED = [12]
 export const isBlocked = (a) =>
   [...(a.genres || []), ...(a.explicit_genres || [])].some(g => BLOCKED.includes(g.mal_id))
 
@@ -170,21 +170,17 @@ export const searchAnimeFilter = ({ genres = [], type, year, sort, page = 1 }) =
   params.set('limit', '24')
   if (genres.length) params.set('genres', genres.join(','))
   if (type)  params.set('type', type.toUpperCase())
-  if (year)  params.set('start_date', `${year}-01-01`), params.set('end_date', `${year}-12-31`)
-
-  // Ordenação
+  if (year) { params.set('start_date', `${year}-01-01`); params.set('end_date', `${year}-12-31`) }
   const sortMap = {
     bypopularity: { order_by: 'popularity', sort: 'asc' },
     favorite:     { order_by: 'score',      sort: 'desc' },
-    airing:       { order_by: 'start_date', sort: 'desc', status: 'airing' },
-    upcoming:     { order_by: 'start_date', sort: 'desc', status: 'upcoming' },
+    airing:       { order_by: 'start_date', sort: 'desc' },
+    upcoming:     { order_by: 'start_date', sort: 'desc' },
   }
   const s = sortMap[sort] || sortMap.bypopularity
   params.set('order_by', s.order_by)
   params.set('sort', s.sort)
-  if (s.status) params.set('status', s.status)
-
   return jikan.get(`/anime?${params.toString()}`)
     .then(r => ({ ...r.data, data: (r.data.data || []).filter(a => !isBlocked(a)) }))
-                                                                                           }
-  
+  }
+             
