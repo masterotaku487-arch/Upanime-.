@@ -162,3 +162,13 @@ ul, ol { list-style: none; }
 }
 .btn-fav:hover { border-color: #e53935; color: #e53935; }
 .btn-fav.favorited { background: rgba(229,57,53,.12); border-color: #e53935; color: #e53935; }
+
+/* ── BottomNav: oculta em desktop, mostra no mobile ── */
+@media (min-width: 768px) {
+  .bottom-nav { display: none; }
+}
+
+/* Padding para não ser coberto pelo BottomNav no mobile */
+@media (max-width: 767px) {
+  main { padding-bottom: 70px; }
+}
