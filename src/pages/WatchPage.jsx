@@ -196,35 +196,72 @@ export default function WatchPage() {
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
     } catch (e) {
-      console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
+      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
 
-      // ── Fallback: fontes BR alternativas ──
+      // ── Fallback 1: animesonlinecc.to via Worker ──
       try {
         const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Tentando fontes alternativas...')
-        const r = await fetch(
-          `/api/altsources?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
-        )
-        const data = await r.json()
-        const hit = data.results?.[0]
+        setStatus('🔄 Tentando animesonlinecc.to...')
 
-        if (hit?.videoSrc) {
-          // Tem URL direta de vídeo
-          setSources([{ url: hit.videoSrc, label: 'Auto', directUrl: hit.videoSrc }])
-          setCurrentSrc(hit.videoSrc)
-          setStatus(`✅ ${hit.source} — ${hit.videoSrc.includes('m3u8') ? 'HLS' : 'MP4'}`)
-        } else if (hit?.pageUrl) {
-          // Tem página com player embed — abre como iframe fallback
-          setCurrentSrc('__embed__')
-          setErrorMsg(hit.pageUrl)
-          setStatus(`✅ ${hit.source} (embed)`)
-        } else {
-          throw new Error('sem fontes')
+        const ccRes = await fetch(
+          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+          `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
+        )
+        const ccData = await ccRes.json()
+
+        if (ccData.sources?.length) {
+          const mp4s = ccData.sources.filter(s => !s.isM3U8)
+          const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
+          setSources(ccData.sources)
+          setCurrentSrc(best?.url || ccData.sources[0].url)
+          setStatus(`✅ animesonlinecc — ${best?.label || 'Auto'}`)
+          setLoading(false)
+          return
         }
-      } catch {
-        setError(true)
-        setErrorMsg(e.message)
+
+        if (ccData.iframe) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(ccData.iframe)
+          setStatus('✅ animesonlinecc (embed)')
+          setLoading(false)
+          return
+        }
+
+        if (ccData.pageUrl) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(ccData.pageUrl)
+          setStatus('✅ animesonlinecc (página)')
+          setLoading(false)
+          return
+        }
+      } catch (ccErr) {
+        console.warn('[animesonlinecc]', ccErr.message)
       }
+
+      // ── Fallback 2: título em japonês ──
+      if (animeObj.title !== animeObj.title_english) {
+        try {
+          setStatus('🔄 Tentando título original...')
+          const ccRes2 = await fetch(
+            `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+            `&title=${encodeURIComponent(animeObj.title)}&ep=${ep}&dub=${dub ? '1' : '0'}`
+          )
+          const ccData2 = await ccRes2.json()
+          if (ccData2.sources?.length || ccData2.iframe || ccData2.pageUrl) {
+            const src = ccData2.sources?.[0]?.url || ccData2.iframe || ccData2.pageUrl
+            const isEmbed = !ccData2.sources?.length
+            setSources(ccData2.sources || [])
+            setCurrentSrc(isEmbed ? '__embed__' : src)
+            if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
+            setStatus(`✅ animesonlinecc (JP) — Auto`)
+            setLoading(false)
+            return
+          }
+        } catch {}
+      }
+
+      setError(true)
+      setErrorMsg(e.message)
     } finally {
       setLoading(false)
     }
@@ -267,7 +304,11 @@ export default function WatchPage() {
                 <div className="loading-ring" />
                 <img src="/logo.png" className="loading-logo" alt="" />
                 <p className="loading-text">{status}</p>
-                <p className="loading-sub">Fonte: 🇧🇷 AnimeFire via Cloudflare</p>
+                <p className="loading-sub">
+                  {status.includes('animesonlinecc') ? 'Fonte: 🌐 animesonlinecc.to'
+                   : status.includes('Tentando') ? '🔄 Buscando fontes...'
+                   : 'Fonte: 🇧🇷 AnimeFire via Cloudflare'}
+                </p>
               </div>
             ) : error ? (
               <div className="player-error">
@@ -288,14 +329,6 @@ export default function WatchPage() {
                   </a>
                 </div>
               </div>
-            ) : currentSrc === '__embed__' ? (
-              <iframe
-                src={errorMsg}
-                className="video-iframe"
-                allowFullScreen
-                allow="autoplay; fullscreen"
-                style={{ width: '100%', height: '100%', border: 'none' }}
-              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
@@ -339,7 +372,9 @@ export default function WatchPage() {
               </div>
             )}
             {afSlug && !loading && !error && (
-              <span className="provider-tag" style={{ marginLeft: 'auto' }}>✅ AnimeFire</span>
+              <span className="provider-tag" style={{ marginLeft: 'auto' }}>
+                {status.includes('animesonlinecc') ? '🌐 animesonlinecc' : '✅ AnimeFire'}
+              </span>
             )}
           </div>
 
@@ -438,4 +473,4 @@ export default function WatchPage() {
 
 
 
-    
+  
