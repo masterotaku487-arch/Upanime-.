@@ -42,7 +42,7 @@ export default function GenresPage() {
   const navigate = useNavigate()
   const [genres, setGenres] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showAll, setShowAll] = useState(false)
+  const [showAll, setShowAll] = useState(true)
 
   // Filtros
   const [selGenres, setSelGenres] = useState([])
@@ -144,5 +144,5 @@ export default function GenresPage() {
       <button className="apply-btn" onClick={apply}>Aplicar filtro</button>
     </div>
   )
-  }
-      
+                 }
+                                     
