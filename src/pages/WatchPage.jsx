@@ -163,13 +163,23 @@ export default function WatchPage() {
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
-      if (d.status === 'fulfilled') setAnime(d.value.data)
+      if (d.status === 'fulfilled') {
+        const a = d.value.data
+        setAnime(a)
+        // Título dinâmico com ep: "Naruto EP 1 - Assistir | Up Anime+"
+        const t = a.title_english || a.title || 'Anime'
+        const epNum = searchParams.get('ep') || '1'
+        document.title = `${t} EP ${epNum} - Assistir | Up Anime+`
+      }
       if (e.status === 'fulfilled') {
         setEpisodes(e.value.data || [])
         setHasMoreEps(e.value.pagination?.has_next_page || false)
       }
     })
     window.scrollTo(0, 0)
+    return () => {
+      document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD'
+    }
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
@@ -268,7 +278,12 @@ export default function WatchPage() {
   }
 
   useEffect(() => {
-    if (anime) doLoad(anime, epNum, isDub, afSlug)
+    if (anime) {
+      doLoad(anime, epNum, isDub, afSlug)
+      // Atualiza título com número do episódio atual
+      const t = anime.title_english || anime.title || 'Anime'
+      document.title = `${t} EP ${epNum} - Assistir | Up Anime+`
+    }
   }, [anime, epNum, isDub])
 
   const goEp = (n) => setSearchParams({ ep: n, ...(isDub ? { dub: '1' } : {}) })
@@ -473,4 +488,5 @@ export default function WatchPage() {
 
 
 
-  
+
+          
