@@ -38,7 +38,49 @@ export default function AnimePage() {
           getAnimeEpisodes(id, 1),
         ])
         if (data.status === 'fulfilled') {
-          setAnime(data.value.data)
+          const a = data.value.data
+          setAnime(a)
+
+          // ── Título dinâmico ──────────────────────────────────────
+          const t = a.title_english || a.title || 'Anime'
+          document.title = `${t} - Assistir Online | Up Anime+`
+
+          // ── Meta description dinâmica ────────────────────────────
+          const desc = document.querySelector('meta[name="description"]')
+          if (desc) desc.setAttribute('content',
+            `Assista ${t} online grátis em HD no Up Anime+. ${(a.synopsis || '').slice(0, 130)}`)
+
+          // ── Schema BreadcrumbList + TVSeries ─────────────────────
+          let schEl = document.getElementById('anime-page-schema')
+          if (!schEl) {
+            schEl = document.createElement('script')
+            schEl.id = 'anime-page-schema'
+            schEl.type = 'application/ld+json'
+            document.head.appendChild(schEl)
+          }
+          schEl.textContent = JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                  { '@type': 'ListItem', position: 1, name: 'Início',   item: 'https://upanime-nine.vercel.app/' },
+                  { '@type': 'ListItem', position: 2, name: t, item: `https://upanime-nine.vercel.app/anime/${id}` },
+                ],
+              },
+              {
+                '@type': 'TVSeries',
+                name: t,
+                description: (a.synopsis || '').slice(0, 300),
+                image: a.images?.jpg?.large_image_url || '',
+                url: `https://upanime-nine.vercel.app/anime/${id}`,
+                numberOfEpisodes: a.episodes || undefined,
+                genre: a.genres?.map(g => g.name) || [],
+                startDate: a.aired?.from ? a.aired.from.slice(0, 10) : undefined,
+              },
+            ],
+          })
+
           // Carrega AniList em paralelo (não bloqueia)
           getAniListByMalId(id).then(al => setAlData(al)).catch(() => {})
         }
@@ -49,6 +91,11 @@ export default function AnimePage() {
     }
     load()
     window.scrollTo(0, 0)
+    return () => {
+      // Restaura título e schema ao sair da página
+      document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD'
+      document.getElementById('anime-page-schema')?.remove()
+    }
   }, [id])
 
   const loadMoreEps = async () => {
@@ -229,4 +276,5 @@ export default function AnimePage() {
                   }
 
 
-            
+
+                                                                                      
