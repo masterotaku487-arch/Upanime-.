@@ -21,9 +21,9 @@ const ENDPOINTS = [
   },
   {
     id: 'video2',
-    label: 'Fonte Alternativa',
-    icon: '🌐',
-    url: 'https://animeonline-proxy.masterotaku487.workers.dev/?action=search&title=naruto',
+    label: 'Fonte Alternativa 2',
+    icon: '☁️',
+    url: 'https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=search&title=naruto',
     method: 'GET',
   },
   {
@@ -247,4 +247,5 @@ export default function ApiStatusPage() {
       </p>
     </div>
   )
-}
+      }
+                        
