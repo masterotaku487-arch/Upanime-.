@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // ── Jikan ─────────────────────────────────────────────────────
-const jikan = axios.create({ baseURL: 'https://api.jikan.moe/v4', timeout: 12000 })
+const jikan = axios.create({ baseURL: 'https://jikan-cache.masterotaku487.workers.dev', timeout: 12000 })
 
 const BLOCKED = [12]
 export const isBlocked = (a) =>
@@ -183,4 +183,5 @@ export const searchAnimeFilter = ({ genres = [], type, year, sort, page = 1 }) =
   return jikan.get(`/anime?${params.toString()}`)
     .then(r => ({ ...r.data, data: (r.data.data || []).filter(a => !isBlocked(a)) }))
   }
-             
+
+                 
