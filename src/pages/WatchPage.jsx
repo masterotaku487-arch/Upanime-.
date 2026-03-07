@@ -271,13 +271,13 @@ export default function WatchPage() {
         } catch {}
       }
 
-      // ── Fallback 3: animeshd.to via Worker ──────────────────
+      // ── Fallback 3: animesonline.cloud via Worker ─────────────
       try {
         const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Tentando animeshd.to...')
+        setStatus('🔄 Tentando animesonline.cloud...')
 
         const hdRes = await fetch(
-          `https://animeshd-proxy.masterotaku487.workers.dev/?action=episode` +
+          `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
           `&title=${encodeURIComponent(titleQuery)}&ep=${ep}`
         )
         const hdData = await hdRes.json()
@@ -287,26 +287,26 @@ export default function WatchPage() {
           const best = bestQuality(mp4s.length ? mp4s : hdData.sources)
           setSources(hdData.sources)
           setCurrentSrc(best?.url || hdData.sources[0].url)
-          setStatus(`✅ animeshd — ${best?.label || 'Auto'}`)
+          setStatus(`✅ animesonline.cloud — ${best?.label || 'Auto'}`)
           setLoading(false)
           return
         }
         if (hdData.iframe) {
           setCurrentSrc('__embed__')
           setErrorMsg(hdData.iframe)
-          setStatus('✅ animeshd (embed)')
+          setStatus('✅ animesonline.cloud (embed)')
           setLoading(false)
           return
         }
         if (hdData.pageUrl) {
           setCurrentSrc('__embed__')
           setErrorMsg(hdData.pageUrl)
-          setStatus('✅ animeshd (página)')
+          setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
         }
       } catch (hdErr) {
-        console.warn('[animeshd]', hdErr.message)
+        console.warn('[animesonlinecloud]', hdErr.message)
       }
 
       setError(true)
@@ -362,7 +362,7 @@ export default function WatchPage() {
                 <p className="loading-text">{status}</p>
                 <p className="loading-sub">
                   {status.includes('animesonlinecc') ? 'Fonte: 🌐 animesonlinecc.to'
-                   : status.includes('animeshd')     ? 'Fonte: 🎬 animeshd.to'
+                   : status.includes('animesonlinecloud') ? 'Fonte: ☁️ animesonline.cloud'
                    : status.includes('Tentando')     ? '🔄 Buscando fontes...'
                    : 'Fonte: 🇧🇷 AnimeFire via Cloudflare'}
                 </p>
@@ -500,34 +500,4 @@ export default function WatchPage() {
                 <p className="watch-synopsis">{synopsis.slice(0, 300)}{synopsis.length > 300 ? '...' : ''}</p>
               )}
             </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <aside className="ep-sidebar">
-          <div className="sidebar-head">
-            <span>📋 Episódios</span>
-            {anime?.episodes && <span className="ep-count-badge">{anime.episodes}</span>}
-          </div>
-          <div className="ep-scroll">
-            {episodes.map(ep => (
-              <button key={ep.mal_id} className={`ep-row ${ep.mal_id === epNum ? 'playing' : ''}`} onClick={() => goEp(ep.mal_id)}>
-                <span className="ep-row-num">{ep.mal_id}</span>
-                <div className="ep-row-info">
-                  <span className="ep-row-title">{ep.title || `Episódio ${ep.mal_id}`}</span>
-                  {ep.aired && <span className="ep-row-date">{new Date(ep.aired).toLocaleDateString('pt-BR')}</span>}
-                </div>
-                {ep.mal_id === epNum && <span className="now-playing">▶</span>}
-              </button>
-            ))}
-            {hasMoreEps && <button className="load-more-btn" onClick={loadMoreEps}>⬇ Carregar mais</button>}
-          </div>
-        </aside>
-      </div>
-    </div>
-  )
-  }
-
-
-
-  
+        
