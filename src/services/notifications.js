@@ -47,7 +47,7 @@ export const checkNewEpisodes = async (favorites) => {
     try {
       await new Promise(r => setTimeout(r, 500)) // respeita rate-limit Jikan
 
-      const res  = await fetch(`https://api.jikan.moe/v4/anime/${fav.mal_id}`)
+      const res  = await fetch(`https://jikan-cache.masterotaku487.workers.dev/anime/${fav.mal_id}`)
       if (!res.ok) continue
       const data = await res.json()
       const current = data.data?.episodes_aired ?? data.data?.episodes ?? 0
