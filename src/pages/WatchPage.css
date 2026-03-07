@@ -229,3 +229,31 @@ code {
   background: var(--surface); padding: 1px 6px;
   border-radius: 4px; font-size: 0.78rem; color: #f5c518;
               }
+
+/* ── Toasts de conquista ───────────────────────────── */
+.achievement-toasts {
+  position: fixed; top: 80px; right: 16px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 10px;
+  pointer-events: none;
+}
+.achievement-toast {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border-radius: 12px;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid rgba(234,179,8,.4);
+  box-shadow: 0 4px 20px rgba(0,0,0,.5), 0 0 20px rgba(234,179,8,.1);
+  animation: slideIn .4s ease, fadeOut .4s ease 4.6s forwards;
+  min-width: 240px;
+}
+.ach-toast-icon  { font-size: 1.8rem; flex-shrink: 0; }
+.ach-toast-label { display: block; font-size: .65rem; color: #eab308; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.ach-toast-title { display: block; font-size: .88rem; font-weight: 700; color: #fff; margin-top: 2px; }
+
+@keyframes slideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; transform: translateX(120%); }
+}
