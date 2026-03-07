@@ -4,9 +4,10 @@ import { useFavorites } from '../context/FavoritesContext'
 import { Link } from 'react-router-dom'
 import {
   FiHeart, FiLogOut, FiUser, FiInfo, FiShield, FiBell,
-  FiExternalLink, FiClock, FiTrash2, FiActivity,
+  FiExternalLink, FiClock, FiTrash2, FiActivity, FiAward,
 } from 'react-icons/fi'
 import { getHistory, clearHistory, getEpProgress } from '../services/history'
+import { loadAchievements, ACHIEVEMENTS } from '../services/achievements'
 import { requestNotifPermission } from '../services/notifications'
 import './ConfigPage.css'
 
@@ -16,8 +17,13 @@ export default function ConfigPage() {
   const [notif,    setNotif]    = useState(() => localStorage.getItem('upanime_notif') === '1')
   const [history,  setHistory]  = useState([])
   const [showHist, setShowHist] = useState(false)
+  const [achCount, setAchCount] = useState(0)
 
-  useEffect(() => { setHistory(getHistory()) }, [])
+  useEffect(() => {
+    setHistory(getHistory())
+    const ach = loadAchievements()
+    setAchCount(ach.unlocked?.length || 0)
+  }, [])
 
   const toggleNotif = async () => {
     if (!notif) {
@@ -74,6 +80,10 @@ export default function ConfigPage() {
           <span className="stat-num">{history.length}</span>
           <span className="stat-label">Assistidos</span>
         </div>
+        <div className="stat-card">
+          <span className="stat-num">{achCount}/{ACHIEVEMENTS.length}</span>
+          <span className="stat-label">Conquistas</span>
+        </div>
       </div>
 
       {/* Histórico de assistidos */}
@@ -129,6 +139,11 @@ export default function ConfigPage() {
           </Link>
         )}
 
+        <Link to="/conquistas" className="config-item">
+          <FiAward /> Minhas Conquistas
+          {achCount > 0 && <span className="config-badge">{achCount}</span>}
+        </Link>
+
         <button className="config-item" onClick={toggleNotif}>
           <FiBell /> Notificações de Novos EPs
           <div className={`config-toggle ${notif ? 'on' : ''}`} />
@@ -155,4 +170,4 @@ export default function ConfigPage() {
       <p className="config-version">Up Anime+ v2.0.0</p>
     </div>
   )
-      }
+                                                                          }
