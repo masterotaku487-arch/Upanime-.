@@ -141,9 +141,9 @@ export default function ConfigPage() {
 
         <Link to="/termos" className="config-item"><FiInfo /> Termos de Uso</Link>
         <Link to="/privacidade" className="config-item"><FiShield /> Política de Privacidade</Link>
-        <a href="https://upanime-nine.vercel.app" target="_blank" rel="noreferrer" className="config-item">
+        <Link to="/sobre" className="config-item">
           <FiExternalLink /> Sobre o Up Anime+
-        </a>
+        </Link>
 
         {user && (
           <button className="config-item config-logout" onClick={logout}>
@@ -155,4 +155,4 @@ export default function ConfigPage() {
       <p className="config-version">Up Anime+ v2.0.0</p>
     </div>
   )
-}
+      }
