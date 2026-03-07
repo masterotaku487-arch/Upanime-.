@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { FiPlay, FiInfo, FiChevronLeft, FiChevronRight, FiStar } from 'react-icons/fi'
+import { useTranslatedSynopsis } from '../services/translate'
 import './Hero.css'
+
+// Sub-componente para sinopse traduzida de cada slide
+function HeroSynopsis({ synopsis }) {
+  const translated = useTranslatedSynopsis(synopsis)
+  if (!translated) return null
+  const text = translated.slice(0, 220)
+  return <p className="hero-synopsis">{text}{translated.length > 220 ? '...' : ''}</p>
+}
 
 export default function Hero({ animes }) {
   const [current, setCurrent] = useState(0)
@@ -26,7 +35,6 @@ export default function Hero({ animes }) {
 
   const anime = items[current]
   const image = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url
-  const synopsis = anime.synopsis?.slice(0, 220)
 
   return (
     <section className="hero">
@@ -61,7 +69,7 @@ export default function Hero({ animes }) {
           {anime.episodes && <span className="hero-tag">{anime.episodes} eps</span>}
           {anime.status && <span className="hero-tag">{anime.status}</span>}
         </div>
-        {synopsis && <p className="hero-synopsis">{synopsis}{anime.synopsis?.length > 220 ? '...' : ''}</p>}
+        {anime.synopsis && <HeroSynopsis synopsis={anime.synopsis} />}
         <div className="hero-actions">
           <Link to={`/anime/${anime.mal_id}`} className="btn btn-primary">
             <FiPlay /> Assistir Agora
