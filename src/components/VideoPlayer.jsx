@@ -38,7 +38,7 @@ export const getAnimeProgress = (animeId, totalEps) => {
   return null
 }
 
-export default function VideoPlayer({ src, title, animeId, epNum, onError, sources = [], onQualityChange }) {
+export default function VideoPlayer({ src, title, animeId, epNum, onError, sources = [], onQualityChange, onEpisodeWatched }) {
   const videoRef     = useRef(null)
   const containerRef = useRef(null)
   const seekRef      = useRef(null)
@@ -147,12 +147,19 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     if (videoRef.current) videoRef.current.currentTime = ratio * duration
   }
 
+  const watchedTriggered = useRef(false)
+
   const onTimeUpdate = () => {
     const v = videoRef.current; if (!v) return
     setCurrentTime(v.currentTime)
     if (v.buffered.length) setBuffered(v.buffered.end(v.buffered.length - 1))
     // Salva progresso a cada 5s
     if (Math.round(v.currentTime) % 5 === 0) saveProgress(animeId, epNum, v.currentTime, v.duration)
+    // Dispara conquista ao assistir ≥75% do ep
+    if (!watchedTriggered.current && v.duration > 0 && (v.currentTime / v.duration) >= 0.75) {
+      watchedTriggered.current = true
+      onEpisodeWatched?.()
+    }
   }
 
   const progress    = duration ? (currentTime / duration) * 100 : 0
@@ -266,4 +273,5 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     </div>
   )
       }
-                
+
+    
