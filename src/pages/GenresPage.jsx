@@ -15,7 +15,7 @@ const GENRE_LABELS = {
   'School':'Vida Escolar','Magic':'Magia','Demons':'Demônios','Vampire':'Vampiro',
   'Samurai':'Samurai','Space':'Espaço','Game':'Jogos','Cars':'Carros',
   'Parody':'Paródia','Martial Arts':'Artes Marciais','Super Power':'Super Poderes',
-  'Kids':'Infantil','Josei':'Josei','Girls Love':'Girls Love','Boys Love':'Boys Love',
+  'Kids':'Infantil','Girls Love':'Girls Love','Boys Love':'Boys Love',
   'Avant Garde':'Avant Garde','Award Winning':'Premiado','Gourmet':'Gastronomia',
   'Suspense':'Suspense','Gore':'Gore','Erotica':'Adulto',
 }
@@ -145,4 +145,4 @@ export default function GenresPage() {
     </div>
   )
                  }
-                                     
+
