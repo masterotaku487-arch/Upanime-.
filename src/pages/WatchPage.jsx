@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
+import { saveHistory } from '../services/history'
 import VideoPlayer from '../components/VideoPlayer'
 import './WatchPage.css'
 
@@ -283,6 +284,8 @@ export default function WatchPage() {
       // Atualiza título com número do episódio atual
       const t = anime.title_english || anime.title || 'Anime'
       document.title = `${t} EP ${epNum} - Assistir | Up Anime+`
+      // Salva no histórico
+      saveHistory(anime, epNum)
     }
   }, [anime, epNum, isDub])
 
@@ -489,4 +492,4 @@ export default function WatchPage() {
 
 
 
-          
+  
