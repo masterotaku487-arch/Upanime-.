@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom'
-import './LegalPage.css'
+import './SobrePage.css'
 
 export default function SobrePage() {
   return (
-    <div className="legal-page container">
-      <div className="legal-header">
+    <div className="sobre-page container">
+      <div className="sobre-header">
         <h1>Sobre o <span>Up Anime+</span></h1>
         <p>A plataforma de animes feita para a comunidade brasileira 🇧🇷</p>
       </div>
 
-      <div className="legal-body">
+      <div className="sobre-body">
         <section>
           <h2>🎌 O que é o Up Anime+?</h2>
           <p>
@@ -23,8 +23,7 @@ export default function SobrePage() {
         <section>
           <h2>⚙️ Como funciona?</h2>
           <p>
-            O site usa uma combinação de fontes para entregar o melhor vídeo possível. Quando você
-            aperta play, ele tenta automaticamente:
+            Quando você aperta play, o site tenta automaticamente as melhores fontes em ordem:
           </p>
           <ol>
             <li><strong>🇧🇷 AnimeFire</strong> — fonte principal com episódios em português</li>
@@ -32,8 +31,8 @@ export default function SobrePage() {
             <li><strong>🎬 animeshd.to</strong> — terceira opção de fallback</li>
           </ol>
           <p>
-            Todo esse processo acontece em segundos, de forma invisível para o usuário.
-            O catálogo é alimentado pela API pública do <strong>MyAnimeList (Jikan)</strong>.
+            O catálogo é alimentado pela API pública do <strong>MyAnimeList (Jikan)</strong> com cache
+            via Cloudflare para carregamento mais rápido.
           </p>
         </section>
 
@@ -42,24 +41,7 @@ export default function SobrePage() {
           <p>
             Desenvolvido com <strong>React + Vite</strong>, hospedado na <strong>Vercel</strong>
             e usando <strong>Cloudflare Workers</strong> como proxies para as fontes de vídeo.
-            Toda a lógica de busca e fallback roda em menos de 3 segundos.
           </p>
-        </section>
-
-        <section>
-          <h2>📺 Canal no YouTube</h2>
-          <p>
-            O Up Anime+ apoia criadores de conteúdo de anime. Acompanhe o canal parceiro
-            para recomendações e novidades:
-          </p>
-          <a
-            href="https://youtube.com/@kazu_sempau-chan"
-            target="_blank"
-            rel="noreferrer"
-            className="sobre-yt-btn"
-          >
-            📺 Kazu Sempai no YouTube
-          </a>
         </section>
 
         <section>
@@ -71,10 +53,11 @@ export default function SobrePage() {
           </p>
         </section>
 
-        <div className="sobre-links">
+        <div className="sobre-footer-links">
           <Link to="/termos">📄 Termos de Uso</Link>
           <Link to="/privacidade">🛡️ Privacidade</Link>
           <Link to="/api-status">📊 Status dos Serviços</Link>
+          <Link to="/">← Voltar</Link>
         </div>
       </div>
     </div>
