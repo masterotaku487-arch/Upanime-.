@@ -3,7 +3,9 @@ import { useAuth } from '../context/AuthContext'
 import { FiBug, FiMessageSquare, FiX, FiSend, FiCheck } from 'react-icons/fi'
 import './FeedbackModal.css'
 
-const WORKER = 'https://comments-proxy.masterotaku487.workers.dev'
+// Cole aqui o ID do seu form no formspree.io (ex: xpzvkqaw)
+const FORMSPREE_ID = 'xyknzpwr'
+const FORMSPREE_URL = `https://formspree.io/f/${FORMSPREE_ID}`
 
 const BUG_OPTIONS = [
   { id: 'no_video',     icon: '📺', label: 'Vídeo não carregou' },
@@ -34,30 +36,31 @@ export default function FeedbackModal({ onClose, animeId, ep, animeTitle }) {
     if (tab === 'feedback' && rating === 0) return
     setSending(true)
     try {
-      const payload = tab === 'bug'
+      const bugsLabel = bugs.map(id => BUG_OPTIONS.find(b => b.id === id)?.label || id).join(', ')
+
+      const formData = tab === 'bug'
         ? {
-            type:    'bug',
-            bugs,
-            note:    note.trim(),
-            animeId: animeId || null,
-            ep:      ep      || null,
-            animeTitle: animeTitle || null,
-            user:    user ? { id: user.id, name: user.name } : null,
-            ts:      Date.now(),
-            url:     window.location.href,
+            _subject:   `🐛 Bug: ${animeTitle || 'Geral'} EP${ep || '?'}`,
+            tipo:       'Bug Report',
+            problemas:  bugsLabel,
+            detalhes:   note.trim() || '—',
+            anime:      animeTitle  || '—',
+            episodio:   ep          || '—',
+            url:        window.location.href,
+            usuario:    user ? `${user.name} (${user.id})` : 'Visitante',
           }
         : {
-            type:   'feedback',
-            rating,
-            text:   feedText.trim(),
-            user:   user ? { id: user.id, name: user.name } : null,
-            ts:     Date.now(),
+            _subject:   `💬 Feedback — ${rating}⭐`,
+            tipo:       'Feedback',
+            nota:       `${'⭐'.repeat(rating)} (${rating}/5)`,
+            mensagem:   feedText.trim() || '—',
+            usuario:    user ? `${user.name} (${user.id})` : 'Visitante',
           }
 
-      await fetch(`${WORKER}?action=report`, {
+      await fetch(FORMSPREE_URL, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body:    JSON.stringify(formData),
       })
       setDone(true)
     } catch {}
