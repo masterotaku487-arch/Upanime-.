@@ -114,3 +114,11 @@
   0%, 100% { opacity: 1; }
   50% { opacity: .4; }
 }
+.edit-profile-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); flex-shrink: 0; text-decoration: none;
+  transition: border-color .15s, color .15s;
+}
+.edit-profile-btn:hover { border-color: var(--red); color: var(--red); }
