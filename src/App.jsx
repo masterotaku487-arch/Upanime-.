@@ -19,6 +19,7 @@ import ConfigPage from './pages/ConfigPage'
 import ApiStatusPage from './pages/ApiStatusPage'
 import SobrePage from './pages/SobrePage'
 import AchievementsPage from './pages/AchievementsPage'
+import ProfilePage from './pages/ProfilePage'
 import { checkNewEpisodes, notifEnabled } from './services/notifications'
 
 // Checa novos eps dos favoritos (roda uma vez ao abrir o site)
@@ -56,6 +57,7 @@ function AppInner() {
           <Route path="/api-status"        element={<ApiStatusPage />} />
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
+          <Route path="/perfil"             element={<ProfilePage />} />
         </Routes>
       </main>
       {!isWatch && <BottomNav />}
