@@ -52,10 +52,13 @@ export default function ConfigPage() {
         {user ? (
           <>
             <img src={user.picture} alt={user.name} className="config-avatar" />
-            <div>
+            <div style={{ flex: 1 }}>
               <h2 className="config-name">{user.name}</h2>
               <p className="config-email">{user.email}</p>
             </div>
+            <Link to="/perfil" className="edit-profile-btn" title="Editar perfil">
+              <FiUser size={16} />
+            </Link>
           </>
         ) : (
           <>
@@ -170,4 +173,5 @@ export default function ConfigPage() {
       <p className="config-version">Up Anime+ v2.0.0</p>
     </div>
   )
-                                                                          }
+            }
+              
