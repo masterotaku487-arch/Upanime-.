@@ -39,6 +39,9 @@ export const ACHIEVEMENTS = [
 
   // Raras
   { id: 'days_100',       icon: '🏆', title: 'Lenda do Up Anime+',  desc: 'Usou o site por 100 dias',          type: 'days',    value: 100, rare: true },
+
+  // Beta
+  { id: 'beta_tester',    icon: '🧪', title: 'Beta Tester',         desc: 'Acessou o Up Anime+ durante o beta', type: 'special', rare: true },
 ]
 
 // ─── Carrega / salva stats ──────────────────────────────────────────────────
@@ -74,7 +77,7 @@ export const loadAchievements = () => {
   } catch { return { unlocked: [], seenAt: {} } }
 }
 
-const saveAchievements = (a) => {
+export const saveAchievements = (a) => {
   try { localStorage.setItem(KEY_ACHIEVEMENTS, JSON.stringify(a)) } catch {}
 }
 
@@ -186,4 +189,5 @@ export const getProgress = (achievement, stats) => {
   if (achievement.type === 'animes')  return { current: s.totalAnimes,     max: achievement.value }
   if (achievement.type === 'days')    return { current: s.daysUsed.length, max: achievement.value }
   return null
-}
+   }
+  
