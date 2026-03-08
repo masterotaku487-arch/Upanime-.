@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { FiHeart, FiTrash2, FiSend } from 'react-icons/fi'
+import { FiHeart, FiTrash2, FiSend, FiAlertCircle } from 'react-icons/fi'
 import './Comments.css'
 
 const WORKER = 'https://comments-proxy.masterotaku487.workers.dev'
@@ -16,38 +16,45 @@ const timeAgo = (ts) => {
 }
 
 export default function Comments({ animeId, ep }) {
-  const { user, openLogin } = useAuth()
+  const { user, login } = useAuth()
   const [comments, setComments] = useState([])
   const [likes,    setLikes]    = useState(0)
   const [liked,    setLiked]    = useState(false)
   const [text,     setText]     = useState('')
   const [loading,  setLoading]  = useState(true)
   const [sending,  setSending]  = useState(false)
+  const [errMsg,   setErrMsg]   = useState('')
   const textareaRef = useRef(null)
 
+  const showErr = (msg) => { setErrMsg(msg); setTimeout(() => setErrMsg(''), 4000) }
+
   const fetchComments = async () => {
+    setLoading(true)
     try {
       const r = await fetch(`${WORKER}?action=list&anime=${animeId}&ep=${ep}`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const d = await r.json()
       setComments(d.comments || [])
       setLikes(d.likes || 0)
-      // Checa se o usuário já curtiu (localStorage como cache local)
       if (user) {
         const likedKey = `liked_${user.id}_${animeId}_${ep}`
         setLiked(!!localStorage.getItem(likedKey))
       }
-    } catch {}
-    finally { setLoading(false) }
+    } catch (e) {
+      showErr('Erro ao carregar comentários: ' + e.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    setLoading(true)
     setComments([])
+    setLiked(false)
     fetchComments()
   }, [animeId, ep])
 
   const handleLike = async () => {
-    if (!user) { openLogin(); return }
+    if (!user) { login(); return }
     const likedKey = `liked_${user.id}_${animeId}_${ep}`
     try {
       const r = await fetch(`${WORKER}?action=like&anime=${animeId}&ep=${ep}`, {
@@ -56,18 +63,20 @@ export default function Comments({ animeId, ep }) {
         body: JSON.stringify({ userId: user.id }),
       })
       const d = await r.json()
+      if (d.error) { showErr(d.error); return }
       setLikes(d.likes)
       setLiked(d.liked)
       if (d.liked) localStorage.setItem(likedKey, '1')
       else localStorage.removeItem(likedKey)
-    } catch {}
+    } catch (e) { showErr('Erro ao curtir: ' + e.message) }
   }
 
   const handleSend = async () => {
-    if (!user) { openLogin(); return }
+    if (!user) { login(); return }
     const trimmed = text.trim()
     if (!trimmed || sending) return
     setSending(true)
+    setErrMsg('')
     try {
       const r = await fetch(`${WORKER}?action=comment&anime=${animeId}&ep=${ep}`, {
         method: 'POST',
@@ -75,47 +84,58 @@ export default function Comments({ animeId, ep }) {
         body: JSON.stringify({
           userId: user.id,
           name:   user.name,
-          avatar: user.picture,
+          avatar: user.picture || '',
           text:   trimmed,
         }),
       })
       const d = await r.json()
-      if (d.ok) {
+      if (!r.ok || d.error) {
+        showErr(d.error || `Erro ${r.status}`)
+        return
+      }
+      if (d.ok && d.comment) {
         setComments(prev => [d.comment, ...prev])
         setText('')
         textareaRef.current?.focus()
-      } else {
-        alert(d.error || 'Erro ao enviar')
       }
-    } catch {}
-    finally { setSending(false) }
+    } catch (e) {
+      showErr('Erro de conexão: ' + e.message)
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleDelete = async (commentId) => {
-    if (!user) return
-    if (!confirm('Apagar comentário?')) return
+    if (!user || !confirm('Apagar comentário?')) return
     try {
-      await fetch(`${WORKER}?action=comment&anime=${animeId}&ep=${ep}`, {
+      const r = await fetch(`${WORKER}?action=comment&anime=${animeId}&ep=${ep}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, commentId }),
       })
-      setComments(prev => prev.filter(c => c.id !== commentId))
-    } catch {}
+      const d = await r.json()
+      if (d.ok) setComments(prev => prev.filter(c => c.id !== commentId))
+      else showErr(d.error || 'Não foi possível apagar')
+    } catch (e) { showErr('Erro: ' + e.message) }
   }
 
   return (
     <div className="comments-section">
-      {/* Botão de like do episódio */}
       <div className="comments-header">
         <h3 className="comments-title">💬 Comentários <span>({comments.length})</span></h3>
         <button className={`ep-like-btn ${liked ? 'liked' : ''}`} onClick={handleLike}>
-          <FiHeart /> {likes > 0 && <span>{likes}</span>}
-          {liked ? 'Curtido' : 'Curtir EP'}
+          <FiHeart /> {likes > 0 && <span>{likes}</span>} {liked ? 'Curtido' : 'Curtir EP'}
         </button>
       </div>
 
-      {/* Input de comentário */}
+      {/* Erro */}
+      {errMsg && (
+        <div className="comment-error">
+          <FiAlertCircle size={14} /> {errMsg}
+        </div>
+      )}
+
+      {/* Input */}
       <div className="comment-input-area">
         {user ? (
           <>
@@ -125,7 +145,7 @@ export default function Comments({ animeId, ep }) {
                 ref={textareaRef}
                 value={text}
                 onChange={e => setText(e.target.value)}
-                placeholder="O que achou desse episódio?"
+                placeholder="O que achou desse episódio? (Ctrl+Enter para enviar)"
                 maxLength={500}
                 rows={2}
                 onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) handleSend() }}
@@ -139,19 +159,17 @@ export default function Comments({ animeId, ep }) {
             </div>
           </>
         ) : (
-          <button className="comment-login-btn" onClick={openLogin}>
+          <button className="comment-login-btn" onClick={login}>
             🔒 Entre com Google para comentar
           </button>
         )}
       </div>
 
-      {/* Lista de comentários */}
+      {/* Lista */}
       <div className="comments-list">
-        {loading && (
-          <div className="comments-loading">
-            {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 60, borderRadius: 10 }} />)}
-          </div>
-        )}
+        {loading && [1,2].map(i => (
+          <div key={i} className="skeleton" style={{ height: 60, borderRadius: 10 }} />
+        ))}
         {!loading && comments.length === 0 && (
           <p className="comments-empty">Seja o primeiro a comentar! 👇</p>
         )}
@@ -163,7 +181,7 @@ export default function Comments({ animeId, ep }) {
                 <span className="comment-name">{c.name}</span>
                 <span className="comment-time">{timeAgo(c.ts)}</span>
                 {user?.id === c.userId && (
-                  <button className="comment-del" onClick={() => handleDelete(c.id)} title="Apagar">
+                  <button className="comment-del" onClick={() => handleDelete(c.id)}>
                     <FiTrash2 size={12} />
                   </button>
                 )}
@@ -175,4 +193,5 @@ export default function Comments({ animeId, ep }) {
       </div>
     </div>
   )
-}
+      }
+               
