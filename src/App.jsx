@@ -23,7 +23,7 @@ import ProfilePage from './pages/ProfilePage'
 import FeedbackModal from './components/FeedbackModal'
 import { checkNewEpisodes, notifEnabled } from './services/notifications'
 import { loadAchievements, saveAchievements } from './services/achievements'
-import { FiBug } from 'react-icons/fi'
+import { FiAlertTriangle } from "react-icons/fi"
 import './App.css'
 
 function NotifChecker() {
@@ -85,7 +85,7 @@ function AppInner() {
         onClick={() => setShowFeedback(true)}
         title="Relatar bug ou enviar feedback"
       >
-        <FiBug size={18} />
+        <FiAlertTriangle size={18} />
         <span>Feedback</span>
       </button>
 
