@@ -1,0 +1,77 @@
+.profile-page { padding: 80px 0 100px; }
+
+.profile-header {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+}
+.profile-header h1 { font-family: var(--font-display); font-size: 1.6rem; letter-spacing: 1px; }
+
+/* Card do usuário */
+.profile-card {
+  display: flex; align-items: center; gap: 18px;
+  padding: 20px; border-radius: 16px;
+  background: var(--bg2); border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.profile-avatar-big {
+  width: 72px; height: 72px; border-radius: 50%;
+  object-fit: cover; border: 3px solid var(--red); flex-shrink: 0;
+}
+.profile-name  { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; }
+.profile-email { font-size: .78rem; color: var(--text-dim); margin-bottom: 8px; }
+.profile-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: .72rem; font-weight: 700;
+  background: rgba(229,57,53,.15); border: 1px solid rgba(229,57,53,.3); color: var(--red);
+}
+
+/* Login prompt */
+.profile-login-prompt {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  padding: 48px 24px; border-radius: 16px;
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text-dim); text-align: center;
+}
+.profile-login-prompt svg { opacity: .4; }
+.profile-login-prompt p { font-size: .9rem; max-width: 260px; }
+.btn-primary {
+  padding: 12px 28px; border-radius: 10px; font-size: .9rem; font-weight: 700;
+  background: var(--red); color: #fff; border: none; cursor: pointer;
+}
+
+/* Seções */
+.profile-section { margin-bottom: 20px; }
+.profile-section-title { font-size: .82rem; font-weight: 700; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* Opções de player/audio */
+.profile-options { display: flex; gap: 10px; }
+.profile-option {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 14px 16px; border-radius: 12px; text-align: left; cursor: pointer;
+  background: var(--bg2); border: 2px solid var(--border);
+  transition: border-color .15s, background .15s;
+}
+.profile-option.active { border-color: var(--red); background: rgba(229,57,53,.08); }
+.opt-icon  { font-size: 1.4rem; }
+.opt-label { font-size: .85rem; font-weight: 700; }
+.opt-desc  { font-size: .7rem; color: var(--text-dim); }
+
+/* Toggles */
+.profile-toggles { display: flex; flex-direction: column; gap: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.profile-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; background: var(--bg2); gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-toggle-row:last-child { border-bottom: none; }
+.toggle-label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 3px; }
+.toggle-desc  { display: block; font-size: .72rem; color: var(--text-dim); }
+
+/* Botão salvar */
+.profile-save-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 14px; border-radius: 12px; font-size: .9rem; font-weight: 700;
+  background: var(--red); color: #fff; border: none; cursor: pointer;
+  margin-top: 8px; margin-bottom: 16px; transition: opacity .15s;
+}
+.profile-save-btn:hover { opacity: .85; }
+.profile-note { font-size: .72rem; color: var(--text-dim); text-align: center; }
