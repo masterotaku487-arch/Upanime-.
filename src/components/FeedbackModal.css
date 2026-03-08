@@ -1,0 +1,102 @@
+.feedback-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0 0 env(safe-area-inset-bottom);
+}
+@media (min-width: 600px) {
+  .feedback-overlay { align-items: center; }
+}
+
+.feedback-modal {
+  width: 100%; max-width: 480px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0; padding: 20px 20px 32px;
+  animation: slideUp .25s ease;
+}
+@media (min-width: 600px) {
+  .feedback-modal { border-radius: 20px; }
+}
+@keyframes slideUp {
+  from { transform: translateY(60px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Header */
+.feedback-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.feedback-tabs { display: flex; gap: 6px; }
+.feedback-tabs button {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 20px; font-size: .8rem; font-weight: 700;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-dim); cursor: pointer; transition: all .15s;
+}
+.feedback-tabs button.active { background: rgba(229,57,53,.15); border-color: var(--red); color: var(--red); }
+.feedback-x {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  padding: 6px; border-radius: 8px;
+}
+
+.feedback-hint { font-size: .82rem; color: var(--text-dim); margin-bottom: 12px; }
+
+/* Bug grid */
+.bug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.bug-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 10px; font-size: .8rem; font-weight: 600;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; text-align: left; position: relative;
+  transition: all .15s;
+}
+.bug-option.selected { border-color: var(--red); background: rgba(229,57,53,.1); color: var(--red); }
+.bug-check {
+  position: absolute; top: 6px; right: 8px;
+  font-size: .65rem; font-weight: 800; color: var(--red);
+}
+
+/* Stars */
+.star-rating { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.star {
+  font-size: 1.8rem; background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.15); transition: color .1s, transform .1s;
+}
+.star.lit  { color: #eab308; }
+.star:hover { transform: scale(1.15); }
+.star-label { font-size: .85rem; font-weight: 700; color: #eab308; margin-left: 6px; }
+
+/* Textarea */
+.feedback-textarea {
+  width: 100%; padding: 10px 14px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-size: .82rem; resize: none;
+  font-family: var(--font-body); line-height: 1.5;
+  margin-bottom: 14px; transition: border-color .15s;
+}
+.feedback-textarea:focus { outline: none; border-color: var(--red); }
+
+/* Send */
+.feedback-send-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px; border-radius: 12px;
+  background: var(--red); color: #fff; border: none;
+  font-size: .9rem; font-weight: 700; cursor: pointer; transition: opacity .15s;
+}
+.feedback-send-btn:disabled { opacity: .4; cursor: default; }
+
+/* Done state */
+.feedback-done {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 16px 0 8px; text-align: center;
+}
+.feedback-done-icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3);
+  display: flex; align-items: center; justify-content: center; color: #4ade80;
+}
+.feedback-done h3 { font-size: 1.1rem; font-weight: 800; }
+.feedback-done p  { font-size: .84rem; color: var(--text-dim); max-width: 240px; }
+.feedback-close-btn {
+  margin-top: 8px; padding: 10px 28px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-size: .85rem; font-weight: 700; cursor: pointer;
+}
