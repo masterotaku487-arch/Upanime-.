@@ -1,0 +1,15 @@
+
+/* ── Botão flutuante de feedback ─────────────────────── */
+.fab-feedback {
+  position: fixed; bottom: 80px; right: 16px; z-index: 900;
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 16px; border-radius: 24px;
+  background: rgba(20,20,30,.92); border: 1px solid rgba(229,57,53,.4);
+  color: rgba(255,255,255,.75); font-size: .78rem; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  backdrop-filter: blur(8px);
+  transition: border-color .15s, color .15s, transform .15s;
+}
+.fab-feedback:hover {
+  border-color: var(--red); color: var(--red); transform: translateY(-2px);
+}
