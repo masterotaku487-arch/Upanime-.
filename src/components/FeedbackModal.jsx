@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { FiBug, FiMessageSquare, FiX, FiSend, FiCheck } from 'react-icons/fi'
+import { FiAlertTriangle, FiMessageSquare, FiX, FiSend, FiCheck } from 'react-icons/fi'
 import './FeedbackModal.css'
 
 // Cole aqui o ID do seu form no formspree.io (ex: xpzvkqaw)
@@ -91,7 +91,7 @@ export default function FeedbackModal({ onClose, animeId, ep, animeTitle }) {
         <div className="feedback-header">
           <div className="feedback-tabs">
             <button className={tab === 'bug' ? 'active' : ''} onClick={() => setTab('bug')}>
-              <FiBug /> Relatar Bug
+              <FiAlertTriangle /> Relatar Bug
             </button>
             <button className={tab === 'feedback' ? 'active' : ''} onClick={() => setTab('feedback')}>
               <FiMessageSquare /> Feedback
