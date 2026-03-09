@@ -23,5 +23,11 @@ Crawl-delay: 1
 
 User-agent: Googlebot-Image
 Allow: /
+Allow: /anime/
+Allow: /watch/
+
+User-agent: Googlebot-Video
+Allow: /
+Allow: /watch/
 
 Sitemap: https://upanime-nine.vercel.app/sitemap.xml
