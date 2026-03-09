@@ -32,12 +32,6 @@ async function verifyDiscord(request, publicKey, bodyText) {
   } catch { return false }
 }
 
-// ── Resposta imediata: "Bot está digitando..." ─────────────────────────────
-const DEFERRED = new Response(
-  JSON.stringify({type:5}),
-  {headers:{'Content-Type':'application/json'}}
-)
-
 // ── Edita a mensagem após processar ───────────────────────────────────────
 async function editReply(token, embed, content='', env) {
   await fetch(`https://discord.com/api/v10/webhooks/${CLIENT_ID}/${token}/messages/@original`, {
@@ -312,10 +306,10 @@ export default {
       ctx.waitUntil(processCommand(cmd, opts, token, env))
 
       // Responde instantaneamente com "Bot está digitando..."
-      return new Response(JSON.stringify({type:5}), {headers:{'Content-Type':'application/json'}})
+      return new Response('{"type":5}', {headers:{'Content-Type':'application/json'}})
     }
 
     return new Response('OK')
   }
-    }
-          
+      }
+        
