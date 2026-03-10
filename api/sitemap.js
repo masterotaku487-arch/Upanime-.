@@ -3,10 +3,12 @@ export default async function handler(req, res) {
   try {
     const base  = 'https://upanime-nine.vercel.app'
     const today = new Date().toISOString().split('T')[0]
+    const PROXY = 'https://img-proxy.masterotaku487.workers.dev'
+    const proxyImg = (url) => url ? `${PROXY}/?url=${encodeURIComponent(url)}` : ''
     const esc   = (s) => (s||'').replace(/[<>&"']/g, c =>
       ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]))
 
-    // Busca 3 páginas em paralelo (mais rápido, menos timeout)
+    // Busca 3 páginas em paralelo
     const [r1, r2, r3] = await Promise.allSettled([
       fetch('https://api.jikan.moe/v4/top/anime?limit=25&page=1&filter=bypopularity').then(r=>r.json()),
       fetch('https://api.jikan.moe/v4/top/anime?limit=25&page=2&filter=bypopularity').then(r=>r.json()),
@@ -48,11 +50,11 @@ export default async function handler(req, res) {
     const animeXml = animes.map(a => {
       const img    = a.images?.jpg?.large_image_url || a.images?.jpg?.image_url || ''
       const title  = esc(a.title_english || a.title)
-      const maxEps = Math.min(a.episodes || 13, 24) // até 24 eps por anime
+      const maxEps = Math.min(a.episodes || 13, 24)
 
       const imgTag = img ? `
     <image:image>
-      <image:loc>${esc(img)}</image:loc>
+      <image:loc>${esc(proxyImg(img))}</image:loc>
       <image:title>${title}</image:title>
       <image:caption>Assista ${title} online grátis no Up Anime+</image:caption>
     </image:image>` : ''
@@ -72,7 +74,7 @@ export default async function handler(req, res) {
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>${img ? `
     <image:image>
-      <image:loc>${esc(img)}</image:loc>
+      <image:loc>${esc(proxyImg(img))}</image:loc>
       <image:title>${title} Episódio ${ep}</image:title>
     </image:image>` : ''}
   </url>`).join('')
@@ -81,7 +83,6 @@ export default async function handler(req, res) {
     }).join('')
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
@@ -93,6 +94,6 @@ ${animeXml}
     res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate')
     res.status(200).send(xml)
   } catch (err) {
-    res.status(500).send(`<?xml version="1.0"?><error>${err.message}</error>`)
+    res.status(500).send(`<?xml version="1.0"?><e>${err.message}</e>`)
   }
 }
