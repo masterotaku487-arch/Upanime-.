@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DMCA & Direitos Autorais | Up Anime+</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0a0a0a;color:#e0e0e0;font-family:'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+    .card{background:#141414;border:1px solid #222;border-radius:16px;max-width:640px;width:100%;padding:40px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+    .logo{font-size:1.4rem;font-weight:800;color:#e53935;letter-spacing:1px;margin-bottom:8px}
+    h1{font-size:1.6rem;font-weight:700;margin-bottom:8px}
+    p{color:#aaa;line-height:1.7;margin-bottom:16px;font-size:.95rem}
+    .badge{display:inline-block;background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:12px 16px;font-size:.85rem;color:#888;margin-bottom:24px;width:100%}
+    label{display:block;font-size:.88rem;color:#aaa;margin-bottom:6px;margin-top:16px}
+    input,textarea,select{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:12px;color:#e0e0e0;font-size:.9rem;outline:none;transition:border .2s}
+    input:focus,textarea:focus,select:focus{border-color:#e53935}
+    textarea{resize:vertical;min-height:120px}
+    button{margin-top:24px;width:100%;background:#e53935;color:#fff;border:none;border-radius:8px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;transition:background .2s}
+    button:hover{background:#c62828}
+    .footer{margin-top:24px;text-align:center;font-size:.8rem;color:#555}
+    a{color:#e53935;text-decoration:none}
+    .success{display:none;background:#1b5e20;border:1px solid #2e7d32;border-radius:8px;padding:16px;text-align:center;color:#a5d6a7;margin-top:16px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Up Anime+</div>
+    <h1>📋 Notificação DMCA</h1>
+    <p>O Up Anime+ respeita os direitos de propriedade intelectual. Se você acredita que algum conteúdo viola seus direitos autorais, preencha o formulário abaixo.</p>
+
+    <div class="badge">
+      ⚠️ Apenas o titular dos direitos autorais ou seu representante legal autorizado pode enviar uma notificação DMCA válida.
+    </div>
+
+    <form id="dmcaForm" action="https://formspree.io/f/xyknzpwr" method="POST">
+      <input type="hidden" name="_subject" value="[DMCA] Notificação de Direitos Autorais — Up Anime+">
+      <input type="hidden" name="_next" value="https://upanime-nine.vercel.app/dmca.html?sent=1">
+
+      <label>Seu nome completo *</label>
+      <input type="text" name="nome" required placeholder="Nome do titular ou representante">
+
+      <label>E-mail para contato *</label>
+      <input type="email" name="email" required placeholder="email@exemplo.com">
+
+      <label>Empresa / Organização</label>
+      <input type="text" name="empresa" placeholder="Opcional">
+
+      <label>URL do conteúdo infrator *</label>
+      <input type="url" name="url_infratora" required placeholder="https://upanime-nine.vercel.app/...">
+
+      <label>URL do conteúdo original *</label>
+      <input type="url" name="url_original" required placeholder="Link oficial do conteúdo">
+
+      <label>Descrição da violação *</label>
+      <textarea name="descricao" required placeholder="Descreva como o conteúdo viola seus direitos autorais..."></textarea>
+
+      <label>Declaração legal</label>
+      <div class="badge" style="margin-bottom:0">
+        Ao enviar, declaro sob pena de perjúrio que sou o titular dos direitos ou seu representante autorizado, e que as informações fornecidas são verdadeiras e precisas.
+      </div>
+
+      <button type="submit">📨 Enviar Notificação DMCA</button>
+    </form>
+
+    <div class="success" id="successMsg">
+      ✅ Notificação recebida! Analisaremos em até <strong>72 horas</strong>.
+    </div>
+
+    <div class="footer">
+      <a href="/">← Voltar ao Up Anime+</a> &nbsp;•&nbsp;
+      Respondemos a todas as notificações válidas em até 72 horas.
+    </div>
+  </div>
+
+  <script>
+    // Detectar redirect de sucesso
+    if (location.search.includes('sent=1')) {
+      document.getElementById('dmcaForm').style.display = 'none'
+      document.getElementById('successMsg').style.display = 'block'
+    }
+  </script>
+</body>
+</html>
