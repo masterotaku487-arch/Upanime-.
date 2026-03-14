@@ -140,3 +140,26 @@
   .vp-btn { width: 32px; height: 32px; font-size: .88rem; }
   .vp-time { font-size: .65rem; }
 }
+
+/* Marca d'água */
+.vp-watermark {
+  position: absolute;
+  font-size: .78rem;
+  font-family: inherit;
+  color: rgba(255,255,255,.28);
+  letter-spacing: .5px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 5;
+  animation: wmFade 6s ease forwards;
+  /* Posição muda aleatoriamente via JS — padrão: canto superior direito */
+  top: 18px;
+  right: 18px;
+}
+@keyframes wmFade {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+  }
+                
