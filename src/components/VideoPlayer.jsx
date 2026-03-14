@@ -54,6 +54,8 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const [showControls, setShowControls] = useState(true)
   const [showSkip, setShowSkip]         = useState(false)
   const [showVolume, setShowVolume]     = useState(false)
+  const [showWatermark, setShowWatermark] = useState(false)
+  const wmTimer = useRef(null)
 
   // Restaurar progresso ao carregar
   useEffect(() => {
@@ -66,35 +68,6 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     }
   }, [src, animeId, epNum])
 
-  // Suporte HLS (.m3u8) via hls.js
-  useEffect(() => {
-    if (!src || !videoRef.current) return
-    if (!src.includes('.m3u8')) return // só HLS
-
-    let hls = null
-    const loadHls = async () => {
-      if (window.Hls?.isSupported()) {
-        hls = new window.Hls({ maxBufferLength: 30 })
-        hls.loadSource(src)
-        hls.attachMedia(videoRef.current)
-      } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari nativo
-        videoRef.current.src = src
-      }
-    }
-
-    if (!window.Hls) {
-      const script = document.createElement('script')
-      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js'
-      script.onload = loadHls
-      document.head.appendChild(script)
-    } else {
-      loadHls()
-    }
-
-    return () => { if (hls) hls.destroy() }
-  }, [src])
-
   const resetHideTimer = useCallback(() => {
     setShowControls(true)
     clearTimeout(hideTimer.current)
@@ -106,6 +79,25 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   useEffect(() => {
     setShowSkip(currentTime > 5 && currentTime < INTRO_END && playing)
   }, [currentTime, playing])
+
+  // Marca d'água — aparece aos 2min, depois a cada 5min, some após 6s
+  useEffect(() => {
+    if (!playing) return
+    const FIRST  = 120  // 2 minutos
+    const REPEAT = 300  // a cada 5 minutos
+    const SHOW   = 6000 // fica 6 segundos
+
+    if (currentTime >= FIRST) {
+      const cycle = Math.floor((currentTime - FIRST) / REPEAT)
+      const inWindow = (currentTime - FIRST) % REPEAT < (SHOW / 1000)
+      if (inWindow && !showWatermark) {
+        setShowWatermark(true)
+        clearTimeout(wmTimer.current)
+        wmTimer.current = setTimeout(() => setShowWatermark(false), SHOW)
+      }
+    }
+  }, [currentTime, playing])
+
 
   useEffect(() => {
     const handler = () => setFullscreen(!!document.fullscreenElement)
@@ -224,6 +216,20 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       )}
 
       {/* Skip intro */}
+      {showWatermark && (
+        <div className="vp-watermark" style={(() => {
+          const positions = [
+            { top:'18px',  right:'18px',  left:'auto',  bottom:'auto' },
+            { top:'18px',  left:'18px',   right:'auto', bottom:'auto' },
+            { bottom:'80px', right:'18px', left:'auto',  top:'auto'   },
+            { bottom:'80px', left:'18px',  right:'auto', top:'auto'   },
+          ]
+          return positions[Math.floor(Date.now()/1000) % 4]
+        })()}>
+          upanime-nine.vercel.app
+        </div>
+      )}
+
       {showSkip && (
         <button className="vp-skip" onClick={skipIntro}>
           ⏭ Pular Abertura
@@ -304,4 +310,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       }
 
 
-      
+         
