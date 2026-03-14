@@ -46,33 +46,9 @@ export default function AnimePage() {
           document.title = `${t} - Assistir Online | Up Anime+`
 
           // ── Meta description dinâmica ────────────────────────────
-          const genres = a.genres?.map(g => g.name).join(', ') || ''
-          const descText = `Assista ${t} online grátis em HD no Up Anime+. ${genres ? genres + '. ' : ''}${(a.synopsis || '').slice(0, 120)}`
           const desc = document.querySelector('meta[name="description"]')
-          if (desc) desc.setAttribute('content', descText)
-
-          // ── Open Graph dinâmico (capa do anime no WhatsApp/Discord) ──
-          const image = a.images?.jpg?.large_image_url || a.images?.jpg?.image_url || ''
-          const setMeta = (sel, attr, val) => {
-            const el = document.querySelector(sel)
-            if (el && val) el.setAttribute(attr, val)
-          }
-          setMeta('meta[property="og:title"]',       'content', `${t} - Assistir Online Grátis | Up Anime+`)
-          setMeta('meta[property="og:description"]', 'content', descText)
-          setMeta('meta[property="og:image"]',       'content', image)
-          setMeta('meta[property="og:url"]',         'content', `https://upanime-nine.vercel.app/anime/${id}`)
-          setMeta('meta[name="twitter:title"]',      'content', `${t} | Up Anime+`)
-          setMeta('meta[name="twitter:description"]','content', descText)
-          setMeta('meta[name="twitter:image"]',      'content', image)
-
-          // ── Canonical dinâmico ───────────────────────────────────
-          let canonical = document.querySelector('link[rel="canonical"]')
-          if (!canonical) {
-            canonical = document.createElement('link')
-            canonical.rel = 'canonical'
-            document.head.appendChild(canonical)
-          }
-          canonical.href = `https://upanime-nine.vercel.app/anime/${id}`
+          if (desc) desc.setAttribute('content',
+            `Assista ${t} online grátis em HD no Up Anime+. ${(a.synopsis || '').slice(0, 130)}`)
 
           // ── Schema BreadcrumbList + TVSeries ─────────────────────
           let schEl = document.getElementById('anime-page-schema')
@@ -82,51 +58,25 @@ export default function AnimePage() {
             schEl.type = 'application/ld+json'
             document.head.appendChild(schEl)
           }
-          const schemaGenres = a.genres?.map(g => g.name) || []
           schEl.textContent = JSON.stringify({
             '@context': 'https://schema.org',
             '@graph': [
               {
                 '@type': 'BreadcrumbList',
                 itemListElement: [
-                  { '@type': 'ListItem', position: 1, name: 'Início', item: 'https://upanime-nine.vercel.app/' },
-                  { '@type': 'ListItem', position: 2, name: 'Animes', item: 'https://upanime-nine.vercel.app/explorar' },
-                  { '@type': 'ListItem', position: 3, name: t, item: `https://upanime-nine.vercel.app/anime/${id}` },
+                  { '@type': 'ListItem', position: 1, name: 'Início',   item: 'https://upanime-nine.vercel.app/' },
+                  { '@type': 'ListItem', position: 2, name: t, item: `https://upanime-nine.vercel.app/anime/${id}` },
                 ],
               },
               {
                 '@type': 'TVSeries',
-                '@id': `https://upanime-nine.vercel.app/anime/${id}`,
                 name: t,
-                alternateName: a.title !== t ? a.title : undefined,
-                description: (a.synopsis || '').slice(0, 500),
-                image: {
-                  '@type': 'ImageObject',
-                  url: a.images?.jpg?.large_image_url || '',
-                  width: 225,
-                  height: 318,
-                },
+                description: (a.synopsis || '').slice(0, 300),
+                image: a.images?.jpg?.large_image_url || '',
                 url: `https://upanime-nine.vercel.app/anime/${id}`,
                 numberOfEpisodes: a.episodes || undefined,
-                numberOfSeasons: 1,
-                genre: schemaGenres,
-                inLanguage: 'ja',
+                genre: a.genres?.map(g => g.name) || [],
                 startDate: a.aired?.from ? a.aired.from.slice(0, 10) : undefined,
-                endDate: a.aired?.to ? a.aired.to.slice(0, 10) : undefined,
-                contentRating: a.rating || undefined,
-                ...(a.score ? {
-                  aggregateRating: {
-                    '@type': 'AggregateRating',
-                    ratingValue: a.score.toFixed(1),
-                    bestRating: '10',
-                    worstRating: '1',
-                    ratingCount: a.scored_by || 1,
-                  }
-                } : {}),
-                potentialAction: {
-                  '@type': 'WatchAction',
-                  target: `https://upanime-nine.vercel.app/watch/${id}`,
-                },
               },
             ],
           })
@@ -288,8 +238,10 @@ export default function AnimePage() {
               <iframe
                 src={anime.trailer?.embed_url || `https://www.youtube.com/embed/${anime.trailer?.youtube_id}?rel=0&modestbranding=1`}
                 title="Trailer"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
+                referrerPolicy="origin"
+                loading="lazy"
                 className="trailer-iframe"
               />
             </div>
