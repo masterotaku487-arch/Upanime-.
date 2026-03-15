@@ -13,3 +13,61 @@
 .fab-feedback:hover {
   border-color: var(--red); color: var(--red); transform: translateY(-2px);
 }
+
+/* ── Banner Discord ───────────────────────────────────── */
+.discord-banner {
+  position: fixed;
+  bottom: 80px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 950;
+  width: calc(100% - 32px);
+  max-width: 560px;
+  animation: bannerIn .4s cubic-bezier(.17,.67,.35,1.2) both;
+}
+@keyframes bannerIn {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+.discord-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(15,15,25,.96);
+  border: 1px solid rgba(88,101,242,.5);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(88,101,242,.15);
+  backdrop-filter: blur(12px);
+}
+.discord-banner-icon { font-size: 1.6rem; flex-shrink: 0; }
+.discord-banner-text {
+  display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+}
+.discord-banner-text strong {
+  font-size: .88rem; color: #fff; font-weight: 700;
+}
+.discord-banner-text span {
+  font-size: .75rem; color: rgba(255,255,255,.5);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.discord-banner-btn {
+  flex-shrink: 0;
+  background: #5865F2;
+  color: #fff;
+  font-size: .78rem; font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background .15s, transform .15s;
+  white-space: nowrap;
+}
+.discord-banner-btn:hover { background: #4752c4; transform: scale(1.04); }
+.discord-banner-close {
+  flex-shrink: 0;
+  background: none; border: none;
+  color: rgba(255,255,255,.4);
+  font-size: 1rem; cursor: pointer;
+  padding: 4px; line-height: 1;
+  transition: color .15s;
+}
+.discord-banner-close:hover { color: #fff; }
