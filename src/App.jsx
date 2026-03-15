@@ -52,6 +52,15 @@ function AppInner() {
   const { pathname } = useLocation()
   const isWatch = pathname.startsWith('/watch/')
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showDiscordBanner, setShowDiscordBanner] = useState(() => {
+    // Mostra só 1x por sessão
+    return !sessionStorage.getItem('discord_banner_seen')
+  })
+
+  const fecharBanner = () => {
+    sessionStorage.setItem('discord_banner_seen', '1')
+    setShowDiscordBanner(false)
+  }
 
   return (
     <div className="app">
@@ -91,6 +100,29 @@ function AppInner() {
 
       {showFeedback && (
         <FeedbackModal onClose={() => setShowFeedback(false)} />
+      )}
+
+      {/* Banner Discord */}
+      {showDiscordBanner && (
+        <div className="discord-banner">
+          <div className="discord-banner-content">
+            <span className="discord-banner-icon">🎌</span>
+            <div className="discord-banner-text">
+              <strong>Junte-se à nossa comunidade!</strong>
+              <span>Receba notificações de novos episódios e converse com outros fãs.</span>
+            </div>
+            <a
+              className="discord-banner-btn"
+              href="https://discord.gg/m3yGmU7Kzn"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={fecharBanner}
+            >
+              Entrar no Discord
+            </a>
+            <button className="discord-banner-close" onClick={fecharBanner}>✕</button>
+          </div>
+        </div>
       )}
     </div>
   )
