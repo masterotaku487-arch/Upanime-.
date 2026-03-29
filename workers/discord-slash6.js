@@ -4,7 +4,7 @@
 const SITE_URL  = 'https://upanime-nine.vercel.app'
 const CANAIS = {
   novosEps:    '1482465313298710610',
-  animesAlta:  '1482465324044390510',
+  animesAlta:  '1482465318470291478',
   topAnimes:   '1482465324044390510',
   calendario:  '1482465330033856657',
 }
