@@ -1,33 +1,10 @@
 User-agent: *
 Allow: /
 Allow: /anime/
-Allow: /watch/
-Allow: /search
-Allow: /genres
-Allow: /category/
-Allow: /novidades
-Allow: /sobre
-Allow: /explorar
-Disallow: /api/
+Disallow: /watch/
 Disallow: /favoritos
-Disallow: /config
 Disallow: /perfil
-Disallow: /conquistas
-Disallow: /api-status
-
-User-agent: Googlebot
-Allow: /
-Allow: /anime/
-Allow: /watch/
-Crawl-delay: 1
-
-User-agent: Googlebot-Image
-Allow: /
-Allow: /anime/
-Allow: /watch/
-
-User-agent: Googlebot-Video
-Allow: /
-Allow: /watch/
+Disallow: /novidades
+Disallow: /config
 
 Sitemap: https://upanime-nine.vercel.app/sitemap.xml
