@@ -10,7 +10,8 @@ export default function StudioPage() {
   const [studio, setStudio] = useState(null)
   const [fanDubs, setFanDubs] = useState([])
   const [form, setForm] = useState({ nome:'', email:'', senha:'', descricao:'', discord:'' })
-  const [dubForm, setDubForm] = useState({ animeTitulo:'', animeCapa:'', titulo:'', descricao:'', embedUrl:'', downloadUrl:'', episodios:1, qualidade:'HD', direitos:'', capa:'', tags:'', elenco:'' })
+  const [dubForm, setDubForm] = useState({ animeTitulo:'', animeCapa:'', titulo:'', descricao:'', embedUrl:'', downloadUrl:'', episodios:1, qualidade:'HD', direitos:'', capa:'', tags:'', elenco:'', listaEps:'' })
+  const [modoEps, setModoEps] = useState('simples') // simples | lista
   const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const [showDubForm, setShowDubForm] = useState(false)
@@ -59,7 +60,14 @@ export default function StudioPage() {
       return { personagem: personagem || l, dublador: dublador || '' }
     })
     const tags = dubForm.tags.split(',').map(t => t.trim()).filter(Boolean)
-    const body = { ...dubForm, episodios: parseInt(dubForm.episodios), elenco, tags }
+    // Lista de episódios: "1|Titulo EP1|https://drive..." um por linha
+    const listaEpisodios = modoEps === 'lista'
+      ? dubForm.listaEps.split('\n').filter(Boolean).map((linha, i) => {
+          const partes = linha.split('|').map(s => s.trim())
+          return { ep: parseInt(partes[0]) || i+1, titulo: partes[1] || `Episódio ${i+1}`, url: partes[2] || dubForm.embedUrl }
+        })
+      : []
+    const body = { ...dubForm, episodios: listaEpisodios.length || parseInt(dubForm.episodios), elenco, tags, listaEpisodios }
     const r = await fetch(`${API}/api/fanDubs`, {
       method:'POST',
       headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${studio.studioId}` },
@@ -153,7 +161,15 @@ export default function StudioPage() {
               <input className="studio-input" placeholder="URL da capa do anime" value={dubForm.animeCapa} onChange={e=>setDubForm({...dubForm,animeCapa:e.target.value})} />
               <input className="studio-input" placeholder="Título do fan-dub *" value={dubForm.titulo} onChange={e=>setDubForm({...dubForm,titulo:e.target.value})} />
               <textarea className="studio-input" placeholder="Descrição" rows={3} value={dubForm.descricao} onChange={e=>setDubForm({...dubForm,descricao:e.target.value})} />
-              <input className="studio-input" placeholder="URL do player/embed * (ex: YouTube, Drive...)" value={dubForm.embedUrl} onChange={e=>setDubForm({...dubForm,embedUrl:e.target.value})} />
+              <div className="eps-modo-toggle">
+                <button className={`eps-modo-btn ${modoEps==='simples'?'active':''}`} onClick={()=>setModoEps('simples')}>1 URL para todos os EPs</button>
+                <button className={`eps-modo-btn ${modoEps==='lista'?'active':''}`} onClick={()=>setModoEps('lista')}>URL por episódio</button>
+              </div>
+              {modoEps === 'simples' ? (
+                <input className="studio-input" placeholder="URL do player/embed * (ex: Drive, YouTube...)" value={dubForm.embedUrl} onChange={e=>setDubForm({...dubForm,embedUrl:e.target.value})} />
+              ) : (
+                <textarea className="studio-input" placeholder={"URL por episódio (uma por linha):\n1|Título EP1|https://drive.google.com/...\n2|Título EP2|https://drive.google.com/..."} rows={6} value={dubForm.listaEps} onChange={e=>setDubForm({...dubForm,listaEps:e.target.value})} />
+              )}
               <input className="studio-input" placeholder="URL de download (opcional)" value={dubForm.downloadUrl} onChange={e=>setDubForm({...dubForm,downloadUrl:e.target.value})} />
               <input className="studio-input" placeholder="URL da capa do fan-dub (se diferente do anime)" value={dubForm.capa} onChange={e=>setDubForm({...dubForm,capa:e.target.value})} />
               <input className="studio-input" placeholder="Número de episódios" type="number" value={dubForm.episodios} onChange={e=>setDubForm({...dubForm,episodios:e.target.value})} />

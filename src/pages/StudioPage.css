@@ -34,3 +34,8 @@
 .dub-item-titulo { font-size: .88rem; font-weight: 700; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dub-item-status { font-size: .75rem; font-weight: 700; }
 .studio-painel { display: flex; flex-direction: column; gap: 0; }
+
+/* Toggle modo episódios */
+.eps-modo-toggle { display: flex; gap: 6px; }
+.eps-modo-btn { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border,#222); background: var(--card,#111); color: var(--text,#f0f0f0); font-size: .78rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.eps-modo-btn.active { background: var(--yellow,#FFD600); border-color: var(--yellow,#FFD600); color: #000; }

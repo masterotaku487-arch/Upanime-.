@@ -1,15 +1,32 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
+// Converte qualquer link do Drive para embed direto
+function driveToEmbed(url) {
+  if (!url) return url
+  // https://drive.google.com/file/d/ID/view → /preview
+  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
+  // https://drive.google.com/open?id=ID
+  const matchOpen = url.match(/[?&]id=([^&]+)/)
+  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
+  // Já é embed ou outro player
+  return url
+}
+
 export default function FanDubDetailPage() {
-  const { id } = useParams()
-  const nav    = useNavigate()
-  const [fanDub, setFanDub] = useState(null)
+  const { id }   = useParams()
+  const nav      = useNavigate()
+  const [sp, setSp] = useSearchParams()
+  const epAtual  = parseInt(sp.get('ep') || '1')
+
+  const [fanDub, setFanDub]   = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('assistir')
+  const [tab, setTab]         = useState('assistir')
+  const [fullscreen, setFullscreen] = useState(false)
 
   useEffect(() => {
     fetch(`${API}/api/fanDubs/${id}`)
@@ -17,14 +34,46 @@ export default function FanDubDetailPage() {
       .then(d => { setFanDub(d.fanDub); setLoading(false) })
   }, [id])
 
-  if (loading) return <div className="fddetail-loading"><div className="skeleton" style={{width:'100%',height:280}} /></div>
+  if (loading) return (
+    <div className="fddetail-loading">
+      <div className="skeleton" style={{width:'100%',height:280,borderRadius:0}} />
+      <div style={{padding:16,display:'flex',flexDirection:'column',gap:10}}>
+        <div className="skeleton" style={{height:28,borderRadius:8}} />
+        <div className="skeleton" style={{height:20,width:'60%',borderRadius:8}} />
+      </div>
+    </div>
+  )
   if (!fanDub) return <div className="fddetail-error">Fan-dub não encontrado</div>
+
+  // Episódios: suporta array de {ep, titulo, url} ou url única
+  const episodios = Array.isArray(fanDub.listaEpisodios) && fanDub.listaEpisodios.length > 0
+    ? fanDub.listaEpisodios
+    : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
+
+  const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
+  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
+  const totalEps = episodios.length
+
+  const goEp = (n) => setSp({ ep: n })
+
+  const toggleFS = () => {
+    const el = document.getElementById('fandub-iframe')
+    if (!document.fullscreenElement) {
+      el?.requestFullscreen?.()
+      setFullscreen(true)
+    } else {
+      document.exitFullscreen?.()
+      setFullscreen(false)
+    }
+  }
 
   return (
     <div className="fddetail-page">
       {/* Hero */}
       <div className="fddetail-hero">
-        <img src={fanDub.capa || fanDub.animeCapa} alt={fanDub.titulo} className="fddetail-backdrop" />
+        <img src={fanDub.capa || fanDub.animeCapa} alt={fanDub.titulo}
+          className="fddetail-backdrop"
+          onError={e => e.target.style.display='none'} />
         <div className="fddetail-grad" />
         <button className="fddetail-back" onClick={() => nav(-1)}>‹</button>
         <div className="fddetail-hero-info">
@@ -33,14 +82,17 @@ export default function FanDubDetailPage() {
           <div className="fddetail-meta">
             <span className="fddetail-badge">🇧🇷 {fanDub.idioma}</span>
             <span className="fddetail-badge">{fanDub.qualidade}</span>
-            <span className="fddetail-badge">📺 {fanDub.episodios} EP{fanDub.episodios>1?'S':''}</span>
+            <span className="fddetail-badge">📺 {totalEps} EP{totalEps > 1 ? 'S' : ''}</span>
           </div>
         </div>
       </div>
 
       {/* Estúdio */}
       <div className="fddetail-studio-bar" onClick={() => nav(`/fandubs?studio=${fanDub.studioId}`)}>
-        {fanDub.studioLogo && <img src={fanDub.studioLogo} alt={fanDub.studioNome} className="fddetail-studio-logo" />}
+        {fanDub.studioLogo
+          ? <img src={fanDub.studioLogo} alt={fanDub.studioNome} className="fddetail-studio-logo" />
+          : <div className="fddetail-studio-avatar">🎙️</div>
+        }
         <div>
           <div className="fddetail-studio-label">Estúdio de dublagem</div>
           <div className="fddetail-studio-nome">{fanDub.studioNome}</div>
@@ -50,35 +102,83 @@ export default function FanDubDetailPage() {
 
       {/* Tabs */}
       <div className="fddetail-tabs">
-        {['assistir','elenco','info'].map(t => (
-          <div key={t} className={`fddetail-tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>
-            {t==='assistir'?'▶ Assistir':t==='elenco'?'🎙️ Elenco':'ℹ️ Info'}
+        {['assistir','episodios','elenco','info'].map(t => (
+          <div key={t} className={`fddetail-tab ${tab === t ? 'active' : ''}`}
+            onClick={() => setTab(t)}>
+            {t === 'assistir'  ? '▶ Assistir'
+           : t === 'episodios' ? '📋 EPs'
+           : t === 'elenco'    ? '🎙️ Elenco'
+           : 'ℹ️ Info'}
           </div>
         ))}
       </div>
 
-      {/* Player */}
+      {/* ── PLAYER ── */}
       {tab === 'assistir' && (
         <div className="fddetail-player-section">
-          {fanDub.trailer && (
-            <div className="fddetail-trailer-label">🎬 Trailer</div>
+          {/* Info do EP atual */}
+          <div className="fddetail-ep-info">
+            <span className="fddetail-ep-label">EP {epAtual}</span>
+            {epData?.titulo && epData.titulo !== fanDub.titulo && (
+              <span className="fddetail-ep-titulo">{epData.titulo}</span>
+            )}
+            <button className="fddetail-fs-btn" onClick={toggleFS}>⛶</button>
+          </div>
+
+          {/* iframe limpo */}
+          <div className="fddetail-iframe-wrap">
+            <iframe
+              id="fandub-iframe"
+              className="fddetail-iframe"
+              src={embedUrl}
+              allowFullScreen
+              allow="autoplay; fullscreen; encrypted-media"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+
+          {/* Navegação de episódios */}
+          {totalEps > 1 && (
+            <div className="fddetail-ep-nav">
+              <button className="fddetail-ep-btn"
+                disabled={epAtual <= 1}
+                onClick={() => epAtual > 1 && goEp(epAtual - 1)}>
+                ‹ EP {epAtual - 1}
+              </button>
+              <span className="fddetail-ep-cur">EP {epAtual} / {totalEps}</span>
+              <button className="fddetail-ep-btn"
+                disabled={epAtual >= totalEps}
+                onClick={() => epAtual < totalEps && goEp(epAtual + 1)}>
+                EP {epAtual + 1} ›
+              </button>
+            </div>
           )}
-          <iframe
-            className="fddetail-iframe"
-            src={fanDub.embedUrl}
-            allowFullScreen
-            allow="autoplay; fullscreen"
-            referrerPolicy="origin"
-          />
+
           {fanDub.downloadUrl && (
-            <a href={fanDub.downloadUrl} target="_blank" rel="noopener noreferrer" className="fddetail-download">
+            <a href={fanDub.downloadUrl} target="_blank" rel="noopener noreferrer"
+              className="fddetail-download">
               ⬇️ Download do Fan-Dub
             </a>
           )}
         </div>
       )}
 
-      {/* Elenco */}
+      {/* ── LISTA DE EPISÓDIOS ── */}
+      {tab === 'episodios' && (
+        <div className="fddetail-eps-list">
+          {episodios.map(e => (
+            <div key={e.ep}
+              className={`fddetail-ep-item ${epAtual === e.ep ? 'active' : ''}`}
+              onClick={() => { setTab('assistir'); goEp(e.ep) }}>
+              <span className="fddetail-ep-num">EP {e.ep}</span>
+              <span className="fddetail-ep-name">{e.titulo || `Episódio ${e.ep}`}</span>
+              {epAtual === e.ep && <span className="fddetail-ep-playing">▶</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── ELENCO ── */}
       {tab === 'elenco' && (
         <div className="fddetail-elenco">
           {fanDub.elenco?.length > 0 ? (
@@ -90,12 +190,12 @@ export default function FanDubDetailPage() {
               </div>
             ))
           ) : (
-            <p style={{color:'var(--muted)',padding:'20px 0'}}>Elenco não informado.</p>
+            <p style={{color:'var(--muted)',padding:'20px 16px'}}>Elenco não informado.</p>
           )}
         </div>
       )}
 
-      {/* Info */}
+      {/* ── INFO ── */}
       {tab === 'info' && (
         <div className="fddetail-info-section">
           {fanDub.descricao && (
@@ -125,7 +225,7 @@ export default function FanDubDetailPage() {
             <div className="fddetail-section-title">📊 Informações</div>
             <div className="fddetail-meta-grid">
               <div className="fddetail-meta-item"><span>Anime</span><strong>{fanDub.animeTitulo}</strong></div>
-              <div className="fddetail-meta-item"><span>Episódios</span><strong>{fanDub.episodios}</strong></div>
+              <div className="fddetail-meta-item"><span>Episódios</span><strong>{totalEps}</strong></div>
               <div className="fddetail-meta-item"><span>Qualidade</span><strong>{fanDub.qualidade}</strong></div>
               <div className="fddetail-meta-item"><span>Idioma</span><strong>{fanDub.idioma}</strong></div>
               <div className="fddetail-meta-item"><span>Estúdio</span><strong>{fanDub.studioNome}</strong></div>
