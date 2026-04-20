@@ -1,0 +1,37 @@
+.fddetail-page { min-height: 100vh; padding-bottom: 80px; }
+.fddetail-loading, .fddetail-error { padding: 16px; }
+.fddetail-hero { position: relative; height: 300px; overflow: hidden; }
+.fddetail-backdrop { width: 100%; height: 100%; object-fit: cover; filter: brightness(.4); }
+.fddetail-grad { position: absolute; inset: 0; background: linear-gradient(to top, var(--black) 0%, transparent 50%); }
+.fddetail-back { position: absolute; top: 14px; left: 14px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.2); color: #fff; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+.fddetail-hero-info { position: absolute; bottom: 20px; left: 16px; right: 16px; }
+.fddetail-anime-tag { font-size: .75rem; color: var(--yellow); font-weight: 700; margin-bottom: 6px; }
+.fddetail-titulo { font-family: var(--font-cond); font-size: 1.6rem; font-weight: 900; line-height: 1.1; margin-bottom: 10px; }
+.fddetail-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.fddetail-badge { font-size: .68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); }
+.fddetail-studio-bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card); border-bottom: 1px solid var(--border); cursor: pointer; }
+.fddetail-studio-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
+.fddetail-studio-label { font-size: .7rem; color: var(--muted); }
+.fddetail-studio-nome { font-size: .9rem; font-weight: 700; }
+.fddetail-tabs { display: flex; border-bottom: 1px solid var(--border); }
+.fddetail-tab { flex: 1; padding: 12px; text-align: center; font-size: .82rem; font-weight: 700; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; }
+.fddetail-tab.active { color: var(--yellow); border-color: var(--yellow); }
+.fddetail-player-section { padding: 16px; }
+.fddetail-iframe { width: 100%; aspect-ratio: 16/9; border: none; border-radius: 12px; display: block; background: #000; }
+.fddetail-download { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; padding: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; font-size: .88rem; font-weight: 700; color: var(--yellow); }
+.fddetail-elenco { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.fddetail-elenco-item { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--card); border-radius: 10px; border: 1px solid var(--border); }
+.elenco-personagem { font-weight: 700; font-size: .88rem; flex: 1; }
+.elenco-sep { color: var(--muted); }
+.elenco-dublador { font-size: .85rem; color: var(--yellow); font-weight: 600; }
+.fddetail-info-section { padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+.fddetail-section-title { font-family: var(--font-cond); font-size: .95rem; font-weight: 900; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.fddetail-section-title::before { content: ''; width: 3px; height: 14px; background: var(--yellow); border-radius: 2px; display: block; }
+.fddetail-descricao { font-size: .88rem; line-height: 1.7; color: rgba(255,255,255,.75); }
+.fddetail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.fddetail-tag { padding: 4px 10px; border-radius: 100px; background: var(--card); border: 1px solid var(--border); font-size: .75rem; }
+.fddetail-direitos { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-size: .85rem; line-height: 1.6; color: rgba(255,255,255,.7); }
+.fddetail-meta-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+.fddetail-meta-item { background: var(--card); border-radius: 10px; padding: 10px 12px; }
+.fddetail-meta-item span { font-size: .7rem; color: var(--muted); display: block; margin-bottom: 2px; }
+.fddetail-meta-item strong { font-size: .88rem; }
