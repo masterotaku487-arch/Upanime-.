@@ -20,7 +20,6 @@ import ApiStatusPage from './pages/ApiStatusPage'
 import SobrePage from './pages/SobrePage'
 import AchievementsPage from './pages/AchievementsPage'
 import ProfilePage from './pages/ProfilePage'
-import ConectarPage from './pages/ConectarPage'
 import FanDubsPage from './pages/FanDubsPage'
 import FanDubDetailPage from './pages/FanDubDetailPage'
 import StudioPage from './pages/StudioPage'
@@ -80,8 +79,6 @@ function AppInner() {
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
           <Route path="/perfil"            element={<ProfilePage />} />
-          {/* Novas rotas */}
-          <Route path="/conectar"          element={<ConectarPage />} />
           <Route path="/fandubs"           element={<FanDubsPage />} />
           <Route path="/fandub/:id"        element={<FanDubDetailPage />} />
           <Route path="/studio"            element={<StudioPage />} />
@@ -89,7 +86,6 @@ function AppInner() {
       </main>
       {!isWatch && <BottomNav />}
 
-      {/* Botão flutuante de feedback */}
       <button
         className="fab-feedback"
         onClick={() => setShowFeedback(true)}
