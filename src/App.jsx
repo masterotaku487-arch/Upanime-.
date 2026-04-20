@@ -23,6 +23,7 @@ import ProfilePage from './pages/ProfilePage'
 import FanDubsPage from './pages/FanDubsPage'
 import FanDubDetailPage from './pages/FanDubDetailPage'
 import StudioPage from './pages/StudioPage'
+import AdminPage from './pages/AdminPage'
 import FeedbackModal from './components/FeedbackModal'
 import { checkNewEpisodes, notifEnabled } from './services/notifications'
 import { loadAchievements, saveAchievements } from './services/achievements'
@@ -79,13 +80,16 @@ function AppInner() {
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
           <Route path="/perfil"            element={<ProfilePage />} />
+          {/* Novas rotas */} 
           <Route path="/fandubs"           element={<FanDubsPage />} />
           <Route path="/fandub/:id"        element={<FanDubDetailPage />} />
           <Route path="/studio"            element={<StudioPage />} />
+          <Route path="/admin"             element={<AdminPage />} />
         </Routes>
       </main>
       {!isWatch && <BottomNav />}
 
+      {/* Botão flutuante de feedback */}
       <button
         className="fab-feedback"
         onClick={() => setShowFeedback(true)}
