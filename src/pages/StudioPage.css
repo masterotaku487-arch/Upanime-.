@@ -7,13 +7,17 @@
 .stab.active { background: var(--yellow); color: var(--black); }
 .studio-form { display: flex; flex-direction: column; gap: 10px; }
 .studio-form-sub { font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
-.studio-input { width: 100%; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: .9rem; outline: none; font-family: inherit; resize: vertical; }
+.studio-input { width: 100%; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: .9rem; outline: none; font-family: inherit; resize: vertical; box-sizing: border-box; }
 .studio-input:focus { border-color: var(--yellow); }
 .studio-msg { padding: 10px 14px; background: rgba(255,255,255,.05); border-radius: 8px; font-size: .85rem; }
 .studio-btn { width: 100%; padding: 14px; background: var(--yellow); color: var(--black); font-weight: 900; font-size: 1rem; border-radius: 12px; border: none; cursor: pointer; transition: transform .15s; margin-top: 4px; }
 .studio-btn:active { transform: scale(.98); }
 .studio-btn:disabled { opacity: .6; }
+.studio-btn-secondary { flex: 1; padding: 14px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-weight: 700; font-size: .9rem; border-radius: 12px; cursor: pointer; transition: all .15s; }
+.studio-btn-secondary:active { border-color: var(--yellow); color: var(--yellow); }
 .studio-nota { font-size: .75rem; color: var(--muted); text-align: center; }
+
+/* Painel */
 .painel-welcome { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--card); border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border); }
 .painel-avatar { font-size: 2rem; }
 .painel-nome { font-weight: 800; font-size: 1rem; }
@@ -23,19 +27,47 @@
 .pstat { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
 .pstat-val { font-family: var(--font-cond); font-size: 1.6rem; font-weight: 900; color: var(--yellow); }
 .pstat-label { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+
+/* Formulário */
 .dub-form { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
 .dub-form-title { font-family: var(--font-cond); font-size: 1.1rem; font-weight: 900; margin-bottom: 4px; }
+.dub-form-actions { display: flex; gap: 8px; margin-top: 4px; }
+.dub-form-actions .studio-btn { flex: 2; margin-top: 0; }
+
+/* Toggle modo episódios */
+.eps-section-title { font-size: .78rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding-top: 4px; }
+.eps-modo-toggle { display: flex; gap: 6px; }
+.eps-modo-btn { flex: 1; padding: 9px 6px; border-radius: 8px; border: 1px solid var(--border,#222); background: var(--card,#111); color: var(--text,#f0f0f0); font-size: .78rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.eps-modo-btn.active { background: var(--yellow,#FFD600); border-color: var(--yellow,#FFD600); color: #000; }
+
+/* Episode builder visual */
+.eps-builder { display: flex; flex-direction: column; gap: 8px; }
+.eps-builder-hint { font-size: .78rem; color: var(--muted); margin-bottom: 2px; }
+.eps-row { display: flex; align-items: flex-start; gap: 8px; background: var(--card2,#161616); border: 1px solid var(--border,#222); border-radius: 10px; padding: 10px 12px; }
+.eps-row-num-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.eps-row-label { font-size: .65rem; font-weight: 900; color: var(--yellow,#FFD600); letter-spacing: .04em; }
+.eps-row-num { width: 52px !important; text-align: center; padding: 8px 6px !important; font-weight: 900; font-size: .9rem !important; }
+.eps-row-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.eps-row-fields .studio-input { padding: 9px 12px; font-size: .85rem; }
+.eps-row-remove { flex-shrink: 0; width: 30px; height: 30px; margin-top: 4px; border-radius: 8px; background: rgba(229,57,53,.15); border: 1px solid rgba(229,57,53,.3); color: #E53935; font-size: .85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; align-self: center; }
+.eps-add-btn { padding: 10px; border-radius: 10px; border: 1px dashed var(--border,#222); background: transparent; color: var(--yellow,#FFD600); font-size: .88rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.eps-add-btn:active { background: rgba(255,214,0,.08); }
+
+/* Lista de dubs */
 .dubs-list { margin-top: 20px; }
 .dubs-list-title { font-family: var(--font-cond); font-size: 1rem; font-weight: 900; margin-bottom: 12px; }
-.dub-item { display: flex; gap: 12px; padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+.dub-item { display: flex; gap: 12px; padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; align-items: center; }
 .dub-item-img { width: 48px; height: 64px; border-radius: 6px; object-fit: cover; background: var(--card2); flex-shrink: 0; }
 .dub-item-info { flex: 1; min-width: 0; }
 .dub-item-anime { font-size: .7rem; color: var(--muted); }
 .dub-item-titulo { font-size: .88rem; font-weight: 700; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dub-item-meta { display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+.dub-item-eps { font-size: .72rem; color: var(--muted); }
 .dub-item-status { font-size: .75rem; font-weight: 700; }
-.studio-painel { display: flex; flex-direction: column; gap: 0; }
+.dub-item-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.dub-item-edit-btn { width: 36px; height: 36px; border-radius: 10px; background: var(--card2); border: 1px solid var(--border); color: var(--text); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.dub-item-edit-btn:active { border-color: var(--yellow); }
+.dub-item-delete-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(229,57,53,.1); border: 1px solid rgba(229,57,53,.25); color: #E53935; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.dub-item-delete-btn:active { background: rgba(229,57,53,.25); }
 
-/* Toggle modo episódios */
-.eps-modo-toggle { display: flex; gap: 6px; }
-.eps-modo-btn { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border,#222); background: var(--card,#111); color: var(--text,#f0f0f0); font-size: .78rem; font-weight: 700; cursor: pointer; transition: all .15s; }
-.eps-modo-btn.active { background: var(--yellow,#FFD600); border-color: var(--yellow,#FFD600); color: #000; }
+.studio-painel { display: flex; flex-direction: column; gap: 0; }

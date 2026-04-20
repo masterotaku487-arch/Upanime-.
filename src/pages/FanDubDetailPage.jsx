@@ -4,48 +4,63 @@ import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-// Converte qualquer link do Drive para embed direto
 function driveToEmbed(url) {
   if (!url) return url
-  // https://drive.google.com/file/d/ID/view → /preview
   const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
   if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
-  // https://drive.google.com/open?id=ID
   const matchOpen = url.match(/[?&]id=([^&]+)/)
   if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
-  // Já é embed ou outro player
   return url
 }
 
-export default function FanDubDetailPage() {
-  const { id }   = useParams()
-  const nav      = useNavigate()
-  const [sp, setSp] = useSearchParams()
-  const epAtual  = parseInt(sp.get('ep') || '1')
+function discordUrl(raw) {
+  if (!raw) return null
+  if (raw.startsWith('http')) return raw
+  return `https://${raw}`
+}
 
-  const [fanDub, setFanDub]   = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [tab, setTab]         = useState('assistir')
+export default function FanDubDetailPage() {
+  const { id }  = useParams()
+  const nav     = useNavigate()
+  const [sp, setSp] = useSearchParams()
+  const epAtual = parseInt(sp.get('ep') || '1')
+
+  const [fanDub,    setFanDub]    = useState(null)
+  const [studioData, setStudioData] = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [tab,       setTab]       = useState('assistir')
   const [fullscreen, setFullscreen] = useState(false)
 
+  // Carrega o fan-dub
   useEffect(() => {
     fetch(`${API}/api/fanDubs/${id}`)
       .then(r => r.json())
-      .then(d => { setFanDub(d.fanDub); setLoading(false) })
+      .then(d => {
+        setFanDub(d.fanDub)
+        setLoading(false)
+      })
   }, [id])
+
+  // Carrega dados do estúdio (para pegar o Discord)
+  useEffect(() => {
+    if (!fanDub?.studioId) return
+    fetch(`${API}/api/studios/${fanDub.studioId}`)
+      .then(r => r.json())
+      .then(d => setStudioData(d.studio))
+      .catch(() => {})
+  }, [fanDub?.studioId])
 
   if (loading) return (
     <div className="fddetail-loading">
-      <div className="skeleton" style={{width:'100%',height:280,borderRadius:0}} />
-      <div style={{padding:16,display:'flex',flexDirection:'column',gap:10}}>
-        <div className="skeleton" style={{height:28,borderRadius:8}} />
-        <div className="skeleton" style={{height:20,width:'60%',borderRadius:8}} />
+      <div className="skeleton" style={{ width: '100%', height: 280, borderRadius: 0 }} />
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="skeleton" style={{ height: 28, borderRadius: 8 }} />
+        <div className="skeleton" style={{ height: 20, width: '60%', borderRadius: 8 }} />
       </div>
     </div>
   )
   if (!fanDub) return <div className="fddetail-error">Fan-dub não encontrado</div>
 
-  // Episódios: suporta array de {ep, titulo, url} ou url única
   const episodios = Array.isArray(fanDub.listaEpisodios) && fanDub.listaEpisodios.length > 0
     ? fanDub.listaEpisodios
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
@@ -67,13 +82,15 @@ export default function FanDubDetailPage() {
     }
   }
 
+  const discord = discordUrl(studioData?.discord)
+
   return (
     <div className="fddetail-page">
       {/* Hero */}
       <div className="fddetail-hero">
         <img src={fanDub.capa || fanDub.animeCapa} alt={fanDub.titulo}
           className="fddetail-backdrop"
-          onError={e => e.target.style.display='none'} />
+          onError={e => e.target.style.display = 'none'} />
         <div className="fddetail-grad" />
         <button className="fddetail-back" onClick={() => nav(-1)}>‹</button>
         <div className="fddetail-hero-info">
@@ -97,12 +114,12 @@ export default function FanDubDetailPage() {
           <div className="fddetail-studio-label">Estúdio de dublagem</div>
           <div className="fddetail-studio-nome">{fanDub.studioNome}</div>
         </div>
-        <div style={{marginLeft:'auto',color:'var(--muted)'}}>›</div>
+        <div style={{ marginLeft: 'auto', color: 'var(--muted)' }}>›</div>
       </div>
 
       {/* Tabs */}
       <div className="fddetail-tabs">
-        {['assistir','episodios','elenco','info'].map(t => (
+        {['assistir', 'episodios', 'elenco', 'info'].map(t => (
           <div key={t} className={`fddetail-tab ${tab === t ? 'active' : ''}`}
             onClick={() => setTab(t)}>
             {t === 'assistir'  ? '▶ Assistir'
@@ -125,7 +142,7 @@ export default function FanDubDetailPage() {
             <button className="fddetail-fs-btn" onClick={toggleFS}>⛶</button>
           </div>
 
-          {/* iframe limpo */}
+          {/* iframe */}
           <div className="fddetail-iframe-wrap">
             <iframe
               id="fandub-iframe"
@@ -154,10 +171,24 @@ export default function FanDubDetailPage() {
             </div>
           )}
 
+          {/* Download */}
           {fanDub.downloadUrl && (
             <a href={fanDub.downloadUrl} target="_blank" rel="noopener noreferrer"
               className="fddetail-download">
               ⬇️ Download do Fan-Dub
+            </a>
+          )}
+
+          {/* Discord do estúdio */}
+          {discord && (
+            <a href={discord} target="_blank" rel="noopener noreferrer"
+              className="fddetail-discord">
+              <span className="fddetail-discord-icon">💬</span>
+              <div className="fddetail-discord-text">
+                <span className="fddetail-discord-label">Comunidade oficial</span>
+                <span className="fddetail-discord-nome">Servidor do {fanDub.studioNome}</span>
+              </div>
+              <span className="fddetail-discord-arrow">›</span>
             </a>
           )}
         </div>
@@ -190,7 +221,7 @@ export default function FanDubDetailPage() {
               </div>
             ))
           ) : (
-            <p style={{color:'var(--muted)',padding:'20px 16px'}}>Elenco não informado.</p>
+            <p style={{ color: 'var(--muted)', padding: '20px 16px' }}>Elenco não informado.</p>
           )}
         </div>
       )}
@@ -208,7 +239,7 @@ export default function FanDubDetailPage() {
             <div className="fddetail-section">
               <div className="fddetail-section-title">🏷️ Tags</div>
               <div className="fddetail-tags">
-                {fanDub.tags.map((t,i) => <span key={i} className="fddetail-tag">{t}</span>)}
+                {fanDub.tags.map((t, i) => <span key={i} className="fddetail-tag">{t}</span>)}
               </div>
             </div>
           )}
@@ -216,7 +247,7 @@ export default function FanDubDetailPage() {
             <div className="fddetail-section-title">⚖️ Direitos Autorais</div>
             <div className="fddetail-direitos">
               <p>{fanDub.direitos}</p>
-              <p style={{marginTop:8,fontSize:'.78rem',opacity:.6}}>
+              <p style={{ marginTop: 8, fontSize: '.78rem', opacity: .6 }}>
                 Este é um fan-dub não oficial criado por fãs. Não possui vínculo com os detentores originais dos direitos do anime.
               </p>
             </div>
@@ -232,6 +263,19 @@ export default function FanDubDetailPage() {
               <div className="fddetail-meta-item"><span>Publicado</span><strong>{new Date(fanDub.criadoEm).toLocaleDateString('pt-BR')}</strong></div>
             </div>
           </div>
+
+          {/* Discord também na aba info */}
+          {discord && (
+            <a href={discord} target="_blank" rel="noopener noreferrer"
+              className="fddetail-discord">
+              <span className="fddetail-discord-icon">💬</span>
+              <div className="fddetail-discord-text">
+                <span className="fddetail-discord-label">Comunidade oficial</span>
+                <span className="fddetail-discord-nome">Servidor do {fanDub.studioNome}</span>
+              </div>
+              <span className="fddetail-discord-arrow">›</span>
+            </a>
+          )}
         </div>
       )}
     </div>
