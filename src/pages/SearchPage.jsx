@@ -1,70 +1,64 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { FiSearch } from 'react-icons/fi'
 import AnimeCard from '../components/AnimeCard'
 import { searchAnime } from '../services/api'
 import './SearchPage.css'
 
-const STUDIO_API = 'https://studio-proxy.masterotaku487.workers.dev'
+const FANDUBS_API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-// Card de fan-dub nos resultados de busca
-function FanDubCard({ dub }) {
-  const eps = dub.listaEpisodios?.length || dub.episodios || 1
-  return (
-    <Link to={`/fandubs/${dub.id}`} className="fandub-search-card">
-      <div className="fandub-search-thumb">
-        <img
-          src={dub.capa || dub.animeCapa}
-          alt={dub.titulo}
-          loading="lazy"
-          onError={e => { e.target.style.display = 'none' }}
-        />
-        <span className="fandub-search-badge">🇧🇷 Fan-Dub</span>
-      </div>
-      <div className="fandub-search-info">
-        <div className="fandub-search-anime">{dub.animeTitulo}</div>
-        <div className="fandub-search-titulo">{dub.titulo}</div>
-        <div className="fandub-search-meta">
-          <span>🎙️ {dub.studioNome}</span>
-          <span>{eps} EP{eps > 1 ? 'S' : ''}</span>
-          {dub.qualidade && <span>{dub.qualidade}</span>}
-        </div>
-        {dub.genero && <span className="fandub-search-genero">{dub.genero}</span>}
-      </div>
-    </Link>
+// Busca e cacheia fan-dubs localmente para não refazer o fetch a cada pesquisa
+let fanDubsCache = null
+async function fetchAllFanDubs() {
+  if (fanDubsCache) return fanDubsCache
+  const r = await fetch(`${FANDUBS_API}/api/fanDubs`)
+  const d = await r.json()
+  fanDubsCache = d.fanDubs || []
+  return fanDubsCache
+}
+
+function filterFanDubs(list, q) {
+  if (!q) return []
+  const term = q.toLowerCase()
+  return list.filter(d =>
+    (d.animeTitulo || '').toLowerCase().includes(term) ||
+    (d.titulo      || '').toLowerCase().includes(term) ||
+    (d.studioNome  || '').toLowerCase().includes(term)
   )
 }
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const nav = useNavigate()
   const q = searchParams.get('q') || ''
-  const [query,      setQuery]      = useState(q)
-  const [results,    setResults]    = useState([])
-  const [fanDubs,    setFanDubs]    = useState([])
-  const [loading,    setLoading]    = useState(false)
-  const [loadingDubs, setLoadingDubs] = useState(false)
-  const [page,       setPage]       = useState(1)
-  const [hasMore,    setHasMore]    = useState(false)
+  const [query, setQuery] = useState(q)
 
+  // Resultados animes normais
+  const [results, setResults]   = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [page, setPage]         = useState(1)
+  const [hasMore, setHasMore]   = useState(false)
+
+  // Resultados fan-dubs
+  const [dubResults, setDubResults] = useState([])
+
+  // Busca animes normais
   useEffect(() => {
-    if (!q) return
-
-    // Busca animes
+    if (!q) { setResults([]); return }
     setLoading(true)
     setPage(1)
     searchAnime(q, 1).then(data => {
       setResults(data.data || [])
       setHasMore(data.pagination?.has_next_page || false)
     }).finally(() => setLoading(false))
+  }, [q])
 
-    // Busca fan-dubs em paralelo
-    setLoadingDubs(true)
-    setFanDubs([])
-    fetch(`${STUDIO_API}/api/fanDubs/search?q=${encodeURIComponent(q)}`)
-      .then(r => r.json())
-      .then(d => setFanDubs(d.fanDubs || []))
-      .catch(() => {})
-      .finally(() => setLoadingDubs(false))
+  // Busca fan-dubs (filtra localmente)
+  useEffect(() => {
+    if (!q) { setDubResults([]); return }
+    fetchAllFanDubs()
+      .then(all => setDubResults(filterFanDubs(all, q)))
+      .catch(() => setDubResults([]))
   }, [q])
 
   const handleSearch = (e) => {
@@ -80,7 +74,7 @@ export default function SearchPage() {
     setPage(next)
   }
 
-  const totalResults = results.length + fanDubs.length
+  const totalResults = results.length + dubResults.length
 
   return (
     <div className="search-page container" style={{ paddingTop: 100 }}>
@@ -91,7 +85,7 @@ export default function SearchPage() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar anime ou fan-dub..."
+            placeholder="Buscar anime..."
             autoFocus
           />
         </div>
@@ -100,62 +94,77 @@ export default function SearchPage() {
 
       {q && (
         <div className="search-meta">
-          {(loading || loadingDubs)
-            ? 'Buscando...'
-            : `${totalResults} resultado${totalResults !== 1 ? 's' : ''} para "${q}"`
-          }
+          {loading ? 'Buscando...' : `${totalResults} resultados para "${q}"`}
         </div>
       )}
 
-      {/* ── Fan-Dubs ── */}
-      {(loadingDubs || fanDubs.length > 0) && q && (
-        <div className="search-section">
-          <h3 className="search-section-title">🎙️ Fan-Dubs</h3>
-          {loadingDubs ? (
-            <div className="fandub-search-grid">
-              {Array(4).fill(0).map((_, i) => (
-                <div key={i} className="skeleton" style={{ height: 90, borderRadius: 10 }} />
-              ))}
+      {/* ── Seção Fan-Dubs ── */}
+      {dubResults.length > 0 && (
+        <section className="section" style={{ marginBottom: 8 }}>
+          <div className="section-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 4, height: 18, background: 'var(--accent,#E53935)', borderRadius: 2, display: 'block' }} />
+              <h2 className="section-title">🎙️ Fan-Dubs da <span>Comunidade</span></h2>
             </div>
-          ) : (
-            <div className="fandub-search-grid">
-              {fanDubs.map(d => <FanDubCard key={d.id} dub={d} />)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Animes ── */}
-      {q && (results.length > 0 || loading) && (
-        <div className="search-section">
-          <h3 className="search-section-title">🎌 Animes</h3>
-          {loading ? (
-            <div className="anime-grid">
-              {Array(12).fill(0).map((_, i) => (
-                <div key={i} className="skeleton" style={{ aspectRatio: '2/3' }} />
-              ))}
-            </div>
-          ) : (
-            <>
-              <div className="anime-grid">
-                {results.map((a, i) => <AnimeCard key={a.mal_id} anime={a} index={i} />)}
-              </div>
-              {hasMore && (
-                <div style={{ textAlign: 'center', marginTop: 32 }}>
-                  <button className="btn btn-ghost" onClick={loadMore}>Carregar mais</button>
+          </div>
+          <div className="anime-grid">
+            {dubResults.map(d => (
+              <div
+                key={d.id}
+                className="anime-card"
+                onClick={() => nav(`/fandub/${d.id}`)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="anime-thumb">
+                  <img
+                    src={d.capa || d.animeCapa}
+                    alt={d.animeTitulo}
+                    loading="lazy"
+                    onError={e => { e.target.src = 'https://via.placeholder.com/130x185/111/E53935?text=DUB' }}
+                  />
+                  <div className="anime-badges">
+                    <span className="badge-score" style={{ background: '#E53935' }}>🇧🇷 DUB</span>
+                    {d.genero && <span className="badge-type">{d.genero}</span>}
+                  </div>
+                  {d.studioNome && <span className="ep-count">{d.studioNome}</span>}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+                <div className="anime-info">
+                  <h3 className="anime-title">{d.animeTitulo}</h3>
+                  {d.titulo && d.titulo !== d.animeTitulo && (
+                    <span className="anime-year">{d.titulo}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
-      {/* ── Vazio ── */}
-      {!loading && !loadingDubs && q && totalResults === 0 && (
-        <div className="empty-state">
-          <p>Nenhum resultado encontrado para "<strong>{q}</strong>"</p>
+      {/* ── Seção Animes normais ── */}
+      {loading ? (
+        <div className="anime-grid">
+          {Array(12).fill(0).map((_, i) => (
+            <div key={i} className="skeleton" style={{ aspectRatio: '2/3' }} />
+          ))}
         </div>
+      ) : (
+        <>
+          <div className="anime-grid">
+            {results.map((a, i) => <AnimeCard key={a.mal_id} anime={a} index={i} />)}
+          </div>
+          {totalResults === 0 && q && (
+            <div className="empty-state">
+              <p>Nenhum resultado encontrado para "<strong>{q}</strong>"</p>
+            </div>
+          )}
+          {hasMore && (
+            <div style={{ textAlign: 'center', marginTop: 32 }}>
+              <button className="btn btn-ghost" onClick={loadMore}>Carregar mais</button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
-}
+          }
+                    
