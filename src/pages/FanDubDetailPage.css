@@ -76,3 +76,9 @@
 .fddetail-meta-item { background: var(--card,#111); border-radius: 10px; padding: 10px 12px; }
 .fddetail-meta-item span { font-size: .7rem; color: var(--muted,#555); display: block; margin-bottom: 2px; }
 .fddetail-meta-item strong { font-size: .88rem; }
+
+/* Ações do player */
+.fddetail-acoes { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+.fddetail-acoes::-webkit-scrollbar { display:none; }
+.fddetail-acao-btn { flex-shrink:0; display:flex; align-items:center; gap:5px; padding:8px 14px; border-radius:100px; background:var(--card,#111); border:1px solid var(--border,#222); color:var(--text,#f0f0f0); font-size:.8rem; font-weight:700; cursor:pointer; transition:all .15s; white-space:nowrap; }
+.fddetail-acao-btn:active { border-color:var(--yellow,#FFD600); color:var(--yellow,#FFD600); }

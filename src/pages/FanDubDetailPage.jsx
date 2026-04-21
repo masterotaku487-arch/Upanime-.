@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import Comments from '../components/Comments'
 import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
@@ -71,6 +72,24 @@ export default function FanDubDetailPage() {
 
   const goEp = (n) => setSp({ ep: n })
 
+  const compartilhar = () => {
+    const url = window.location.href
+    if (navigator.share) {
+      navigator.share({ title: fanDub?.titulo, url })
+    } else {
+      navigator.clipboard?.writeText(url)
+      alert('Link copiado!')
+    }
+  }
+
+  const openCastTV = () => {
+    const url = window.location.href
+    window.location.href = `intent:${url}#Intent;package=com.instantbits.cast.webvideo;end`
+    setTimeout(() => {
+      if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo', '_blank')
+    }, 2000)
+  }
+
   const toggleFS = () => {
     const el = document.getElementById('fandub-iframe')
     if (!document.fullscreenElement) {
@@ -139,7 +158,6 @@ export default function FanDubDetailPage() {
             {epData?.titulo && epData.titulo !== fanDub.titulo && (
               <span className="fddetail-ep-titulo">{epData.titulo}</span>
             )}
-            <button className="fddetail-fs-btn" onClick={toggleFS}>⛶</button>
           </div>
 
           {/* iframe */}
@@ -171,13 +189,21 @@ export default function FanDubDetailPage() {
             </div>
           )}
 
-          {/* Download */}
-          {fanDub.downloadUrl && (
-            <a href={fanDub.downloadUrl} target="_blank" rel="noopener noreferrer"
-              className="fddetail-download">
-              ⬇️ Download do Fan-Dub
-            </a>
-          )}
+          {/* Ações */}
+          <div className="fddetail-acoes">
+            <button className="fddetail-acao-btn" onClick={compartilhar}>
+              🔗 <span>Compartilhar</span>
+            </button>
+            <button className="fddetail-acao-btn" onClick={openCastTV}>
+              📡 <span>Cast TV</span>
+            </button>
+            <button className="fddetail-acao-btn" onClick={toggleFS}>
+              ⛶ <span>Tela cheia</span>
+            </button>
+          </div>
+
+          {/* Comentários — mesmo sistema dos animes */}
+          <Comments animeId={`fandub-${id}`} ep={epAtual} />
 
           {/* Discord do estúdio */}
           {discord && (
