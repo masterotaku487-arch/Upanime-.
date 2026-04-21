@@ -29,10 +29,13 @@ export default function ResgateRecompensa() {
     if (!c) return
     setLoading(true); setStatus(null); setResult(null)
     try {
+      // Google OAuth pode usar diferentes campos dependendo da implementação
+      const userId   = user.id  // Google OAuth usa payload.sub como id
+      const userName = user.displayName || user.name || user.email?.split('@')[0] || 'Usuario'
       const r = await fetch(`${API}/resgatar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: c, userId: user.id || user.uid, userName: user.name || user.displayName })
+        body: JSON.stringify({ code: c, userId, userName })
       })
       const d = await r.json()
       if (d.ok) {

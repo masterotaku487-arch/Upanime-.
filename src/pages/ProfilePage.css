@@ -75,3 +75,47 @@
 }
 .profile-save-btn:hover { opacity: .85; }
 .profile-note { font-size: .72rem; color: var(--text-dim); text-align: center; }
+
+/* Recompensas no perfil */
+.profile-avatar-wrap { position: relative; flex-shrink: 0; }
+.profile-vip-ring {
+  position: absolute; inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FFD600, #FF6F00, #FFD600);
+  z-index: -1;
+  animation: vipGlow 2s ease-in-out infinite alternate;
+}
+@keyframes vipGlow {
+  from { opacity: .7; transform: scale(.98); }
+  to   { opacity: 1; transform: scale(1.02); }
+}
+.profile-titulo {
+  font-size: .78rem; color: #FFD600; font-weight: 700;
+  margin-bottom: 2px;
+}
+.profile-badges-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.profile-badge-vip {
+  background: linear-gradient(135deg, rgba(255,214,0,.2), rgba(255,111,0,.15)) !important;
+  border-color: rgba(255,214,0,.4) !important;
+  color: #FFD600 !important;
+}
+.profile-badge-cargo {
+  background: rgba(206,147,216,.1) !important;
+  border-color: rgba(206,147,216,.3) !important;
+  color: #CE93D8 !important;
+}
+.profile-xp-bar-wrap { margin-top: 6px; }
+.profile-xp-label { font-size: .72rem; color: rgba(255,255,255,.5); }
+
+.profile-resgate-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px;
+  background: rgba(229,57,53,.08);
+  border: 1px dashed rgba(229,57,53,.3);
+  border-radius: 12px;
+  color: var(--accent, #E53935);
+  font-weight: 700; font-size: .9rem;
+  cursor: pointer; margin-bottom: 16px;
+  transition: all .15s;
+}
+.profile-resgate-btn:hover { background: rgba(229,57,53,.15); border-style: solid; }

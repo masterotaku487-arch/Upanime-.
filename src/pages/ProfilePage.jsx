@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import './ProfilePage.css'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { FiArrowLeft, FiUser, FiSave } from 'react-icons/fi'
+import { FiArrowLeft, FiUser, FiSave, FiGift } from 'react-icons/fi'
+
+const REWARDS_API = 'https://rewards-proxy.masterotaku487.workers.dev'
 
 
 const PREFS_KEY = 'upanime_prefs'
@@ -17,7 +19,9 @@ export const savePrefs = (prefs) => {
 
 export default function ProfilePage() {
   const { user, login } = useAuth()
+  const nav = useNavigate()
   const [saved, setSaved] = useState(false)
+  const [rewards, setRewards] = useState(null)
   const [prefs, setPrefs] = useState({
     playerMode:  'internal',  // 'internal' | 'mx'
     audioMode:   'sub',       // 'sub' | 'dub'
@@ -29,6 +33,15 @@ export default function ProfilePage() {
     const p = loadPrefs()
     if (Object.keys(p).length) setPrefs(p)
   }, [])
+
+  useEffect(() => {
+    if (!user?.id) return
+    const uid = user.id
+    fetch(`${REWARDS_API}/verificar/${uid}`)
+      .then(r => r.json())
+      .then(d => setRewards(d))
+      .catch(() => {})
+  }, [user])
 
   const set = (key, val) => setPrefs(p => ({ ...p, [key]: val }))
 
@@ -63,13 +76,40 @@ export default function ProfilePage() {
 
       {/* Info da conta */}
       <div className="profile-card">
-        <img src={user.picture} alt={user.name} className="profile-avatar-big" />
+        <div className="profile-avatar-wrap">
+          <img src={user.picture} alt={user.name} className="profile-avatar-big" />
+          {rewards?.vip && <div className="profile-vip-ring" />}
+        </div>
         <div className="profile-user-info">
-          <h2 className="profile-name">{user.name}</h2>
+          <h2 className="profile-name" style={rewards?.cor ? {color: rewards.cor} : {}}>
+            {user.name}
+          </h2>
+          {rewards?.tituloPrincipal && (
+            <div className="profile-titulo">✨ {rewards.tituloPrincipal}</div>
+          )}
           <p className="profile-email">{user.email}</p>
-          <span className="profile-badge">🎌 Otaku</span>
+          <div className="profile-badges-row">
+            {rewards?.vip
+              ? <span className="profile-badge profile-badge-vip">💎 VIP</span>
+              : <span className="profile-badge">🎌 Otaku</span>
+            }
+            {rewards?.cargos?.map((cargo, i) => (
+              <span key={i} className="profile-badge profile-badge-cargo">🏅 {cargo}</span>
+            ))}
+          </div>
+          {rewards?.xp > 0 && (
+            <div className="profile-xp-bar-wrap">
+              <div className="profile-xp-label">⭐ {rewards.xp} XP</div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Botão resgatar código */}
+      <button className="profile-resgate-btn" onClick={() => nav('/resgatar')}>
+        <FiGift size={16} />
+        🎁 Resgatar código de recompensa
+      </button>
 
       {/* Preferências */}
       <div className="profile-section">
