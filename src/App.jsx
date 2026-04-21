@@ -24,6 +24,8 @@ import FanDubsPage from './pages/FanDubsPage'
 import FanDubDetailPage from './pages/FanDubDetailPage'
 import StudioPage from './pages/StudioPage'
 import AdminPage from './pages/AdminPage'
+import ResgateRecompensa from './pages/ResgateRecompensa'
+import AdminRecompensas from './pages/AdminRecompensas'
 import FeedbackModal from './components/FeedbackModal'
 import { checkNewEpisodes, notifEnabled } from './services/notifications'
 import { loadAchievements, saveAchievements } from './services/achievements'
@@ -80,11 +82,13 @@ function AppInner() {
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
           <Route path="/perfil"            element={<ProfilePage />} />
-          {/* Novas rotas */} 
+          {/* Novas rotas */}
           <Route path="/fandubs"           element={<FanDubsPage />} />
           <Route path="/fandub/:id"        element={<FanDubDetailPage />} />
           <Route path="/studio"            element={<StudioPage />} />
           <Route path="/admin"             element={<AdminPage />} />
+          <Route path="/resgatar"          element={<ResgateRecompensa />} />
+          <Route path="/admin/recompensas"  element={<AdminRecompensas />} />
         </Routes>
       </main>
       {!isWatch && <BottomNav />}
