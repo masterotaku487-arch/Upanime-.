@@ -3,7 +3,7 @@
 // Uso: <FanDubsHomeSection />
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
@@ -21,30 +21,48 @@ export default function FanDubsHomeSection() {
   if (!fanDubs.length) return null
 
   return (
-    <section style={{padding:'20px 0 8px'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px',marginBottom:14}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,fontFamily:"var(--font-cond,'Barlow Condensed',sans-serif)",fontSize:'1.15rem',fontWeight:900}}>
-          <span style={{width:4,height:18,background:'var(--accent,#E53935)',borderRadius:2,display:'block'}} />
-          🎙️ Fan-Dubs da Comunidade
+    <section className="section">
+      <div className="section-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 4, height: 18, background: 'var(--accent,#E53935)', borderRadius: 2, display: 'block' }} />
+          <h2 className="section-title">🎙️ Fan-Dubs da <span>Comunidade</span></h2>
         </div>
-        <span style={{fontSize:'.78rem',fontWeight:700,color:'var(--accent,#E53935)',cursor:'pointer'}}
-          onClick={() => nav('/fandubs')}>
-          Ver tudo ›
-        </span>
+        <Link to="/fandubs" className="see-all">Ver tudo →</Link>
       </div>
-      <div style={{display:'flex',gap:10,padding:'0 16px',overflowX:'auto',scrollbarWidth:'none',paddingBottom:4}}>
-        {fanDubs.map(d => (
-          <div key={d.id} style={{flexShrink:0,width:130,cursor:'pointer',position:'relative',borderRadius:12,overflow:'hidden',background:'#111'}}
-            onClick={() => nav(`/fandub/${d.id}`)}>
-            <img src={d.capa||d.animeCapa} alt={d.titulo}
-              style={{width:130,height:185,objectFit:'cover',display:'block'}}
-              onError={e=>{e.target.src='https://via.placeholder.com/130x185/111/E53935?text=DUB'}} />
-            <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,rgba(0,0,0,.92) 0%,transparent 50%)'}} />
-            <div style={{position:'absolute',top:7,left:7,background:'#E53935',color:'#fff',fontSize:'.58rem',fontWeight:900,padding:'2px 6px',borderRadius:4}}>🇧🇷 DUB</div>
-            {d.genero && <div style={{position:'absolute',top:7,right:7,background:'rgba(0,0,0,.7)',color:'#fff',fontSize:'.58rem',fontWeight:700,padding:'2px 6px',borderRadius:4,border:'1px solid rgba(255,255,255,.15)'}}>{d.genero}</div>}
-            <div style={{position:'absolute',bottom:0,left:0,right:0,padding:8}}>
-              <div style={{fontSize:'.72rem',fontWeight:700,lineHeight:1.2,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{d.animeTitulo}</div>
-              <div style={{fontSize:'.62rem',color:'rgba(255,255,255,.55)',marginTop:2}}>{d.studioNome}</div>
+
+      <div className="anime-grid">
+        {fanDubs.map((d, i) => (
+          <div
+            key={d.id}
+            className="anime-card"
+            onClick={() => nav(`/fandub/${d.id}`)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="anime-thumb">
+              <img
+                src={d.capa || d.animeCapa}
+                alt={d.animeTitulo}
+                loading="lazy"
+                onError={e => { e.target.src = 'https://via.placeholder.com/130x185/111/E53935?text=DUB' }}
+              />
+
+              {/* Badge DUB (substitui o badge de rating) */}
+              <div className="anime-badges">
+                <span className="badge-score" style={{ background: '#E53935' }}>🇧🇷 DUB</span>
+                {d.genero && <span className="badge-type">{d.genero}</span>}
+              </div>
+
+              {/* Nome do estúdio no canto inferior direito (como "N eps") */}
+              {d.studioNome && (
+                <span className="ep-count">{d.studioNome}</span>
+              )}
+            </div>
+
+            <div className="anime-info">
+              <h3 className="anime-title">{d.animeTitulo}</h3>
+              {d.titulo && d.titulo !== d.animeTitulo && (
+                <span className="anime-year">{d.titulo}</span>
+              )}
             </div>
           </div>
         ))}
