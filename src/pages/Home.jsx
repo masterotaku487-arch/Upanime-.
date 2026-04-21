@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Hero from '../components/Hero'
 import AnimeCard from '../components/AnimeCard'
+import FanDubsHomeSection from '../components/FanDubsHomeSection'
 import { getSeasonNow, getTopAnime, getSeasonUpcoming } from '../services/api'
 import { getHistory, getEpProgress, removeHistory } from '../services/history'
 import './Home.css'
 
-// Injeta schema JSON-LD no <head> e remove ao sair da página
 function useJsonLd(id, schema) {
   useEffect(() => {
     let el = document.getElementById(id)
@@ -21,7 +21,6 @@ function useJsonLd(id, schema) {
   }, []) // eslint-disable-line
 }
 
-// Card de "continuar assistindo"
 function ContinueCard({ entry, onRemove }) {
   const pct = getEpProgress(entry.mal_id, entry.lastEp) ?? 0
   return (
@@ -74,7 +73,6 @@ export default function Home() {
 
   useEffect(() => {
     document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD'
-    // Carrega histórico local (instantâneo)
     setHistory(getHistory())
 
     const load = async () => {
@@ -101,7 +99,6 @@ export default function Home() {
     setHistory(h => h.filter(e => e.mal_id !== malId))
   }
 
-  // FAQ Schema
   useJsonLd('faq-schema', {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -124,7 +121,7 @@ export default function Home() {
 
       <div className="container">
 
-        {/* ── Continuar Assistindo ─────────────────────────────── */}
+        {/* ── Continuar Assistindo ── */}
         {history.length > 0 && (
           <section className="section continue-section">
             <div className="section-header">
@@ -138,12 +135,15 @@ export default function Home() {
           </section>
         )}
 
-        <AnimeRow title={<>Temporada <span>Atual</span></>}    link="/category/airing"        animes={seasonal.slice(0, 12)} loading={loading} />
-        <AnimeRow title={<>Top <span>Airing</span></>}         link="/category/airing"        animes={top.slice(0, 12)}      loading={loading} />
-        <AnimeRow title={<>Mais <span>Populares</span></>}     link="/category/bypopularity"  animes={popular.slice(0, 12)}  loading={loading} />
-        <AnimeRow title={<>Em <span>Breve</span></>}           link="/category/upcoming"      animes={upcoming.slice(0, 12)} loading={loading} />
+        <AnimeRow title={<>Temporada <span>Atual</span></>}    link="/category/airing"       animes={seasonal.slice(0, 12)} loading={loading} />
+        <AnimeRow title={<>Top <span>Airing</span></>}         link="/category/airing"       animes={top.slice(0, 12)}      loading={loading} />
+
+        {/* ── Fan-Dubs Brasileiros ── */}
+        <FanDubsHomeSection />
+
+        <AnimeRow title={<>Mais <span>Populares</span></>}     link="/category/bypopularity" animes={popular.slice(0, 12)}  loading={loading} />
+        <AnimeRow title={<>Em <span>Breve</span></>}           link="/category/upcoming"     animes={upcoming.slice(0, 12)} loading={loading} />
       </div>
     </div>
   )
-}
-
+       }
