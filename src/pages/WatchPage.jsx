@@ -21,7 +21,8 @@ const proxyUrl = (url) =>
   `/api/proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
-  const qs = new URLSearchParams(params).toString()
+  // _t força o Worker a ignorar cache e retornar token CDN fresco
+  const qs = new URLSearchParams({ ...params, _t: Date.now() }).toString()
   const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
   if (!r.ok) throw new Error(`Proxy ${r.status}`)
   return r.json()
