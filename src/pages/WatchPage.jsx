@@ -104,19 +104,22 @@ const resolveSlug = async (anime, dub = false) => {
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
-  // Para filmes, tenta direto action=video ep=1 em vez de info
-  if (isMovie) {
+  // Para filmes OU dublados: tenta direto action=video ep=1
+  // Dublados frequentemente não listam episódios no endpoint info,
+  // mas os vídeos existem — ex: shingeki-no-kyojin-dublado/1
+  if (isMovie || dub) {
     for (const slug of candidates) {
       try {
         const data = await afFetch({ action: 'video', slug, ep: 1 })
         if (data.sources?.length > 0) {
-          console.log('[AnimeFire] ✅ (movie/ova direct)', slug)
+          console.log('[AnimeFire] ✅ (video direto)', slug)
           return slug
         }
       } catch { /* tenta próximo */ }
     }
   }
 
+  // Para legendados (e como fallback geral): usa probeSlug via info
   for (const slug of candidates) {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
@@ -358,6 +361,19 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
+      // ── Fallback final: define slug provável para o botão "Ver no AnimeFire" ──
+      // Mesmo sem proxy funcionando, o usuário consegue assistir direto no site
+      if (!afSlug) {
+        try {
+          const candidates = buildSlugCandidates(animeObj, dub)
+          const bestGuess = candidates.find(c => dub ? c.includes('dublado') : !c.includes('dublado')) || candidates[0]
+          if (bestGuess) {
+            console.log('[AnimeFire] slug estimado para fallback:', bestGuess)
+            setAfSlug(bestGuess)
+          }
+        } catch {}
+      }
+
       setError(true)
       setErrorMsg(e.message)
     } finally {
@@ -390,8 +406,11 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
-    ? `https://animefire.plus/animes/${afSlug}`
-    : `https://animefire.plus`
+    ? `https://animefire.io/animes/${afSlug}`
+    : `https://animefire.io`
+  const afDirectUrl = afSlug
+    ? `https://animefire.io/animes/${afSlug}/${epNum}`
+    : afExternal
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
@@ -446,8 +465,8 @@ export default function WatchPage() {
                       🎬 Abrir no MX Player
                     </button>
                   )}
-                  <a href={afExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
-                    🇧🇷 Ver no AnimeFire
+                  <a href={afDirectUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
+                    🇧🇷 Ver EP{epNum} no AnimeFire
                   </a>
                 </div>
               </div>
@@ -529,7 +548,7 @@ export default function WatchPage() {
                 </button>
               </>
             )}
-            <a href={afExternal} target="_blank" rel="noreferrer" className="ext-btn">
+            <a href={afDirectUrl} target="_blank" rel="noreferrer" className="ext-btn">
               🇧🇷<span>AnimeFire</span>
             </a>
             <div className="share-container">
@@ -542,7 +561,7 @@ export default function WatchPage() {
                   }}>{copied ? '✅ Copiado!' : '📋 Copiar link'}</button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(`🔥 ${title} EP${epNum}\n${window.location.href}`)}`}
                     target="_blank" rel="noreferrer">💬 WhatsApp</a>
-                  <a href={afExternal} target="_blank" rel="noreferrer">🇧🇷 AnimeFire</a>
+                  <a href={afDirectUrl} target="_blank" rel="noreferrer">🇧🇷 AnimeFire</a>
                 </div>
               )}
             </div>
