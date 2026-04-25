@@ -104,29 +104,40 @@ const resolveSlug = async (anime, dub = false) => {
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
-  // Para filmes OU dublados: tenta direto action=video ep=1
-  // Dublados frequentemente não listam episódios no endpoint info,
-  // mas os vídeos existem — ex: shingeki-no-kyojin-dublado/1
-  if (isMovie || dub) {
-    const videoTargets = dub
-      ? candidates.filter(c => c.includes('dublado')) // só testa candidatos -dublado
-      : candidates
-    for (const slug of videoTargets) {
+  // Para filmes, tenta direto action=video ep=1 em vez de info
+  if (isMovie) {
+    for (const slug of candidates) {
       try {
         const data = await afFetch({ action: 'video', slug, ep: 1 })
         if (data.sources?.length > 0) {
-          console.log('[AnimeFire] ✅ (video direto)', slug)
+          console.log('[AnimeFire] ✅ (movie/ova direct)', slug)
           return slug
         }
       } catch { /* tenta próximo */ }
     }
   }
 
-  // Para legendados (e como fallback geral): usa probeSlug via info
   for (const slug of candidates) {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
+
+  // Último recurso para dublados: testa action=video direto nos candidatos -dublado
+  // Cobre casos onde o AnimeFire não lista eps no info mas o vídeo existe
+  // Ex: shingeki-no-kyojin-movie-1-guren-no-yumiya-dublado/1
+  if (dub) {
+    const dubCandidates = candidates.filter(c => c.includes('-dublado'))
+    for (const slug of dubCandidates) {
+      try {
+        const data = await afFetch({ action: 'video', slug, ep: 1 })
+        if (data.sources?.length > 0) {
+          console.log('[AnimeFire] ✅ (dub fallback direto)', slug)
+          return slug
+        }
+      } catch { /* tenta próximo */ }
+    }
+  }
+
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
@@ -364,8 +375,6 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
-      // Limpa slug em cache para não contaminar próximas tentativas
-      setAfSlug(null)
       setError(true)
       setErrorMsg(e.message)
     } finally {
@@ -398,11 +407,8 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
-    ? `https://animefire.io/animes/${afSlug}`
-    : `https://animefire.io`
-  const afDirectUrl = afSlug
-    ? `https://animefire.io/animes/${afSlug}/${epNum}`
-    : afExternal
+    ? `https://animefire.plus/animes/${afSlug}`
+    : `https://animefire.plus`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
@@ -457,8 +463,8 @@ export default function WatchPage() {
                       🎬 Abrir no MX Player
                     </button>
                   )}
-                  <a href={afDirectUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
-                    🇧🇷 Ver EP{epNum} no AnimeFire
+                  <a href={afExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
+                    🇧🇷 Ver no AnimeFire
                   </a>
                 </div>
               </div>
@@ -540,7 +546,7 @@ export default function WatchPage() {
                 </button>
               </>
             )}
-            <a href={afDirectUrl} target="_blank" rel="noreferrer" className="ext-btn">
+            <a href={afExternal} target="_blank" rel="noreferrer" className="ext-btn">
               🇧🇷<span>AnimeFire</span>
             </a>
             <div className="share-container">
@@ -553,7 +559,7 @@ export default function WatchPage() {
                   }}>{copied ? '✅ Copiado!' : '📋 Copiar link'}</button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(`🔥 ${title} EP${epNum}\n${window.location.href}`)}`}
                     target="_blank" rel="noreferrer">💬 WhatsApp</a>
-                  <a href={afDirectUrl} target="_blank" rel="noreferrer">🇧🇷 AnimeFire</a>
+                  <a href={afExternal} target="_blank" rel="noreferrer">🇧🇷 AnimeFire</a>
                 </div>
               )}
             </div>
