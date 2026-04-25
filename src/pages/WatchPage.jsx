@@ -1,68 +1,52 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
 import { saveHistory } from '../services/history'
-import { recordWatched, ACHIEVEMENTS } from '../services/achievements'
+import { recordWatched } from '../services/achievements'
 import VideoPlayer from '../components/VideoPlayer'
 import Comments from '../components/Comments'
 import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
-// ─────────────────────────────────────────────────────────
-// PROXIES ATUALIZADOS 2026 (AnimeFire + mirrors ativos)
-// ─────────────────────────────────────────────────────────
-const AF = 'https://animefire-proxy.vynx.workers.dev' || 'https://hianime-proxy.ekaonin.workers.dev'
-const CC_PROXY = 'https://media-proxy.vynx.workers.dev/hianime' // animesonlinecc fallback
+// 🔥 Worker
+const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
-// Polyfill AbortSignal.timeout para browsers antigos
-const timeoutSignal = (ms) => {
-  if ('timeout' in AbortSignal) return AbortSignal.timeout(ms)
-  const controller = new AbortController()
-  setTimeout(() => controller.abort(), ms)
-  return controller.signal
-}
-
-const proxyUrl = (url) => `/api/proxy?url=${encodeURIComponent(url)}`
-
+// ✅ FETCH CORRIGIDO (sem AbortSignal.timeout bugado)
 const afFetch = async (params) => {
   const qs = new URLSearchParams({ ...params, _t: Date.now() }).toString()
-  const r = await fetch(`${AF}?${qs}`, { signal: timeoutSignal(30000) })
-  if (!r.ok) throw new Error(`Proxy ${r.status}: ${AF}`)
-  return r.json()
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000)
+
+  try {
+    const r = await fetch(`${AF}?${qs}`, {
+      signal: controller.signal
+    })
+
+    if (!r.ok) throw new Error(`Proxy ${r.status}`)
+
+    return await r.json()
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
-// ... (slugify, stripSeason, stripSubtitle iguais ao seu código)
-
-const SLUG_MAP = { // ADICIONADO DE VOLTA
-  32995: 'yuri-on-ice',
-  31758: 'mob-psycho-100',
-  35790: 'black-clover',
-  38000: 'given',
-  38474: 'vinland-saga',
-  40748: 'kimetsu-no-yaiba-mugen-ressha-hen',
+// 🔥 Melhor qualidade
+const bestQuality = (sources = []) => {
+  const order = ['1080', '720', '480', '360']
+  return [...sources].sort((a, b) => {
+    const ai = order.findIndex(o => (a.label || '').includes(o))
+    const bi = order.findIndex(o => (b.label || '').includes(o))
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })[0] || sources[0]
 }
 
-// ... (buildSlugCandidates, probeSlug, resolveSlug, bestQuality iguais)
-
-const getDirectUrl = (url) => { /* igual */ }
-
-// ─── FUNÇÕES DE PLAYER FORA DO COMPONENTE (FIX SCOPE) ───
-const openVLC = (url, title) => {
-  const directUrl = getDirectUrl(url)
-  window.location.href = `vlc://${directUrl}`
-  setTimeout(() => window.open(directUrl, '_blank'), 1500)
-}
-
-const openMXPlayer = (url, title) => {
-  const directUrl = getDirectUrl(url)
-  const titleEnc = encodeURIComponent(title)
-  const referer = encodeURIComponent('https://animefire.plus')
-  const ua = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-  const intent = `intent:${directUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_Referer=${referer};S.headers_User-Agent=${ua};end`
-  window.location.href = intent
-}
+// 🔥 Mobile fix
+const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+const isIOS     = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+const isMobile  = isAndroid || isIOS
 
 export default function WatchPage() {
   const { id } = useParams()
@@ -70,114 +54,133 @@ export default function WatchPage() {
   const epNum = parseInt(searchParams.get('ep') || '1')
   const isDub = searchParams.get('dub') === '1'
 
-  // ... states iguais, + MANUAL URL ADICIONADO
-  const [manualUrl, setManualUrl] = useState('')
-  const [showManual, setShowManual] = useState(false)
+  const [anime, setAnime] = useState(null)
+  const [episodes, setEpisodes] = useState([])
 
-  // ... useEffects iguais
+  const [sources, setSources] = useState([])
+  const [currentSrc, setCurrentSrc] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  const doLoad = async (animeObj, ep, dub, cachedSlug) => {
-    // ... seu código igual, mas fallbacks atualizados:
+  // 🔥 carregar anime
+  useEffect(() => {
+    Promise.all([
+      getAnimeById(id),
+      getAnimeEpisodes(id)
+    ]).then(([a, e]) => {
+      setAnime(a.data)
+      setEpisodes(e.data || [])
+    })
+  }, [id])
+
+  // 🔥 carregar vídeo
+  const loadVideo = async () => {
+    if (!anime) return
+
+    setLoading(true)
+    setError(false)
+
+    try {
+      console.log('🎬 Carregando:', anime.title, epNum)
+
+      const data = await afFetch({
+        action: 'video',
+        slug: anime.title.toLowerCase().replace(/\s+/g, '-'),
+        ep: epNum
+      })
+
+      if (!data.sources?.length) throw new Error()
+
+      // ✅ SEM proxy (corrigido)
+      const srcs = data.sources.map(s => ({
+        ...s,
+        url: s.url
+      }))
+
+      setSources(srcs)
+      setCurrentSrc(bestQuality(srcs)?.url)
+
     } catch (e) {
-      // Fallback 1: Novo proxy CC 2026
-      try {
-        setStatus('🔄 animesonlinecc.to...')
-        const ccRes = await fetch(`${CC_PROXY}/extract?title=${encodeURIComponent(animeObj.title_english || animeObj.title)}&episode=${ep}`)
-        const ccData = await ccRes.json()
-        if (ccData.sources?.length) {
-          setSources(ccData.sources.map(s => ({...s, url: proxyUrl(s.url)})))
-          setCurrentSrc(ccData.sources[0].url)
-          setStatus('✅ animesonlinecc')
-          setLoading(false)
-          return
-        }
-      } catch {}
-
+      console.log('Erro:', e)
       setError(true)
-      setErrorMsg(e.message)
-      setShowManual(true) // MOSTRA CAMPO MANUAL
-    } finally {
-      setLoading(false)
     }
+
+    setLoading(false)
   }
 
-  // NOVA: Carrega URL manual
-  const loadManualUrl = async () => {
-    if (manualUrl.includes('animefire')) {
-      const slug = manualUrl.split('/').pop()
-      const data = await afFetch({ action: 'video', slug, ep: epNum })
-      if (data.sources?.length) {
-        setSources(data.sources.map(s => ({...s, url: proxyUrl(s.url)})))
-        setCurrentSrc(data.sources[0].url)
-        setError(false)
-        setShowManual(false)
-      }
-    }
-  }
+  useEffect(() => {
+    loadVideo()
+    if (anime) saveHistory(anime, epNum)
+  }, [anime, epNum, isDub])
 
-  // ... resto igual
+  const goEp = (n) => setSearchParams({ ep: n })
+
+  const title = anime?.title || ''
+  const synopsis = useTranslatedSynopsis(anime?.synopsis)
 
   return (
     <div className="watch-page">
-      {/* ... toasts iguais */}
 
-      <div className="watch-layout">
-        <div className="watch-main">
-          <div className="player-wrap">
-            {loading ? (
-              // ... loading igual
-            ) : error ? (
-              <div className="player-error">
-                <span>😕</span>
-                <h3>Anime não encontrado</h3>
-                <p>Cole link do AnimeFire:</p>
-                {/* CAMPO MANUAL ADICIONADO */}
-                <div className="manual-input-wrap">
-                  <input 
-                    value={manualUrl} 
-                    onChange={e => setManualUrl(e.target.value)}
-                    placeholder="https://animefire.plus/animes/naruto-shippuden"
-                  />
-                  <button onClick={loadManualUrl} className="btn">▶ Carregar</button>
-                </div>
-                <div className="error-btns">
-                  <button onClick={() => doLoad(anime, epNum, isDub)}>🔄 Retry</button>
-                  <a href="https://animefire.plus" target="_blank" className="btn">Abrir Site</a>
-                </div>
-              </div>
-            ) : currentSrc ? (
-              <VideoPlayer src={currentSrc} /* ... props iguais */ />
-            ) : null}
+      {/* PLAYER */}
+      <div className="player-wrap">
+        {loading ? (
+          <p>🔄 Carregando...</p>
+        ) : error ? (
+          <div>
+            <p>❌ Erro ao carregar</p>
+            <button onClick={loadVideo}>Tentar novamente</button>
           </div>
-
-          {/* FIX: Audio + Quality completo */}
-          <div className="controls-bar">
-            <div className="audio-toggle">
-              <button className={!isDub ? 'active' : ''} onClick={() => toggleDub()}>
-                🇧🇷 Leg
-              </button>
-              <button className={isDub ? 'active' : ''} onClick={() => toggleDub()}>
-                🎙️ Dub
-              </button>
-            </div>
-            
-            {sources.length > 1 && (
-              <select onChange={e => setCurrentSrc(e.target.value)} value={currentSrc}>
-                {sources.map((s, i) => (
-                  <option key={i} value={s.url}>{s.label || 'Auto'}</option>
-                ))}
-              </select>
-            )}
-            
-            <div className="player-actions">
-              <button onClick={() => openMXPlayer(currentSrc, title)}>📱 MX Player</button>
-              <button onClick={() => openVLC(currentSrc, title)}>🖥️ VLC</button>
-            </div>
-          </div>
-
-          {/* ... resto JSX: episodes list, synopsis, comments */}
-        </div>
+        ) : (
+          <VideoPlayer
+            src={currentSrc}
+            title={`${title} EP${epNum}`}
+            sources={sources}
+            onQualityChange={(url) => setCurrentSrc(url)}
+            onEpisodeWatched={() => {
+              recordWatched({
+                malId: parseInt(id),
+                ep: epNum
+              })
+            }}
+          />
+        )}
       </div>
+
+      {/* CONTROLES */}
+      <div>
+        <button disabled={epNum <= 1} onClick={() => goEp(epNum - 1)}>
+          <FiChevronLeft /> Anterior
+        </button>
+
+        <span> Episódio {epNum} </span>
+
+        <button onClick={() => goEp(epNum + 1)}>
+          Próximo <FiChevronRight />
+        </button>
+      </div>
+
+      {/* INFO */}
+      {anime && (
+        <div>
+          <Link to={`/anime/${id}`}>← Voltar</Link>
+          <h1>{title}</h1>
+          <p>{synopsis}</p>
+        </div>
+      )}
+
+      {/* EP LIST */}
+      <div>
+        {episodes.map(ep => (
+          <button key={ep.mal_id} onClick={() => goEp(ep.mal_id)}>
+            EP {ep.mal_id}
+          </button>
+        ))}
+      </div>
+
+      {/* COMENTÁRIOS */}
+      <Comments animeId={id} ep={epNum} />
+
+      <FeedbackModal />
     </div>
   )
-}
+    }
