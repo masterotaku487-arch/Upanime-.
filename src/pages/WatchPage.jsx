@@ -108,7 +108,10 @@ const resolveSlug = async (anime, dub = false) => {
   // Dublados frequentemente não listam episódios no endpoint info,
   // mas os vídeos existem — ex: shingeki-no-kyojin-dublado/1
   if (isMovie || dub) {
-    for (const slug of candidates) {
+    const videoTargets = dub
+      ? candidates.filter(c => c.includes('dublado')) // só testa candidatos -dublado
+      : candidates
+    for (const slug of videoTargets) {
       try {
         const data = await afFetch({ action: 'video', slug, ep: 1 })
         if (data.sources?.length > 0) {
@@ -361,19 +364,8 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
-      // ── Fallback final: define slug provável para o botão "Ver no AnimeFire" ──
-      // Mesmo sem proxy funcionando, o usuário consegue assistir direto no site
-      if (!afSlug) {
-        try {
-          const candidates = buildSlugCandidates(animeObj, dub)
-          const bestGuess = candidates.find(c => dub ? c.includes('dublado') : !c.includes('dublado')) || candidates[0]
-          if (bestGuess) {
-            console.log('[AnimeFire] slug estimado para fallback:', bestGuess)
-            setAfSlug(bestGuess)
-          }
-        } catch {}
-      }
-
+      // Limpa slug em cache para não contaminar próximas tentativas
+      setAfSlug(null)
       setError(true)
       setErrorMsg(e.message)
     } finally {
