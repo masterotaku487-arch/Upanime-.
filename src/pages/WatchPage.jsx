@@ -10,10 +10,9 @@ import Comments from '../components/Comments'
 import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
-// 🔥 Worker
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
-// ✅ FETCH CORRIGIDO (sem AbortSignal.timeout bugado)
+/* ✅ FETCH CORRIGIDO */
 const afFetch = async (params) => {
   const qs = new URLSearchParams({ ...params, _t: Date.now() }).toString()
 
@@ -33,7 +32,7 @@ const afFetch = async (params) => {
   }
 }
 
-// 🔥 Melhor qualidade
+/* 🔥 qualidade */
 const bestQuality = (sources = []) => {
   const order = ['1080', '720', '480', '360']
   return [...sources].sort((a, b) => {
@@ -43,16 +42,13 @@ const bestQuality = (sources = []) => {
   })[0] || sources[0]
 }
 
-// 🔥 Mobile fix
+/* 📱 proteção mobile */
 const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
-const isIOS     = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
-const isMobile  = isAndroid || isIOS
 
 export default function WatchPage() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const epNum = parseInt(searchParams.get('ep') || '1')
-  const isDub = searchParams.get('dub') === '1'
 
   const [anime, setAnime] = useState(null)
   const [episodes, setEpisodes] = useState([])
@@ -62,7 +58,10 @@ export default function WatchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
-  // 🔥 carregar anime
+  /* ✅ MODAL CONTROLADO (CORRIGIDO) */
+  const [showBugReport, setShowBugReport] = useState(false)
+
+  /* carregar anime */
   useEffect(() => {
     Promise.all([
       getAnimeById(id),
@@ -73,7 +72,7 @@ export default function WatchPage() {
     })
   }, [id])
 
-  // 🔥 carregar vídeo
+  /* carregar vídeo */
   const loadVideo = async () => {
     if (!anime) return
 
@@ -81,17 +80,16 @@ export default function WatchPage() {
     setError(false)
 
     try {
-      console.log('🎬 Carregando:', anime.title, epNum)
+      const slug = anime.title.toLowerCase().replace(/\s+/g, '-')
 
       const data = await afFetch({
         action: 'video',
-        slug: anime.title.toLowerCase().replace(/\s+/g, '-'),
+        slug,
         ep: epNum
       })
 
       if (!data.sources?.length) throw new Error()
 
-      // ✅ SEM proxy (corrigido)
       const srcs = data.sources.map(s => ({
         ...s,
         url: s.url
@@ -100,8 +98,7 @@ export default function WatchPage() {
       setSources(srcs)
       setCurrentSrc(bestQuality(srcs)?.url)
 
-    } catch (e) {
-      console.log('Erro:', e)
+    } catch {
       setError(true)
     }
 
@@ -111,7 +108,7 @@ export default function WatchPage() {
   useEffect(() => {
     loadVideo()
     if (anime) saveHistory(anime, epNum)
-  }, [anime, epNum, isDub])
+  }, [anime, epNum])
 
   const goEp = (n) => setSearchParams({ ep: n })
 
@@ -177,10 +174,24 @@ export default function WatchPage() {
         ))}
       </div>
 
-      {/* COMENTÁRIOS */}
-      <Comments animeId={id} ep={epNum} />
+      {/* BOTÃO DO MODAL */}
+      <div style={{ textAlign: 'center', marginTop: 20 }}>
+        <button onClick={() => setShowBugReport(true)}>
+          🐛 Relatar problema nesse episódio
+        </button>
+      </div>
 
-      <FeedbackModal />
+      {/* ✅ MODAL NÃO ABRE SOZINHO */}
+      {showBugReport && (
+        <FeedbackModal
+          animeId={id}
+          ep={epNum}
+          animeTitle={title}
+          onClose={() => setShowBugReport(false)}
+        />
+      )}
+
+      <Comments animeId={id} ep={epNum} />
     </div>
   )
-    }
+            }
