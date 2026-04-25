@@ -123,7 +123,11 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
 
   const togglePlay = () => {
     const v = videoRef.current; if (!v) return
-    v.paused ? v.play() : v.pause()
+    if (v.paused) {
+      v.play().catch(err => console.warn('[VideoPlayer] play() bloqueado:', err.message))
+    } else {
+      v.pause()
+    }
   }
 
   const skip = (s) => { if (videoRef.current) videoRef.current.currentTime += s }
@@ -212,7 +216,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
 
       {/* Ícone central */}
       {!playing && (
-        <div className="vp-center-icon" onClick={togglePlay}>▶</div>
+        <div className="vp-center-icon" onClick={(e) => { e.stopPropagation(); togglePlay() }}>▶</div>
       )}
 
       {/* Skip intro */}
