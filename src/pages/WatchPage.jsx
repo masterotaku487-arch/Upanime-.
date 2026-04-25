@@ -150,6 +150,23 @@ const resolveSlug = async (anime, dub = false) => {
     }
   }
 
+  // Para dublados: o AnimeFire raramente lista episódios no endpoint info,
+  // mas os vídeos existem. Tenta action=video direto nos candidatos -dublado
+  // antes de desistir com probeSlug.
+  // Ex que deve funcionar: shingeki-no-kyojin-dublado/1
+  if (dub) {
+    const dubOnly = candidates.filter(c => c.includes('-dublado'))
+    for (const slug of dubOnly) {
+      try {
+        const data = await afFetch({ action: 'video', slug, ep: 1 })
+        if (data.sources?.length > 0) {
+          console.log('[AnimeFire] ✅ (dub direto)', slug)
+          return slug
+        }
+      } catch { /* tenta próximo */ }
+    }
+  }
+
   for (const slug of candidates) {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
