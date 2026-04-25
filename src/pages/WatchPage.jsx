@@ -476,7 +476,7 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  // Evita loop infinito: máximo 1 retry, depois mostra erro
+                  // Evita loop infinito: maximo 1 retry com token fresco, depois mostra erro
                   if (retryCount.current >= 1) {
                     setError(true)
                     return
@@ -489,8 +489,7 @@ export default function WatchPage() {
                       .then(data => {
                         const srcs = data.sources || []
                         if (srcs.length) {
-                          // Na 1ª retry usa directUrl (sem proxy) para evitar o loop do proxy
-                          const fresh = srcs.map(s => ({ ...s, url: s.url, directUrl: s.url }))
+                          const fresh = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
                           setSources(fresh)
                           setCurrentSrc(bestQuality(fresh)?.url || fresh[0].url)
                         } else {
