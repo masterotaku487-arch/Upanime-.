@@ -202,6 +202,7 @@ export default function WatchPage() {
   const [sources, setSources] = useState([])
   const [currentSrc, setCurrentSrc] = useState('')
   const [afSlug, setAfSlug] = useState(null)
+  const retryCount = useRef(0)   // evita loop infinito no onError
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
@@ -235,6 +236,7 @@ export default function WatchPage() {
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
     setLoading(true); setError(false); setSources([]); setCurrentSrc('')
+    retryCount.current = 0
 
     try {
       let slug = cachedSlug
@@ -474,13 +476,21 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  // Token do CDN pode ter expirado — rebusca fontes frescas antes de desistir
+                  // Evita loop infinito: máximo 1 retry, depois mostra erro
+                  if (retryCount.current >= 1) {
+                    setError(true)
+                    return
+                  }
+                  retryCount.current += 1
+
+                  // Token do CDN pode ter expirado — rebusca fontes frescas
                   if (afSlug) {
                     afFetch({ action: 'video', slug: afSlug, ep: epNum })
                       .then(data => {
                         const srcs = data.sources || []
                         if (srcs.length) {
-                          const fresh = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+                          // Na 1ª retry usa directUrl (sem proxy) para evitar o loop do proxy
+                          const fresh = srcs.map(s => ({ ...s, url: s.url, directUrl: s.url }))
                           setSources(fresh)
                           setCurrentSrc(bestQuality(fresh)?.url || fresh[0].url)
                         } else {
