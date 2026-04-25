@@ -1,5 +1,6 @@
 // Vercel Serverless — Proxy de video com Referer correto
-// ESTRATEGIA: redirect direto com headers quando possivel
+// ESTRATEGIA: sempre redireciona para a URL final do CDN
+// Isso evita o limite de tamanho e timeout de funcoes serverless
 // Arquivo: /api/proxy.js
 
 export default async function handler(req, res) {
@@ -24,51 +25,17 @@ export default async function handler(req, res) {
     'Origin':  'https://animefire.plus',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
   }
-  if (req.headers.range) headers['Range'] = req.headers.range
 
   try {
-    // Faz HEAD primeiro para pegar o redirect final
+    // Resolve a URL final do CDN seguindo redirects
     const head = await fetch(url, { method: 'HEAD', headers, redirect: 'follow' })
-    const finalUrl = head.url  // URL final apos redirects
+    const finalUrl = head.url
 
-    // Se a URL final for diferente (CDN publico), redireciona direto
-    // O MX Player e o browser fazem o request direto sem precisar do proxy
-    if (finalUrl !== url && !finalUrl.includes(videoHost)) {
-      res.setHeader('Cache-Control', 'public, max-age=300')
-      return res.redirect(302, finalUrl)
-    }
-
-    // Se nao tiver redirect, faz proxy so do inicio (range request)
-    // Limita a 10MB por request para nao crashar a funcao
-    const MAX = 10 * 1024 * 1024  // 10MB
-    const range = req.headers.range || 'bytes=0-'
-    const rangeHeaders = { ...headers, Range: range }
-
-    const videoRes = await fetch(url, { headers: rangeHeaders })
-    const contentLength = Number(videoRes.headers.get('Content-Length') || 0)
-
-    res.setHeader('Content-Type', videoRes.headers.get('Content-Type') || 'video/mp4')
-    res.setHeader('Accept-Ranges', 'bytes')
-    res.setHeader('Cache-Control', 'public, max-age=3600')
-
-    if (videoRes.headers.get('Content-Range'))
-      res.setHeader('Content-Range', videoRes.headers.get('Content-Range'))
-    if (contentLength && contentLength < MAX)
-      res.setHeader('Content-Length', String(contentLength))
-
-    res.status(videoRes.status || 206)
-
-    // Pipe chunk a chunk sem guardar tudo na memoria
-    const reader = videoRes.body.getReader()
-    let total = 0
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      total += value.length
-      res.write(Buffer.from(value))
-      if (total >= MAX) break  // Limita tamanho para nao crashar
-    }
-    res.end()
+    // Sempre redireciona para a URL final resolvida
+    // O browser busca o video direto do CDN sem passar pelo proxy
+    // Isso elimina o limite de 10MB que causava o loop de erro
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    return res.redirect(302, finalUrl)
 
   } catch (e) {
     if (!res.headersSent)
