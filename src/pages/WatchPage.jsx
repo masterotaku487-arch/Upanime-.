@@ -45,6 +45,28 @@ const stripSeason = (s) =>
 
 const stripSubtitle = (s) => s.replace(/\s*[:–]\s*.+$/, '').trim()
 
+// Extrai slug direto de um link do AnimeFire colado pelo usuário
+const extractSlugFromUrl = (url) => {
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('animefire')) {
+      const parts = u.pathname.split('/').filter(Boolean)
+      return parts[parts.length - 1] || null  // ultimo segmento = slug
+    }
+  } catch {}
+  return null
+}
+
+// Mapa manual para animes com slug fora do padrao AnimeFire
+const SLUG_MAP = {
+  32995: 'yuri-on-ice',         // Yuri!!! on Ice
+  31758: 'mob-psycho-100',      // Mob Psycho 100
+  35790: 'black-clover',        // Black Clover
+  38000: 'given',               // Given
+  38474: 'vinland-saga',        // Vinland Saga
+  40748: 'kimetsu-no-yaiba-mugen-ressha-hen', // DS Movie
+}
+
 // Gera candidatos de slug — SEM usar busca, testa diretamente
 // Padrão AnimeFire: {slug}-todos-os-episodios (leg) | {slug}-dublado-todos-os-episodios (dub)
 const buildSlugCandidates = (anime, dub = false) => {
@@ -101,6 +123,17 @@ const probeSlug = async (slug, isMovie = false) => {
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+  // Checa mapa manual primeiro
+  if (SLUG_MAP[anime.mal_id]) {
+    const base = SLUG_MAP[anime.mal_id]
+    const manualCandidates = dub
+      ? [base+'-dublado-todos-os-episodios', base+'-dublado', base]
+      : [base+'-todos-os-episodios', base]
+    for (const slug of manualCandidates) {
+      const found = await probeSlug(slug, isMovie)
+      if (found) return found
+    }
+  }
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
@@ -205,6 +238,8 @@ export default function WatchPage() {
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [manualUrl, setManualUrl] = useState('')
+  const [showManual, setShowManual] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
   const [newAchievements, setNewAchievements] = useState([]) // toast de conquistas
@@ -360,8 +395,39 @@ export default function WatchPage() {
 
       setError(true)
       setErrorMsg(e.message)
+      setShowManual(true)  // mostra campo para colar link manual
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadManualUrl = async () => {
+    const extracted = extractSlugFromUrl(manualUrl)
+    if (extracted) {
+      setShowManual(false)
+      setError(false)
+      setStatus('🔄 Carregando slug manual...')
+      setLoading(true)
+      try {
+        const data = await afFetch({ action: 'video', slug: extracted, ep })
+        if (data.sources?.length) {
+          setSources(data.sources)
+          setCurrentSrc(data.sources[0].url)
+          setStatus('✅ AnimeFire (link manual)')
+          setError(false)
+        } else {
+          setError(true)
+          setErrorMsg('Nenhuma fonte encontrada nesse link.')
+        }
+      } catch(e) {
+        setError(true); setErrorMsg(e.message)
+      } finally { setLoading(false) }
+    } else if (manualUrl.startsWith('http')) {
+      // URL direta de video
+      setCurrentSrc(manualUrl)
+      setStatus('✅ URL manual')
+      setError(false)
+      setShowManual(false)
     }
   }
 
@@ -435,11 +501,34 @@ export default function WatchPage() {
             ) : error ? (
               <div className="player-error">
                 <span className="error-emoji">😕</span>
-                <h3>Erro ao carregar o player</h3>
-                <p className="error-hint">O player interno nao conseguiu reproduzir. Tente outra opcao abaixo.</p>
+                <h3>Anime nao encontrado automaticamente</h3>
+                <p className="error-hint">Cole o link do AnimeFire para carregar manualmente!</p>
+
+                {showManual && (
+                  <div className="manual-url-box">
+                    <p className="manual-label">
+                      🔗 Cole o link do AnimeFire:<br/>
+                      <small>Ex: https://animefire.io/animes/yuri-on-ice</small>
+                    </p>
+                    <input
+                      className="manual-input"
+                      value={manualUrl}
+                      onChange={e => setManualUrl(e.target.value)}
+                      placeholder="https://animefire.io/animes/..."
+                    />
+                    <button className="btn btn-primary" onClick={loadManualUrl}
+                      disabled={!manualUrl.trim()}>
+                      ▶ Carregar
+                    </button>
+                  </div>
+                )}
+
                 <div className="error-btns">
                   <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null)}>
                     🔄 Tentar novamente
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => setShowManual(s => !s)}>
+                    🔗 Colar link AnimeFire
                   </button>
                   {currentSrc && (
                     <button className="btn btn-ghost" onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
