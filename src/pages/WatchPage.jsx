@@ -21,8 +21,7 @@ const proxyUrl = (url) =>
   `/api/proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
-  // _t força token fresco — Worker pode cachear sem isso e retornar token expirado
-  const qs = new URLSearchParams({ ...params, _t: Date.now() }).toString()
+  const qs = new URLSearchParams(params).toString()
   const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
   if (!r.ok) throw new Error(`Proxy ${r.status}`)
   return r.json()
@@ -202,7 +201,6 @@ export default function WatchPage() {
   const [sources, setSources] = useState([])
   const [currentSrc, setCurrentSrc] = useState('')
   const [afSlug, setAfSlug] = useState(null)
-  const retryCount = useRef(0)   // evita loop infinito no onError
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
@@ -236,7 +234,6 @@ export default function WatchPage() {
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
     setLoading(true); setError(false); setSources([]); setCurrentSrc('')
-    retryCount.current = 0
 
     try {
       let slug = cachedSlug
@@ -476,27 +473,9 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  // Evita loop infinito: maximo 1 retry com token fresco, depois mostra erro
-                  if (retryCount.current >= 1) {
-                    setError(true)
-                    return
-                  }
-                  retryCount.current += 1
-
-                  // Token do CDN pode ter expirado — rebusca fontes frescas
-                  if (afSlug) {
-                    afFetch({ action: 'video', slug: afSlug, ep: epNum })
-                      .then(data => {
-                        const srcs = data.sources || []
-                        if (srcs.length) {
-                          const fresh = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
-                          setSources(fresh)
-                          setCurrentSrc(bestQuality(fresh)?.url || fresh[0].url)
-                        } else {
-                          setError(true)
-                        }
-                      })
-                      .catch(() => setError(true))
+                  const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
+                  if (directUrl && currentSrc !== directUrl) {
+                    setCurrentSrc(directUrl)
                   } else {
                     setError(true)
                   }

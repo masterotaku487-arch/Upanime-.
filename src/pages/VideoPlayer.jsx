@@ -124,10 +124,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const togglePlay = () => {
     const v = videoRef.current; if (!v) return
     if (v.paused) {
-      v.play().catch(err => {
-        // Autoplay bloqueado ou fonte inválida — não travar a UI
-        console.warn('[VideoPlayer] play() bloqueado:', err.message)
-      })
+      v.play().catch(err => console.warn('[VideoPlayer] play() bloqueado:', err.message))
     } else {
       v.pause()
     }
