@@ -99,7 +99,15 @@
     "59571": {
       "_titulo": "Shingeki no Kyojin: The Last Attack",
       "leg": "shingeki-no-kyojin-the-last-attack",
-      "dub": "shingeki-no-kyojin-the-last-attack-dublado"
+      "dub": "shingeki-no-kyojin-the-last-attack-dublado",
+      "sources": {
+        "animesonline": {
+          "dub": "shingeki-no-kyojin-movie-kanketsu-hen-the-last-attack-dublado"
+        }
+      },
+      "fallback": {
+        "1": "https://animes.strp2p.com/#ak6nz"
+      }
     },
     "61316": {
       "leg": "re-zero-kara-hajimeru-isekai-seikatsu-4th-season",
