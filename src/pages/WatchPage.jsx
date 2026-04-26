@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
@@ -14,7 +14,7 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (animefire.io)
 // ─────────────────────────────────────────────────────────
 
-const AF = '/api/animefire'  // Proxy local Vercel — não precisa de Worker externo
+const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 const proxyUrl = (url) =>
@@ -87,18 +87,7 @@ const buildSlugCandidates = (anime, dub = false) => {
   return [...new Set([...withSeason, ...withoutSeason])]
 }
 
-// Testa se slug existe E tem episódios no AnimeFire
-const probeSlug = async (slug, isMovie = false) => {
-  try {
-    const data = await afFetch({ action: 'info', slug })
-    // Filmes/OVAs podem ter 0 episódios listados mas ainda assim ter vídeo
-    if (data.episodes?.length > 0) return slug
-    if (isMovie && data.slug) return slug  // aceita para filmes mesmo sem eps listados
-  } catch { /* não existe */ }
-  return null
-}
-
-// Cache dos overrides do slug-overrides.json (carregado uma vez por sessão)
+// Cache do slug-overrides.json — editável no GitHub sem redeploy
 let _overridesCache = null
 const loadOverrides = async () => {
   if (_overridesCache) return _overridesCache
@@ -110,59 +99,49 @@ const loadOverrides = async () => {
   return _overridesCache
 }
 
+// Testa se slug existe E tem episódios no AnimeFire
+const probeSlug = async (slug, isMovie = false) => {
+  try {
+    const data = await afFetch({ action: 'info', slug })
+    // Filmes/OVAs podem ter 0 episódios listados mas ainda assim ter vídeo
+    if (data.episodes?.length > 0) return slug
+    if (isMovie && data.slug) return slug  // aceita para filmes mesmo sem eps listados
+  } catch { /* não existe */ }
+  return null
+}
+
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
 
-  // 1. Checa slug-overrides.json (editável no GitHub, sem redeploy)
+  // Checa slug-overrides.json primeiro (editável no GitHub sem redeploy)
   const overrides = await loadOverrides()
-  const override = overrides[String(anime.mal_id)]
-  if (override) {
-    const slug = (dub && override.dub) ? override.dub : override.leg
-    if (slug) {
-      console.log('[AnimeFire] ✅ (override)', slug)
-      return slug
-    }
+  const ov = overrides[String(anime.mal_id)]
+  if (ov) {
+    const slug = (dub && ov.dub) ? ov.dub : ov.leg
+    if (slug) { console.log('[AnimeFire] ✅ (override)', slug); return slug }
   }
 
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
-  // 2. Filmes/OVAs: testa action=video direto (info não lista eps pra eles)
+  // Para filmes, tenta direto action=video ep=1 em vez de info
   if (isMovie) {
     for (const slug of candidates) {
       try {
         const data = await afFetch({ action: 'video', slug, ep: 1 })
         if (data.sources?.length > 0) {
-          console.log('[AnimeFire] ✅ (movie direto)', slug)
+          console.log('[AnimeFire] ✅ (movie/ova direct)', slug)
           return slug
         }
       } catch { /* tenta próximo */ }
     }
   }
 
-  // 3. Rota principal: probeSlug via action=info
   for (const slug of candidates) {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
-
-  // 4. Último recurso para dublados: action=video direto nos candidatos -dublado
-  //    O AnimeFire frequentemente não lista eps no info pra versão dublada,
-  //    mas os vídeos existem (ex: shingeki-no-kyojin-dublado/1)
-  if (dub) {
-    const dubOnly = candidates.filter(c => c.includes('-dublado'))
-    for (const slug of dubOnly) {
-      try {
-        const data = await afFetch({ action: 'video', slug, ep: 1 })
-        if (data.sources?.length > 0) {
-          console.log('[AnimeFire] ✅ (dub direto)', slug)
-          return slug
-        }
-      } catch { /* tenta próximo */ }
-    }
-  }
-
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
@@ -251,8 +230,6 @@ export default function WatchPage() {
   const [copied, setCopied] = useState(false)
   const [newAchievements, setNewAchievements] = useState([]) // toast de conquistas
   const [showBugReport,   setShowBugReport]   = useState(false)
-  // Previne loop infinito no onError: só tenta URL direta uma vez
-  const videoRetryRef = useRef(false)
 
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
@@ -277,7 +254,6 @@ export default function WatchPage() {
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
-    videoRetryRef.current = false
     setLoading(true); setError(false); setSources([]); setCurrentSrc('')
 
     try {
@@ -300,70 +276,111 @@ export default function WatchPage() {
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
-    } catch (afErr) {
-      console.warn('[AnimeFire] falhou:', afErr.message)
+    } catch (e) {
+      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
 
-      // ── Helper: /api/altsources ──────────────────────────────────────────
-      const tryAltSource = async (source, label, epN, dubFlag) => {
-        // Checa slug override por fonte no slug-overrides.json
-        const overrides = await loadOverrides()
-        const override = overrides[String(animeObj.mal_id)]
-        const srcCfg = override?.sources?.[source]
-        const overrideSlug = srcCfg
-          ? (dubFlag && srcCfg.dub ? srcCfg.dub : srcCfg.leg)
-          : null
+      // ── Fallback 1: animesonlinecc.to via Worker ──
+      try {
+        const titleQuery = animeObj.title_english || animeObj.title
+        setStatus('🔄 Tentando animesonlinecc.to...')
 
-        // Se tem slug override, usa direto; senão busca por título
-        const searchList = overrideSlug
-          ? [{ slug: overrideSlug }]
-          : [...new Set([animeObj.title_english, animeObj.title, animeObj.title_portuguese].filter(Boolean))]
-            .map(t => ({ title: t }))
+        const ccRes = await fetch(
+          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+          `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
+        )
+        const ccData = await ccRes.json()
 
-        for (const item of searchList) {
-          try {
-            const qs = new URLSearchParams({ ...item, ep: epN, dub: dubFlag ? '1' : '0', source })
-            const res = await fetch(`/api/altsources?${qs}`)
-            if (!res.ok) continue
-            const data = await res.json()
-            const hit = data.results?.[0]
-            if (!hit) continue
-
-            if (hit.videoSrc && !hit.embed) {
-              const src = proxyUrl(hit.videoSrc)
-              setSources([{ url: src, directUrl: hit.videoSrc, label: 'HD' }])
-              setCurrentSrc(src)
-              setStatus(`✅ ${label}`)
-              setLoading(false)
-              return true
-            }
-            if (hit.pageUrl) {
-              setCurrentSrc('__embed__')
-              setErrorMsg(hit.pageUrl)
-              setStatus(`✅ ${label} (embed)`)
-              setLoading(false)
-              return true
-            }
-          } catch (err) {
-            console.warn(`[${label}] ${JSON.stringify(item)}:`, err.message)
-          }
+        if (ccData.sources?.length) {
+          const mp4s = ccData.sources.filter(s => !s.isM3U8)
+          const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
+          setSources(ccData.sources)
+          setCurrentSrc(best?.url || ccData.sources[0].url)
+          setStatus(`✅ animesonlinecc — ${best?.label || 'Auto'}`)
+          setLoading(false)
+          return
         }
-        return false
+
+        if (ccData.iframe) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(ccData.iframe)
+          setStatus('✅ animesonlinecc (embed)')
+          setLoading(false)
+          return
+        }
+
+        if (ccData.pageUrl) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(ccData.pageUrl)
+          setStatus('✅ animesonlinecc (página)')
+          setLoading(false)
+          return
+        }
+      } catch (ccErr) {
+        console.warn('[animesonlinecc]', ccErr.message)
       }
 
-      // ── Fallback 1: animesonline.cloud ─────────────────────────────────
-      setStatus('🔄 Tentando animesonline.cloud...')
-      if (await tryAltSource('animesonlinecloud', 'animesonline.cloud', ep, dub)) return
+      // ── Fallback 2: título em japonês ──
+      if (animeObj.title !== animeObj.title_english) {
+        try {
+          setStatus('🔄 Tentando título original...')
+          const ccRes2 = await fetch(
+            `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+            `&title=${encodeURIComponent(animeObj.title)}&ep=${ep}&dub=${dub ? '1' : '0'}`
+          )
+          const ccData2 = await ccRes2.json()
+          if (ccData2.sources?.length || ccData2.iframe || ccData2.pageUrl) {
+            const src = ccData2.sources?.[0]?.url || ccData2.iframe || ccData2.pageUrl
+            const isEmbed = !ccData2.sources?.length
+            setSources(ccData2.sources || [])
+            setCurrentSrc(isEmbed ? '__embed__' : src)
+            if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
+            setStatus(`✅ animesonlinecc (JP) — Auto`)
+            setLoading(false)
+            return
+          }
+        } catch {}
+      }
 
-      // ── Fallback 2: animeshd ───────────────────────────────────────────
-      setStatus('🔄 Tentando animeshd...')
-      if (await tryAltSource('animeshd', 'AnimesHD', ep, dub)) return
+      // ── Fallback 3: animesonline.cloud via Worker ─────────────
+      try {
+        const titleQuery = animeObj.title_english || animeObj.title
+        setStatus('🔄 Tentando animesonline.cloud...')
 
-      // ── Fallback 3: animesonlinecc ─────────────────────────────────────
-      setStatus('🔄 Tentando animesonlinecc.to...')
-      if (await tryAltSource('animesonlinecc', 'animesonlinecc', ep, dub)) return
+        const hdRes = await fetch(
+          `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
+          `&title=${encodeURIComponent(titleQuery)}&ep=${ep}`
+        )
+        const hdData = await hdRes.json()
+
+        if (hdData.sources?.length) {
+          const mp4s = hdData.sources.filter(s => !s.isM3U8)
+          const best = bestQuality(mp4s.length ? mp4s : hdData.sources)
+          setSources(hdData.sources)
+          setCurrentSrc(best?.url || hdData.sources[0].url)
+          setStatus(`✅ animesonline.cloud — ${best?.label || 'Auto'}`)
+          setLoading(false)
+          return
+        }
+        if (hdData.iframe) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(hdData.iframe)
+          setStatus('✅ animesonline.cloud (embed)')
+          setLoading(false)
+          return
+        }
+        if (hdData.pageUrl) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(hdData.pageUrl)
+          setStatus('✅ animesonline.cloud (página)')
+          setLoading(false)
+          return
+        }
+      } catch (hdErr) {
+        console.warn('[animesonlinecloud]', hdErr.message)
+      }
 
       setError(true)
-      setErrorMsg(afErr.message)
+      setErrorMsg(e.message)
     } finally {
       setLoading(false)
     }
@@ -477,15 +494,8 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  if (videoRetryRef.current) {
-                    // Já tentou URL direta — desiste pra não loopar
-                    setError(true)
-                    return
-                  }
-                  videoRetryRef.current = true
-                  // Tenta URL direta (sem proxy Vercel) em caso de falha do stream
                   const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
-                  if (directUrl && directUrl !== currentSrc) {
+                  if (directUrl && currentSrc !== directUrl) {
                     setCurrentSrc(directUrl)
                   } else {
                     setError(true)
