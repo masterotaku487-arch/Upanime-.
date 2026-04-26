@@ -98,25 +98,50 @@ const probeSlug = async (slug, isMovie = false) => {
   return null
 }
 
+// Cache dos overrides (carregado uma vez por sessão)
+let _overridesCache = null
+const loadOverrides = async () => {
+  if (_overridesCache) return _overridesCache
+  try {
+    const res = await fetch('/slug-overrides.json?_t=' + Date.now())
+    const json = await res.json()
+    _overridesCache = json.animes || {}
+  } catch { _overridesCache = {} }
+  return _overridesCache
+}
+
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+
+  // 1. Checa overrides manuais (slug-overrides.json editável no GitHub)
+  const overrides = await loadOverrides()
+  const override = overrides[String(anime.mal_id)]
+  if (override) {
+    const slug = (dub && override.dub) ? override.dub : override.leg
+    if (slug) {
+      console.log('[AnimeFire] ✅ (override manual)', slug)
+      return slug
+    }
+  }
+
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
-  // Para filmes, tenta direto action=video ep=1 em vez de info
+  // 2. Filmes/OVAs: action=video direto
   if (isMovie) {
     for (const slug of candidates) {
       try {
         const data = await afFetch({ action: 'video', slug, ep: 1 })
         if (data.sources?.length > 0) {
-          console.log('[AnimeFire] ✅ (movie/ova direct)', slug)
+          console.log('[AnimeFire] ✅ (movie direto)', slug)
           return slug
         }
       } catch { /* tenta próximo */ }
     }
   }
 
+  // 3. Rota principal via probeSlug
   for (const slug of candidates) {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
