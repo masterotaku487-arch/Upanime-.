@@ -32,7 +32,12 @@
     },
     "16498": {
       "leg": "shingeki-no-kyojin",
-      "dub": "shingeki-no-kyojin-dublado"
+      "dub": "shingeki-no-kyojin-dublado",
+      "sources": {
+        "animesonlinecc": {
+          "leg": "shingeki-no-kyojin"
+        }
+      }
     },
     "20789": {
       "leg": "shingeki-no-kyojin-movie-1-guren-no-yumiya",
@@ -41,6 +46,14 @@
     "22177": {
       "leg": "akame-ga-kill",
       "dub": "akame-ga-kill-dublado"
+    },
+    "25777": {
+      "leg": "shingeki-no-kyojin-2",
+      "sources": {
+        "animesonlinecc": {
+          "leg": "shingeki-no-kyojin-2"
+        }
+      }
     },
     "32901": {
       "_titulo": "Gochuumon wa Usagi Desu ka? Sing for You",
@@ -55,6 +68,14 @@
         }
       }
     },
+    "36474": {
+      "leg": "shingeki-no-kyojin-3",
+      "sources": {
+        "animesonlinecc": {
+          "leg": "shingeki-no-kyojin-3"
+        }
+      }
+    },
     "38000": {
       "leg": "given"
     },
@@ -64,7 +85,12 @@
     },
     "40748": {
       "leg": "shingeki-no-kyojin-the-final-season",
-      "dub": "shingeki-no-kyojin-the-final-season-dublado"
+      "dub": "shingeki-no-kyojin-the-final-season-dublado",
+      "sources": {
+        "animesonlinecc": {
+          "leg": "shingeki-no-kyojin-the-final-season"
+        }
+      }
     },
     "51535": {
       "leg": "shingeki-no-kyojin-the-final-season---kanketsu-hen",
