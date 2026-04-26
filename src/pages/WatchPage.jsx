@@ -11,7 +11,7 @@ import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
-// STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
+// STREAMING via AnimeFire (animefire.io)
 // ─────────────────────────────────────────────────────────
 
 const AF = '/api/animefire'  // Proxy local Vercel — não precisa de Worker externo
@@ -210,7 +210,7 @@ const openVLC = (url, title) => {
 const openMXPlayer = (url, title) => {
   const directUrl = getDirectUrl(url)  // URL real sem proxy
   const titleEnc  = encodeURIComponent(title)
-  const referer   = encodeURIComponent('https://animefire.plus')
+  const referer   = encodeURIComponent('https://animefire.io')
   const ua        = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
 
   // MX Player recebe a URL direta + headers via S.headers_*
@@ -389,8 +389,8 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
-    ? `https://animefire.plus/animes/${afSlug}`
-    : `https://animefire.plus`
+    ? `https://animefire.io/animes/${afSlug}`
+    : `https://animefire.io`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
