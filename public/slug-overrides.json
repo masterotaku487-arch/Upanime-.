@@ -1,9 +1,21 @@
 {
   "_instrucoes": {
-    "como_usar": "Adicione o mal_id do anime como chave. O valor é o slug exato do AnimeFire.io",
-    "exemplo_url": "https://animefire.io/animes/SEU-SLUG-AQUI/1",
-    "dub": "Se o slug dublado for diferente, use a chave 'dub' separada",
-    "como_achar_mal_id": "O mal_id aparece na URL do site: /watch/35122 → mal_id é 35122"
+    "formato": "leg/dub = slugs do AnimeFire. sources = slugs por fonte alternativa",
+    "como_achar_mal_id": "O mal_id aparece na URL do site: /watch/35122 → mal_id é 35122",
+    "fontes_disponiveis": [
+      "animesonlinecc",
+      "animesonline",
+      "animeshd"
+    ],
+    "exemplo": {
+      "leg": "slug-animefire-legendado",
+      "dub": "slug-animefire-dublado",
+      "sources": {
+        "animesonlinecc": {
+          "leg": "slug-no-cc"
+        }
+      }
+    }
   },
   "animes": {
     "20": {
@@ -26,8 +38,22 @@
       "leg": "shingeki-no-kyojin-movie-1-guren-no-yumiya",
       "dub": "shingeki-no-kyojin-movie-1-guren-no-yumiya-dublado"
     },
+    "22177": {
+      "leg": "akame-ga-kill",
+      "dub": "akame-ga-kill-dublado"
+    },
+    "32901": {
+      "_titulo": "Gochuumon wa Usagi Desu ka? Sing for You",
+      "_aviso": "Confirme o MAL ID no seu site",
+      "leg": "gochuumon-wa-usagi-desu-ka-sing-for-you"
+    },
     "32995": {
-      "leg": "yuri-on-ice"
+      "leg": "yuri-on-ice",
+      "sources": {
+        "animesonlinecc": {
+          "leg": "yuri-on-ice"
+        }
+      }
     },
     "38000": {
       "leg": "given"
