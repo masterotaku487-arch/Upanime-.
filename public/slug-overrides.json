@@ -1,0 +1,41 @@
+{
+  "_instrucoes": {
+    "como_usar": "Adicione o mal_id do anime como chave. O valor é o slug exato do AnimeFire.io",
+    "exemplo_url": "https://animefire.io/animes/SEU-SLUG-AQUI/1",
+    "dub": "Se o slug dublado for diferente, use a chave 'dub' separada",
+    "como_achar_mal_id": "O mal_id aparece na URL do site: /watch/35122 → mal_id é 35122"
+  },
+
+  "animes": {
+    "11757": {
+      "leg": "sword-art-online",
+      "dub": "sword-art-online-dublado"
+    },
+    "20": {
+      "leg": "naruto",
+      "dub": "naruto-dublado"
+    },
+    "1735": {
+      "leg": "naruto-shippuden",
+      "dub": "naruto-shippuden-dublado"
+    },
+    "16498": {
+      "leg": "shingeki-no-kyojin",
+      "dub": "shingeki-no-kyojin-dublado"
+    },
+    "40748": {
+      "leg": "shingeki-no-kyojin-the-final-season",
+      "dub": "shingeki-no-kyojin-the-final-season-dublado"
+    },
+    "38000": {
+      "leg": "given"
+    },
+    "32995": {
+      "leg": "yuri-on-ice"
+    },
+    "38474": {
+      "leg": "vinland-saga",
+      "dub": "vinland-saga-dublado"
+    }
+  }
+}
