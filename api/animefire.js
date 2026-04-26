@@ -1,10 +1,8 @@
-// Vercel Serverless — AnimeFire Proxy
-// Domínio correto: animefire.io (não .plus nem .net)
+// Vercel Serverless — AnimeFire Proxy (animefire.io)
 // Arquivo: /api/animefire.js
 //
-// Rotas:
-//   ?action=info&slug={slug}         → { slug, episodes: [{ep}] }
-//   ?action=video&slug={slug}&ep={n} → { sources: [{url, label}] }
+// ?action=info&slug={slug}         → { slug, episodes: [{ep}] }
+// ?action=video&slug={slug}&ep={n} → { sources: [{url, label}] }
 
 const AF = 'https://animefire.io'
 
@@ -43,36 +41,36 @@ async function handleInfo(slug) {
 async function handleVideo(slug, ep) {
   const html = await fetchPage(`/animes/${slug}/${ep}`)
 
-  // Padrão 1: endpoint /video/{id} retorna JSON com sources
-  const videoIdMatch = html.match(/data-video-src="\/video\/([^"]+)"/)
-    || html.match(/["']\/video\/([a-zA-Z0-9_-]+)["']/)
-  if (videoIdMatch) {
-    const apiRes = await fetch(`${AF}/video/${videoIdMatch[1]}`, {
+  // Padrão 1: endpoint /video/{id} com JSON de sources
+  const vidMatch = html.match(/data-video-src="\/video\/([^"]+)"/)
+    || html.match(/["']\/video\/([a-zA-Z0-9_-]{6,})["']/)
+  if (vidMatch) {
+    const apiRes = await fetch(`${AF}/video/${vidMatch[1]}`, {
       headers: { ...HEADERS, Accept: 'application/json, */*' },
     })
     if (apiRes.ok) {
-      const apiData = await apiRes.json()
-      const raw = apiData.data || apiData.sources || []
+      const d = await apiRes.json()
+      const raw = d.data || d.sources || []
       if (raw.length) return { sources: raw.map(s => ({ url: s.src || s.file || s.url, label: s.label || 'HD' })).filter(s => s.url) }
     }
   }
 
-  // Padrão 2: URL .mp4 direto no HTML (CDN lightspeedst, etc.)
-  const allMp4 = [...html.matchAll(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/g)]
-  if (allMp4.length) {
-    const unique = [...new Set(allMp4.map(m => m[0]))]
+  // Padrão 2: URLs .mp4 diretas no HTML
+  const mp4s = [...html.matchAll(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/g)]
+  if (mp4s.length) {
+    const unique = [...new Set(mp4s.map(m => m[0]))]
     return { sources: unique.map((url, i) => ({ url, label: i === 0 ? 'HD' : 'SD' })) }
   }
 
-  // Padrão 3: array sources no script (jwplayer/videojs)
+  // Padrão 3: array sources[] no script (jwplayer/videojs)
   const srcArr = html.match(/sources\s*:\s*\[([^\]]+)\]/s)
   if (srcArr) {
     const files  = [...srcArr[1].matchAll(/file\s*:\s*["']([^"']+)["']/g)]
     const labels = [...srcArr[1].matchAll(/label\s*:\s*["']([^"']+)["']/g)]
-    if (files.length) return { sources: files.map((m, i) => ({ url: m[1], label: labels[i]?.[1] || 'HD' })) }
+    if (files.length) return { sources: files.map((f, i) => ({ url: f[1], label: labels[i]?.[1] || 'HD' })) }
   }
 
-  throw new Error(`Nenhuma fonte em ${slug} EP${ep}`)
+  throw new Error(`Sem fontes: ${slug} EP${ep}`)
 }
 
 export default async function handler(req, res) {

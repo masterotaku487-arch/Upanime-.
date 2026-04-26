@@ -20,8 +20,8 @@ export default async function handler(req, res) {
   }
 
   const headers = {
-    'Referer': 'https://animefire.plus/',
-    'Origin':  'https://animefire.plus',
+    'Referer': 'https://animefire.io/',
+    'Origin':  'https://animefire.io',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
   }
   if (req.headers.range) headers['Range'] = req.headers.range
