@@ -230,6 +230,7 @@ export default function WatchPage() {
   const [copied, setCopied] = useState(false)
   const [newAchievements, setNewAchievements] = useState([]) // toast de conquistas
   const [showBugReport,   setShowBugReport]   = useState(false)
+  const [fallbackUrl,     setFallbackUrl]     = useState(null) // URL alternativa do slug-overrides
 
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
@@ -254,7 +255,7 @@ export default function WatchPage() {
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
-    setLoading(true); setError(false); setSources([]); setCurrentSrc('')
+    setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setFallbackUrl(null)
 
     try {
       let slug = cachedSlug
@@ -385,14 +386,10 @@ export default function WatchPage() {
       try {
         const overrides = await loadOverrides()
         const ov = overrides[String(animeObj.mal_id)]
-        const fallbackUrl = ov?.fallback?.[String(ep)]
-        if (fallbackUrl) {
-          console.log('[fallback] usando URL hardcoded:', fallbackUrl)
-          setCurrentSrc('__embed__')
-          setErrorMsg(fallbackUrl)
-          setStatus('✅ Player alternativo')
-          setLoading(false)
-          return
+        const fbUrl = ov?.fallback?.[String(ep)]
+        if (fbUrl) {
+          console.log('[fallback] URL alternativa disponível:', fbUrl)
+          setFallbackUrl(fbUrl)
         }
       } catch {}
 
@@ -470,6 +467,17 @@ export default function WatchPage() {
                    : 'Fonte: 🇧🇷 AnimeFire via Cloudflare'}
                 </p>
               </div>
+            ) : error && fallbackUrl ? (
+              // Fallback: iframe com proxy anti-ads
+              <iframe
+                key={fallbackUrl}
+                src={`/api/embed?url=${encodeURIComponent(fallbackUrl)}`}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups-to-escape-sandbox"
+                title={`${title} EP${epNum}`}
+              />
             ) : error ? (
               <div className="player-error">
                 <span className="error-emoji">😕</span>
