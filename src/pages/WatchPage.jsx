@@ -299,111 +299,71 @@ export default function WatchPage() {
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
-    } catch (e) {
-      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
+    } catch (afErr) {
+      console.warn('[AnimeFire] falhou:', afErr.message)
 
-      // ── Fallback 1: animesonlinecc.to via Worker ──
-      try {
-        const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Tentando animesonlinecc.to...')
+      // ── Helper: tenta qualquer proxy com múltiplos títulos ──────────────
+      const tryProxy = async (baseUrl, label, titles, epN, dubFlag) => {
+        for (const title of titles) {
+          try {
+            const qs = new URLSearchParams({ action: 'episode', title, ep: epN, dub: dubFlag ? '1' : '0' })
+            const res = await fetch(`${baseUrl}?${qs}`)
+            if (!res.ok) continue
+            const data = await res.json()
 
-        const ccRes = await fetch(
-          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-          `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
-        )
-        const ccData = await ccRes.json()
-
-        if (ccData.sources?.length) {
-          const mp4s = ccData.sources.filter(s => !s.isM3U8)
-          const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
-          setSources(ccData.sources)
-          setCurrentSrc(best?.url || ccData.sources[0].url)
-          setStatus(`✅ animesonlinecc — ${best?.label || 'Auto'}`)
-          setLoading(false)
-          return
-        }
-
-        if (ccData.iframe) {
-          setCurrentSrc('__embed__')
-          setErrorMsg(ccData.iframe)
-          setStatus('✅ animesonlinecc (embed)')
-          setLoading(false)
-          return
-        }
-
-        if (ccData.pageUrl) {
-          setCurrentSrc('__embed__')
-          setErrorMsg(ccData.pageUrl)
-          setStatus('✅ animesonlinecc (página)')
-          setLoading(false)
-          return
-        }
-      } catch (ccErr) {
-        console.warn('[animesonlinecc]', ccErr.message)
-      }
-
-      // ── Fallback 2: título em japonês ──
-      if (animeObj.title !== animeObj.title_english) {
-        try {
-          setStatus('🔄 Tentando título original...')
-          const ccRes2 = await fetch(
-            `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-            `&title=${encodeURIComponent(animeObj.title)}&ep=${ep}&dub=${dub ? '1' : '0'}`
-          )
-          const ccData2 = await ccRes2.json()
-          if (ccData2.sources?.length || ccData2.iframe || ccData2.pageUrl) {
-            const src = ccData2.sources?.[0]?.url || ccData2.iframe || ccData2.pageUrl
-            const isEmbed = !ccData2.sources?.length
-            setSources(ccData2.sources || [])
-            setCurrentSrc(isEmbed ? '__embed__' : src)
-            if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
-            setStatus(`✅ animesonlinecc (JP) — Auto`)
-            setLoading(false)
-            return
+            if (data.sources?.length) {
+              const mp4s = data.sources.filter(s => !s.isM3U8)
+              const best = bestQuality(mp4s.length ? mp4s : data.sources)
+              setSources(data.sources)
+              setCurrentSrc(best?.url || data.sources[0].url)
+              setStatus(`✅ ${label} — ${best?.label || 'Auto'}`)
+              setLoading(false)
+              return true
+            }
+            if (data.iframe || data.pageUrl) {
+              setCurrentSrc('__embed__')
+              setErrorMsg(data.iframe || data.pageUrl)
+              setStatus(`✅ ${label} (embed)`)
+              setLoading(false)
+              return true
+            }
+          } catch (err) {
+            console.warn(`[${label}] título "${title}":`, err.message)
           }
-        } catch {}
+        }
+        return false
       }
 
-      // ── Fallback 3: animesonline.cloud via Worker ─────────────
-      try {
-        const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Tentando animesonline.cloud...')
+      // Títulos a tentar em cada proxy (inglês primeiro, depois japonês/português)
+      const titles = [...new Set([
+        animeObj.title_english,
+        animeObj.title,
+        animeObj.title_portuguese,
+      ].filter(Boolean))]
 
-        const hdRes = await fetch(
-          `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
-          `&title=${encodeURIComponent(titleQuery)}&ep=${ep}`
-        )
-        const hdData = await hdRes.json()
+      // ── Fallback 1: animesonline.cloud ─────────────────────────────────
+      setStatus('🔄 Tentando animesonline.cloud...')
+      if (await tryProxy(
+        'https://animesonlinecloud-proxy.masterotaku487.workers.dev',
+        'animesonline.cloud', titles, ep, dub
+      )) return
 
-        if (hdData.sources?.length) {
-          const mp4s = hdData.sources.filter(s => !s.isM3U8)
-          const best = bestQuality(mp4s.length ? mp4s : hdData.sources)
-          setSources(hdData.sources)
-          setCurrentSrc(best?.url || hdData.sources[0].url)
-          setStatus(`✅ animesonline.cloud — ${best?.label || 'Auto'}`)
-          setLoading(false)
-          return
-        }
-        if (hdData.iframe) {
-          setCurrentSrc('__embed__')
-          setErrorMsg(hdData.iframe)
-          setStatus('✅ animesonline.cloud (embed)')
-          setLoading(false)
-          return
-        }
-        if (hdData.pageUrl) {
-          setCurrentSrc('__embed__')
-          setErrorMsg(hdData.pageUrl)
-          setStatus('✅ animesonline.cloud (página)')
-          setLoading(false)
-          return
-        }
-      } catch (hdErr) {
-        console.warn('[animesonlinecloud]', hdErr.message)
-      }
+      // ── Fallback 2: animeshd ───────────────────────────────────────────
+      setStatus('🔄 Tentando animeshd...')
+      if (await tryProxy(
+        'https://animeshd-proxy.masterotaku487.workers.dev',
+        'animeshd', titles, ep, dub
+      )) return
+
+      // ── Fallback 3: animesonlinecc ─────────────────────────────────────
+      setStatus('🔄 Tentando animesonlinecc.to...')
+      if (await tryProxy(
+        'https://animeonline-proxy.masterotaku487.workers.dev',
+        'animesonlinecc', titles, ep, dub
+      )) return
 
       setError(true)
-      setErrorMsg(e.message)
+      setErrorMsg(afErr.message)
     } finally {
       setLoading(false)
     }
