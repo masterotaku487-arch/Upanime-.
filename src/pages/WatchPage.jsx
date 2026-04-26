@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
@@ -14,15 +14,14 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF = '/api/animefire'  // Proxy local Vercel — não precisa de Worker externo
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 const proxyUrl = (url) =>
   `/api/proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
-  // _t força o Worker a ignorar cache e retornar token CDN fresco
-  const qs = new URLSearchParams({ ...params, _t: Date.now() }).toString()
+  const qs = new URLSearchParams(params).toString()
   const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
   if (!r.ok) throw new Error(`Proxy ${r.status}`)
   return r.json()
@@ -99,29 +98,70 @@ const probeSlug = async (slug, isMovie = false) => {
   return null
 }
 
+// Mapa manual para animes com slug fora do padrão gerado automaticamente
+const SLUG_MAP = {
+  32995: 'yuri-on-ice',
+  31758: 'mob-psycho-100',
+  35790: 'black-clover',
+  38000: 'given',
+  38474: 'vinland-saga',
+  40748: 'kimetsu-no-yaiba-mugen-ressha-hen',
+}
+
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+
+  // 1. Checa mapa manual primeiro (slugs conhecidos que fogem do padrão)
+  if (SLUG_MAP[anime.mal_id]) {
+    const base = SLUG_MAP[anime.mal_id]
+    const manualCandidates = dub
+      ? [base + '-dublado-todos-os-episodios', base + '-dublado', base]
+      : [base + '-todos-os-episodios', base]
+    for (const slug of manualCandidates) {
+      const found = await probeSlug(slug, isMovie)
+      if (found) { console.log('[AnimeFire] ✅ (mapa manual)', slug); return found }
+    }
+  }
+
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
-  // Para filmes, tenta direto action=video ep=1 em vez de info
+  // 2. Filmes/OVAs: testa action=video direto (info não lista eps pra eles)
   if (isMovie) {
     for (const slug of candidates) {
       try {
         const data = await afFetch({ action: 'video', slug, ep: 1 })
         if (data.sources?.length > 0) {
-          console.log('[AnimeFire] ✅ (movie/ova direct)', slug)
+          console.log('[AnimeFire] ✅ (movie direto)', slug)
           return slug
         }
       } catch { /* tenta próximo */ }
     }
   }
 
+  // 3. Rota principal: probeSlug via action=info
   for (const slug of candidates) {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
+
+  // 4. Último recurso para dublados: action=video direto nos candidatos -dublado
+  //    O AnimeFire frequentemente não lista eps no info pra versão dublada,
+  //    mas os vídeos existem (ex: shingeki-no-kyojin-dublado/1)
+  if (dub) {
+    const dubOnly = candidates.filter(c => c.includes('-dublado'))
+    for (const slug of dubOnly) {
+      try {
+        const data = await afFetch({ action: 'video', slug, ep: 1 })
+        if (data.sources?.length > 0) {
+          console.log('[AnimeFire] ✅ (dub direto)', slug)
+          return slug
+        }
+      } catch { /* tenta próximo */ }
+    }
+  }
+
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
@@ -210,6 +250,8 @@ export default function WatchPage() {
   const [copied, setCopied] = useState(false)
   const [newAchievements, setNewAchievements] = useState([]) // toast de conquistas
   const [showBugReport,   setShowBugReport]   = useState(false)
+  // Previne loop infinito no onError: só tenta URL direta uma vez
+  const videoRetryRef = useRef(false)
 
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
@@ -234,6 +276,7 @@ export default function WatchPage() {
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
+    videoRetryRef.current = false
     setLoading(true); setError(false); setSources([]); setCurrentSrc('')
 
     try {
@@ -474,8 +517,15 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
+                  if (videoRetryRef.current) {
+                    // Já tentou URL direta — desiste pra não loopar
+                    setError(true)
+                    return
+                  }
+                  videoRetryRef.current = true
+                  // Tenta URL direta (sem proxy Vercel) em caso de falha do stream
                   const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
-                  if (directUrl && currentSrc !== directUrl) {
+                  if (directUrl && directUrl !== currentSrc) {
                     setCurrentSrc(directUrl)
                   } else {
                     setError(true)
