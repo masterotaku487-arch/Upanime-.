@@ -302,27 +302,31 @@ export default function WatchPage() {
     } catch (afErr) {
       console.warn('[AnimeFire] falhou:', afErr.message)
 
-      // ── Helper: tenta qualquer proxy com múltiplos títulos ──────────────
-      const tryProxy = async (baseUrl, label, titles, epN, dubFlag) => {
+      // ── Helper: /api/altsources (Vercel — sem Worker externo) ───────────
+      // Já raspa animeshd, animesonlinecc e animesonlinecloud diretamente
+      const tryAltSource = async (source, label, titles, epN, dubFlag) => {
         for (const title of titles) {
           try {
-            const qs = new URLSearchParams({ action: 'episode', title, ep: epN, dub: dubFlag ? '1' : '0' })
-            const res = await fetch(`${baseUrl}?${qs}`)
+            const qs = new URLSearchParams({ title, ep: epN, dub: dubFlag ? '1' : '0', source })
+            const res = await fetch(`/api/altsources?${qs}`)
             if (!res.ok) continue
             const data = await res.json()
 
-            if (data.sources?.length) {
-              const mp4s = data.sources.filter(s => !s.isM3U8)
-              const best = bestQuality(mp4s.length ? mp4s : data.sources)
-              setSources(data.sources)
-              setCurrentSrc(best?.url || data.sources[0].url)
-              setStatus(`✅ ${label} — ${best?.label || 'Auto'}`)
+            // /api/altsources retorna { results: [{source, pageUrl, videoSrc, embed}] }
+            const hit = data.results?.[0]
+            if (!hit) continue
+
+            if (hit.videoSrc && !hit.embed) {
+              const src = proxyUrl(hit.videoSrc)
+              setSources([{ url: src, directUrl: hit.videoSrc, label: 'HD' }])
+              setCurrentSrc(src)
+              setStatus(`✅ ${label}`)
               setLoading(false)
               return true
             }
-            if (data.iframe || data.pageUrl) {
+            if (hit.pageUrl) {
               setCurrentSrc('__embed__')
-              setErrorMsg(data.iframe || data.pageUrl)
+              setErrorMsg(hit.pageUrl)
               setStatus(`✅ ${label} (embed)`)
               setLoading(false)
               return true
@@ -334,7 +338,7 @@ export default function WatchPage() {
         return false
       }
 
-      // Títulos a tentar em cada proxy (inglês primeiro, depois japonês/português)
+      // Títulos a tentar (inglês primeiro, depois japonês/português)
       const titles = [...new Set([
         animeObj.title_english,
         animeObj.title,
@@ -343,24 +347,15 @@ export default function WatchPage() {
 
       // ── Fallback 1: animesonline.cloud ─────────────────────────────────
       setStatus('🔄 Tentando animesonline.cloud...')
-      if (await tryProxy(
-        'https://animesonlinecloud-proxy.masterotaku487.workers.dev',
-        'animesonline.cloud', titles, ep, dub
-      )) return
+      if (await tryAltSource('animesonlinecloud', 'animesonline.cloud', titles, ep, dub)) return
 
       // ── Fallback 2: animeshd ───────────────────────────────────────────
       setStatus('🔄 Tentando animeshd...')
-      if (await tryProxy(
-        'https://animeshd-proxy.masterotaku487.workers.dev',
-        'animeshd', titles, ep, dub
-      )) return
+      if (await tryAltSource('animeshd', 'AnimesHD', titles, ep, dub)) return
 
       // ── Fallback 3: animesonlinecc ─────────────────────────────────────
       setStatus('🔄 Tentando animesonlinecc.to...')
-      if (await tryProxy(
-        'https://animeonline-proxy.masterotaku487.workers.dev',
-        'animesonlinecc', titles, ep, dub
-      )) return
+      if (await tryAltSource('animesonlinecc', 'animesonlinecc', titles, ep, dub)) return
 
       setError(true)
       setErrorMsg(afErr.message)
