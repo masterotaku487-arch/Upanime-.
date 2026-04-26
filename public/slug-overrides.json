@@ -5,12 +5,7 @@
     "dub": "Se o slug dublado for diferente, use a chave 'dub' separada",
     "como_achar_mal_id": "O mal_id aparece na URL do site: /watch/35122 → mal_id é 35122"
   },
-
   "animes": {
-    "11757": {
-      "leg": "sword-art-online",
-      "dub": "sword-art-online-dublado"
-    },
     "20": {
       "leg": "naruto",
       "dub": "naruto-dublado"
@@ -19,23 +14,43 @@
       "leg": "naruto-shippuden",
       "dub": "naruto-shippuden-dublado"
     },
+    "11757": {
+      "leg": "sword-art-online",
+      "dub": "sword-art-online-dublado"
+    },
     "16498": {
       "leg": "shingeki-no-kyojin",
       "dub": "shingeki-no-kyojin-dublado"
+    },
+    "20789": {
+      "leg": "shingeki-no-kyojin-movie-1-guren-no-yumiya",
+      "dub": "shingeki-no-kyojin-movie-1-guren-no-yumiya-dublado"
+    },
+    "32995": {
+      "leg": "yuri-on-ice"
+    },
+    "38000": {
+      "leg": "given"
+    },
+    "38474": {
+      "leg": "vinland-saga",
+      "dub": "vinland-saga-dublado"
     },
     "40748": {
       "leg": "shingeki-no-kyojin-the-final-season",
       "dub": "shingeki-no-kyojin-the-final-season-dublado"
     },
-    "38000": {
-      "leg": "given"
+    "51535": {
+      "leg": "shingeki-no-kyojin-the-final-season---kanketsu-hen",
+      "dub": "shingeki-no-kyojin-the-final-season---kanketsu-hen-dublado"
     },
-    "32995": {
-      "leg": "yuri-on-ice"
+    "61316": {
+      "leg": "re-zero-kara-hajimeru-isekai-seikatsu-4th-season",
+      "dub": "re-zero-kara-hajimeru-isekai-seikatsu-4th-season-dublado"
     },
-    "38474": {
-      "leg": "vinland-saga",
-      "dub": "vinland-saga-dublado"
+    "62568": {
+      "leg": "dr-stone-science-future-part-3",
+      "dub": "dr-stone-science-future-part-3-dublado"
     }
   }
 }
