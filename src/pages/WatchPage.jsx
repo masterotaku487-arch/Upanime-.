@@ -257,6 +257,20 @@ export default function WatchPage() {
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
     setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setFallbackUrl(null)
 
+    // Checa fallback imediato — se existir, vai direto sem tentar nada
+    try {
+      const overrides = await loadOverrides()
+      const ov = overrides[String(animeObj.mal_id)]
+      const fbUrl = ov?.fallback?.[String(ep)]
+      if (fbUrl) {
+        console.log('[fallback imediato]', fbUrl)
+        setFallbackUrl(fbUrl)
+        setError(true)
+        setLoading(false)
+        return
+      }
+    } catch {}
+
     try {
       let slug = cachedSlug
       if (!slug) {
@@ -379,19 +393,6 @@ export default function WatchPage() {
       } catch (hdErr) {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
-
-      // ── Fallback final: URL hardcoded no slug-overrides.json ──────────
-      // Útil para filmes/especiais onde nenhum proxy funciona
-      // Ex: { "fallback": { "1": "https://animes.strp2p.com/#ak6nz" } }
-      try {
-        const overrides = await loadOverrides()
-        const ov = overrides[String(animeObj.mal_id)]
-        const fbUrl = ov?.fallback?.[String(ep)]
-        if (fbUrl) {
-          console.log('[fallback] URL alternativa disponível:', fbUrl)
-          setFallbackUrl(fbUrl)
-        }
-      } catch {}
 
       setError(true)
       setErrorMsg(e.message)
