@@ -379,6 +379,23 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
+      // ── Fallback final: URL hardcoded no slug-overrides.json ──────────
+      // Útil para filmes/especiais onde nenhum proxy funciona
+      // Ex: { "fallback": { "1": "https://animes.strp2p.com/#ak6nz" } }
+      try {
+        const overrides = await loadOverrides()
+        const ov = overrides[String(animeObj.mal_id)]
+        const fallbackUrl = ov?.fallback?.[String(ep)]
+        if (fallbackUrl) {
+          console.log('[fallback] usando URL hardcoded:', fallbackUrl)
+          setCurrentSrc('__embed__')
+          setErrorMsg(fallbackUrl)
+          setStatus('✅ Player alternativo')
+          setLoading(false)
+          return
+        }
+      } catch {}
+
       setError(true)
       setErrorMsg(e.message)
     } finally {
