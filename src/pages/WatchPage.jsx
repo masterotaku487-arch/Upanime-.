@@ -469,14 +469,13 @@ export default function WatchPage() {
                 </p>
               </div>
             ) : error && fallbackUrl ? (
-              // Fallback: iframe com proxy anti-ads
+              // Fallback: iframe direto na URL original
               <iframe
                 key={fallbackUrl}
-                src={`/api/embed?url=${encodeURIComponent(fallbackUrl)}`}
+                src={fallbackUrl}
                 style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
                 allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups-to-escape-sandbox"
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                 title={`${title} EP${epNum}`}
               />
             ) : error ? (
