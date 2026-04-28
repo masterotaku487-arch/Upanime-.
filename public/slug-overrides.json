@@ -30,6 +30,9 @@
       "leg": "sword-art-online",
       "dub": "sword-art-online-dublado"
     },
+    "14741": {
+      "leg": "chuunibyou-demo-koi-ga-shitai"
+    },
     "16498": {
       "leg": "shingeki-no-kyojin",
       "dub": "shingeki-no-kyojin-dublado",
@@ -61,7 +64,6 @@
       "leg": "gochuumon-wa-usagi-desu-ka-sing-for-you"
     },
     "32995": {
-      "leg": "yuri-on-ice",
       "sources": {
         "animesonlinecc": {
           "leg": "yuri-on-ice"
