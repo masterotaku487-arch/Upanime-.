@@ -292,7 +292,52 @@ export default function WatchPage() {
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
     } catch (e) {
-      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
+      console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
+
+      // ── Fallback 0: embed direto meusanimes / goyabu ───────────
+      // Esses sites usam player JS — extracção por regex não funciona.
+      // Usa o slug/ID exato do slug-overrides e carrega em iframe proxy.
+      try {
+        const overrides  = await loadOverrides()
+        const ov         = overrides[String(animeObj.mal_id)]
+        const PROXY_BASE = 'https://animesfontes-proxy.onrender.com'
+
+        // ── meusanimes.blog ──────────────────────────────────────
+        // Padrão URL: meusanimes.blog/e/{base}-episodio-{ep}/
+        // Override guarda o slug BASE (sem -episodio-N)
+        // Ex: "akame-ga-kill-dublado-1" → /e/akame-ga-kill-dublado-1-episodio-1/
+        const maOv = ov?.sources?.meusanimes
+        if (maOv) {
+          const maBase = (dub ? maOv.dub : maOv.leg) || maOv.any
+          if (maBase) {
+            const maSlug   = `${maBase}-episodio-${ep}`
+            const embedUrl = `${PROXY_BASE}/ma/${maSlug}`
+            setCurrentSrc('__embed__')
+            setErrorMsg(embedUrl)
+            setStatus(`✅ MeusAnimes${dub ? ' 🎙️ Dublado' : ' 📖 Legendado'} — EP${ep}`)
+            setLoading(false); return
+          }
+        }
+
+        // ── goyabu.io ────────────────────────────────────────────
+        // Override guarda o id numérico (ou array ids[] por episódio)
+        const gyOv = ov?.sources?.goyabu
+        if (gyOv) {
+          const gyId = gyOv.ids
+            ? (gyOv.ids[ep - 1] || gyOv.ids[0])
+            : (gyOv.id || (dub ? gyOv.dub : gyOv.leg) || gyOv.any)
+
+          if (gyId) {
+            const embedUrl = `${PROXY_BASE}/gy/${gyId}`
+            setCurrentSrc('__embed__')
+            setErrorMsg(embedUrl)
+            setStatus(`✅ Goyabu — EP${ep}`)
+            setLoading(false); return
+          }
+        }
+      } catch (ovErr) {
+        console.warn('[fallback0 meusanimes/goyabu]', ovErr.message)
+      }
 
       // ── Fallback 1: animesonlinecc.to via Worker ──
       try {
@@ -536,6 +581,17 @@ export default function WatchPage() {
                   </a>
                 </div>
               </div>
+            ) : currentSrc === '__embed__' ? (
+              // Embed: exibe a página do site externo em iframe (player JS funciona)
+              <iframe
+                key={errorMsg}
+                src={errorMsg}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
+                title={`${title} EP${epNum}`}
+              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
