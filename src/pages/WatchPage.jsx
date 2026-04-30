@@ -394,6 +394,45 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
+      // ── Fallback 4: animesfontes-proxy.onrender.com ───────────
+      try {
+        const titleQuery = animeObj.title_english || animeObj.title
+        setStatus('🔄 Tentando AnimeFontes...')
+
+        const afontesRes = await fetch(
+          `https://animesfontes-proxy.onrender.com/episode` +
+          `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
+          { signal: AbortSignal.timeout(30000) }
+        )
+        const afontesData = await afontesRes.json()
+
+        if (afontesData.sources?.length) {
+          const mp4s = afontesData.sources.filter(s => !s.isM3U8)
+          const best = bestQuality(mp4s.length ? mp4s : afontesData.sources)
+          setSources(afontesData.sources)
+          setCurrentSrc(best?.url || afontesData.sources[0].url)
+          setStatus(`✅ AnimeFontes — ${best?.label || 'Auto'}`)
+          setLoading(false)
+          return
+        }
+        if (afontesData.iframe) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(afontesData.iframe)
+          setStatus('✅ AnimeFontes (embed)')
+          setLoading(false)
+          return
+        }
+        if (afontesData.pageUrl) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(afontesData.pageUrl)
+          setStatus('✅ AnimeFontes (página)')
+          setLoading(false)
+          return
+        }
+      } catch (afErr) {
+        console.warn('[animesfontes]', afErr.message)
+      }
+
       setError(true)
       setErrorMsg(e.message)
     } finally {
