@@ -27,6 +27,13 @@ const ENDPOINTS = [
     method: 'GET',
   },
   {
+    id: 'video3',
+    label: 'Fonte Alternativa 3',
+    icon: '🎥',
+    url: 'https://animesfontes-proxy.onrender.com/',
+    method: 'GET',
+  },
+  {
     id: 'database',
     label: 'Base de Dados',
     icon: '🔗',
