@@ -1,21 +1,16 @@
 {
   "_instrucoes": {
-    "formato": "leg/dub = slugs do AnimeFire. sources = slugs por fonte alternativa",
+    "formato": "leg/dub = slugs AnimeFire | sources = slugs por fonte alternativa",
     "como_achar_mal_id": "O mal_id aparece na URL do site: /watch/35122 → mal_id é 35122",
     "fontes_disponiveis": [
       "animesonlinecc",
       "animesonline",
-      "animeshd"
+      "animeshd",
+      "meusanimes",
+      "goyabu"
     ],
-    "exemplo": {
-      "leg": "slug-animefire-legendado",
-      "dub": "slug-animefire-dublado",
-      "sources": {
-        "animesonlinecc": {
-          "leg": "slug-no-cc"
-        }
-      }
-    }
+    "meusanimes_formato": "Slug BASE sem -episodio-N. Ex: url .../yuri-on-ice-dublado-1-episodio-3/ → base é 'yuri-on-ice-dublado-1'",
+    "goyabu_formato": "id = ID numérico único (filmes/OVA). ids = [id_ep1, id_ep2, ...] para séries"
   },
   "animes": {
     "20": {
@@ -48,7 +43,22 @@
     },
     "22177": {
       "leg": "akame-ga-kill",
-      "dub": "akame-ga-kill-dublado"
+      "dub": "akame-ga-kill-dublado",
+      "sources": {
+        "meusanimes": {
+          "dub": "akame-ga-kill-dublado-1",
+          "leg": "akame-ga-kill-1"
+        }
+      }
+    },
+    "22199": {
+      "_titulo": "Confirmar em myanimelist.net/anime/22199",
+      "sources": {
+        "meusanimes": {
+          "dub": "akame-ga-kill-dublado-1",
+          "leg": "akame-ga-kill-1"
+        }
+      }
     },
     "25777": {
       "leg": "shingeki-no-kyojin-2",
@@ -60,13 +70,17 @@
     },
     "32901": {
       "_titulo": "Gochuumon wa Usagi Desu ka? Sing for You",
-      "_aviso": "Confirme o MAL ID no seu site",
       "leg": "gochuumon-wa-usagi-desu-ka-sing-for-you"
     },
     "32995": {
+      "_titulo": "Yuri!!! on Ice",
       "sources": {
         "animesonlinecc": {
           "leg": "yuri-on-ice"
+        },
+        "meusanimes": {
+          "dub": "yuri-on-ice-dublado-1",
+          "leg": "yuri-on-ice-1"
         }
       }
     },
@@ -99,16 +113,11 @@
       "dub": "shingeki-no-kyojin-the-final-season---kanketsu-hen-dublado"
     },
     "59571": {
-      "_titulo": "Shingeki no Kyojin: The Last Attack",
-      "leg": "shingeki-no-kyojin-the-last-attack",
-      "dub": "shingeki-no-kyojin-the-last-attack-dublado",
+      "_titulo": "Attack on Titan: The Last Attack",
       "sources": {
-        "animesonline": {
-          "dub": "shingeki-no-kyojin-movie-kanketsu-hen-the-last-attack-dublado"
+        "goyabu": {
+          "id": "52732"
         }
-      },
-      "fallback": {
-        "1": "https://animes.strp2p.com/#ak6nz"
       }
     },
     "61316": {
