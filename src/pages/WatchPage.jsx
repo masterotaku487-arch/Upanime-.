@@ -12,6 +12,9 @@ import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
 // STREAMING via AnimeFire (animefire.io)
+// IMPORTANTE: usa /api/animefire local (não o Worker externo)
+// Assim o token CDN fica com o IP do Vercel, e o /api/proxy
+// streama do mesmo IP → CDN aceita ✅
 // ─────────────────────────────────────────────────────────
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
@@ -284,8 +287,9 @@ export default function WatchPage() {
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL proxiada para garantir Referer correto
-      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+      // Usa URL directa — token CDN está IP-locked ao Worker que o gerou.
+      // Passar pelo /api/proxy mudaria o IP e o CDN rejeitaria (403).
+      const proxiedSrcs = srcs.map(s => ({ ...s, url: s.url, directUrl: s.url }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
@@ -370,7 +374,7 @@ export default function WatchPage() {
 
         if (ccData.pageUrl) {
           setCurrentSrc('__embed__')
-          setErrorMsg(ccData.pageUrl)
+          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(ccData.pageUrl)}`)
           setStatus('✅ animesonlinecc (página)')
           setLoading(false)
           return
@@ -393,7 +397,10 @@ export default function WatchPage() {
             const isEmbed = !ccData2.sources?.length
             setSources(ccData2.sources || [])
             setCurrentSrc(isEmbed ? '__embed__' : src)
-            if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
+            if (isEmbed) setErrorMsg(
+              ccData2.iframe ||
+              `https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(ccData2.pageUrl)}`
+            )
             setStatus(`✅ animesonlinecc (JP) — Auto`)
             setLoading(false)
             return
@@ -423,14 +430,14 @@ export default function WatchPage() {
         }
         if (hdData.iframe) {
           setCurrentSrc('__embed__')
-          setErrorMsg(hdData.iframe)
+          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(hdData.iframe)}`)
           setStatus('✅ animesonline.cloud (embed)')
           setLoading(false)
           return
         }
         if (hdData.pageUrl) {
           setCurrentSrc('__embed__')
-          setErrorMsg(hdData.pageUrl)
+          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(hdData.pageUrl)}`)
           setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
