@@ -287,9 +287,9 @@ export default function WatchPage() {
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL directa — token CDN está IP-locked ao Worker que o gerou.
-      // Passar pelo /api/proxy mudaria o IP e o CDN rejeitaria (403).
-      const proxiedSrcs = srcs.map(s => ({ ...s, url: s.url, directUrl: s.url }))
+      // Usa URL proxiada — CDN (lightspeedst.net) não tem CORS headers.
+      // O /api/proxy adiciona Access-Control-Allow-Origin: * para o browser aceitar.
+      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
