@@ -1,62 +1,62 @@
-// Vercel Serverless — Proxy de video com Referer correto
-// ESTRATEGIA: redirect direto com headers quando possivel
+// Vercel Serverless — Proxy de vídeo com Referer correto
 // Arquivo: /api/proxy.js
+//
+// Uso: /api/proxy?url=https://lightspeedst.net/...
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, HEAD')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   const { url } = req.query
-  if (!url) return res.status(400).json({ error: 'url obrigatorio' })
+  if (!url) return res.status(400).json({ error: 'url obrigatório' })
 
-  const allowed = ['lightspeedst.net','animefire.io','animefire.plus','animefire.net','animeonlinecc.net','animesonlinecloud.com']
+  // Só permite domínios conhecidos do AnimeFire
+  const allowed = ['lightspeedst.net', 'animefire.io', 'animefire.plus', 'animefire.net']
   let videoHost
-  try { videoHost = new URL(url).hostname } catch {
-    return res.status(400).json({ error: 'url invalida' })
-  }
-  if (!allowed.some(d => videoHost.endsWith(d))) {
-    return res.status(403).json({ error: 'Dominio nao permitido' })
+  try {
+    videoHost = new URL(url).hostname
+  } catch {
+    return res.status(400).json({ error: 'url inválida' })
   }
 
-  const headers = {
-    'Referer': 'https://animefire.io/',
-    'Origin':  'https://animefire.io',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  if (!allowed.some(d => videoHost.endsWith(d))) {
+    return res.status(403).json({ error: 'Domínio não permitido' })
   }
-  if (req.headers.range) headers['Range'] = req.headers.range
 
   try {
-    // Faz HEAD primeiro para pegar o redirect final
-    const head = await fetch(url, { method: 'HEAD', headers, redirect: 'follow' })
-    const finalUrl = head.url  // URL final apos redirects
+    const headers = {
+      'Referer': 'https://animefire.io/',
+      'Origin': 'https://animefire.io',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    }
 
-    // Nunca redireciona o browser para o CDN directamente.
-    // O token tem ip=IP_Cloudflare — se o browser for directo, o seu IP
-    // não bate com o token e o CDN rejeita (403).
-    // Sempre fazemos stream aqui pelo proxy (Vercel fica invisível ao CDN
-    // porque o token já foi gerado com o IP do Worker Cloudflare).
-    const fetchUrl = finalUrl || url
+    // Repassa Range para suporte a seek no player
+    if (req.headers.range) headers['Range'] = req.headers.range
 
-    const MAX = 10 * 1024 * 1024  // 10MB
+    // Força Range para obter 206 — evita o CDN enviar o ficheiro completo
+    // e permite que o browser faça seek correctamente
     const range = req.headers.range || 'bytes=0-'
-    const rangeHeaders = { ...headers, Range: range }
+    headers['Range'] = range
 
-    const videoRes = await fetch(fetchUrl, { headers: rangeHeaders })
-    const contentLength = Number(videoRes.headers.get('Content-Length') || 0)
+    const videoRes = await fetch(url, { headers, redirect: 'follow' })
 
     res.setHeader('Content-Type', videoRes.headers.get('Content-Type') || 'video/mp4')
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Cache-Control', 'public, max-age=3600')
 
-    if (videoRes.headers.get('Content-Range'))
-      res.setHeader('Content-Range', videoRes.headers.get('Content-Range'))
-    if (contentLength && contentLength < MAX)
-      res.setHeader('Content-Length', String(contentLength))
+    const cr = videoRes.headers.get('Content-Range')
+    if (cr) res.setHeader('Content-Range', cr)
 
-    res.status(videoRes.status || 206)
+    // Só envia Content-Length se o chunk for pequeno (< 10MB)
+    // Evita que o browser espere um ficheiro de 200MB que nunca chega
+    const MAX = 10 * 1024 * 1024
+    const cl = Number(videoRes.headers.get('Content-Length') || 0)
+    if (cl && cl <= MAX) res.setHeader('Content-Length', String(cl))
 
-    // Pipe chunk a chunk sem guardar tudo na memoria
+    res.status(videoRes.status === 206 ? 206 : 200)
+
+    // Stream chunk a chunk — NUNCA guarda o vídeo inteiro na memória
     const reader = videoRes.body.getReader()
     let total = 0
     while (true) {
@@ -64,14 +64,11 @@ export default async function handler(req, res) {
       if (done) break
       total += value.length
       res.write(Buffer.from(value))
-      if (total >= MAX) break  // Limita tamanho para nao crashar
+      if (total >= MAX) break  // Limita a 10MB por invocação Vercel
     }
     res.end()
 
   } catch (e) {
-    if (!res.headersSent)
-      res.status(502).json({ error: e.message })
-    else
-      res.end()
+    res.status(502).json({ error: e.message })
   }
 }
