@@ -11,7 +11,7 @@ import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
-// STREAMING via AnimeFire (animefire.io)
+// STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
 // ─────────────────────────────────────────────────────────
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
@@ -87,18 +87,6 @@ const buildSlugCandidates = (anime, dub = false) => {
   return [...new Set([...withSeason, ...withoutSeason])]
 }
 
-// Cache do slug-overrides.json — editável no GitHub sem redeploy
-let _overridesCache = null
-const loadOverrides = async () => {
-  if (_overridesCache) return _overridesCache
-  try {
-    const res = await fetch('/slug-overrides.json?_t=' + Date.now())
-    const json = await res.json()
-    _overridesCache = json.animes || {}
-  } catch { _overridesCache = {} }
-  return _overridesCache
-}
-
 // Testa se slug existe E tem episódios no AnimeFire
 const probeSlug = async (slug, isMovie = false) => {
   try {
@@ -113,15 +101,6 @@ const probeSlug = async (slug, isMovie = false) => {
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
-
-  // Checa slug-overrides.json primeiro (editável no GitHub sem redeploy)
-  const overrides = await loadOverrides()
-  const ov = overrides[String(anime.mal_id)]
-  if (ov) {
-    const slug = (dub && ov.dub) ? ov.dub : ov.leg
-    if (slug) { console.log('[AnimeFire] ✅ (override)', slug); return slug }
-  }
-
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
@@ -154,53 +133,9 @@ const bestQuality = (sources = []) => {
   })[0] || sources[0]
 }
 
-const getDirectUrl = (url) => {
-  // Se for URL do proxy Vercel (/api/proxy?url=...), extrai a URL real
-  try {
-    const u = new URL(url, window.location.origin)
-    if (u.pathname.includes('/api/proxy')) {
-      const real = u.searchParams.get('url')
-      if (real) return decodeURIComponent(real)
-    }
-    // Se for Worker proxy
-    if (url.includes('workers.dev') && u.searchParams.get('url')) {
-      return decodeURIComponent(u.searchParams.get('url'))
-    }
-  } catch {}
-  return url
-}
-
-const isAndroid = /Android/i.test(navigator.userAgent)
-const isIOS     = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-const isMobile  = isAndroid || isIOS
-
-const openVLC = (url, title) => {
-  const directUrl = getDirectUrl(url)
-  // VLC no PC/Mac abre via protocolo vlc://
-  // Funciona se o VLC estiver instalado (gratuito em vlc.media.player)
-  window.location.href = `vlc://${directUrl}`
-  setTimeout(() => {
-    if (!document.hidden) {
-      // Fallback: abre direto no browser (funciona para MP4)
-      window.open(directUrl, '_blank')
-    }
-  }, 1500)
-}
-
 const openMXPlayer = (url, title) => {
-  const directUrl = getDirectUrl(url)  // URL real sem proxy
-  const titleEnc  = encodeURIComponent(title)
-  const referer   = encodeURIComponent('https://animefire.io')
-  const ua        = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-
-  // MX Player recebe a URL direta + headers via S.headers_*
-  const intentFree = `intent:${directUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_Referer=${referer};S.headers_User-Agent=${ua};end`
-  const intentPro  = `intent:${directUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.pro;S.title=${titleEnc};S.headers_Referer=${referer};S.headers_User-Agent=${ua};end`
-
-  window.location.href = intentFree
-  setTimeout(() => {
-    if (!document.hidden) window.location.href = intentPro
-  }, 1000)
+  window.location.href = `intent:${url}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(title)};end`
+  setTimeout(() => window.open(url, '_blank'), 900)
 }
 const openADM = (url, fn) => {
   window.location.href = `adm://add?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fn)}`
@@ -230,7 +165,6 @@ export default function WatchPage() {
   const [copied, setCopied] = useState(false)
   const [newAchievements, setNewAchievements] = useState([]) // toast de conquistas
   const [showBugReport,   setShowBugReport]   = useState(false)
-  const [fallbackUrl,     setFallbackUrl]     = useState(null) // URL alternativa do slug-overrides
 
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
@@ -238,10 +172,64 @@ export default function WatchPage() {
       if (d.status === 'fulfilled') {
         const a = d.value.data
         setAnime(a)
-        // Título dinâmico com ep: "Naruto EP 1 - Assistir | Up Anime+"
         const t = a.title_english || a.title || 'Anime'
         const epNum = searchParams.get('ep') || '1'
-        document.title = `${t} EP ${epNum} - Assistir | Up Anime+`
+        document.title = `${t} Episódio ${epNum} - Assistir Grátis | Up Anime+`
+
+        // ── Meta description do episódio ─────────────────────────
+        const epDesc = `Assista ${t} episódio ${epNum} online grátis em HD. ${(a.synopsis || '').slice(0, 100)}`
+        const descEl = document.querySelector('meta[name="description"]')
+        if (descEl) descEl.setAttribute('content', epDesc)
+
+        // ── og:image com capa do anime ───────────────────────────
+        const image = a.images?.jpg?.large_image_url || a.images?.jpg?.image_url || ''
+        const setMeta = (sel, attr, val) => {
+          const el = document.querySelector(sel); if (el && val) el.setAttribute(attr, val)
+        }
+        setMeta('meta[property="og:title"]',       'content', `${t} EP ${epNum} | Up Anime+`)
+        setMeta('meta[property="og:description"]', 'content', epDesc)
+        setMeta('meta[property="og:image"]',       'content', image)
+        setMeta('meta[property="og:url"]',         'content', `https://upanime-nine.vercel.app/watch/${id}?ep=${epNum}`)
+        setMeta('meta[name="twitter:image"]',      'content', image)
+
+        // ── Canonical ────────────────────────────────────────────
+        let canonical = document.querySelector('link[rel="canonical"]')
+        if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical) }
+        canonical.href = `https://upanime-nine.vercel.app/watch/${id}?ep=${epNum}`
+
+        // ── Schema TVEpisode ─────────────────────────────────────
+        let schEl = document.getElementById('watch-page-schema')
+        if (!schEl) { schEl = document.createElement('script'); schEl.id = 'watch-page-schema'; schEl.type = 'application/ld+json'; document.head.appendChild(schEl) }
+        schEl.textContent = JSON.stringify({
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Início', item: 'https://upanime-nine.vercel.app/' },
+                { '@type': 'ListItem', position: 2, name: t, item: `https://upanime-nine.vercel.app/anime/${id}` },
+                { '@type': 'ListItem', position: 3, name: `Episódio ${epNum}`, item: `https://upanime-nine.vercel.app/watch/${id}?ep=${epNum}` },
+              ],
+            },
+            {
+              '@type': 'TVEpisode',
+              name: `${t} - Episódio ${epNum}`,
+              episodeNumber: parseInt(epNum),
+              url: `https://upanime-nine.vercel.app/watch/${id}?ep=${epNum}`,
+              image: image,
+              description: epDesc,
+              partOfSeries: {
+                '@type': 'TVSeries',
+                name: t,
+                url: `https://upanime-nine.vercel.app/anime/${id}`,
+              },
+              potentialAction: {
+                '@type': 'WatchAction',
+                target: `https://upanime-nine.vercel.app/watch/${id}?ep=${epNum}`,
+              },
+            },
+          ],
+        })
       }
       if (e.status === 'fulfilled') {
         setEpisodes(e.value.data || [])
@@ -251,25 +239,12 @@ export default function WatchPage() {
     window.scrollTo(0, 0)
     return () => {
       document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD'
+      document.getElementById('watch-page-schema')?.remove()
     }
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
-    setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setFallbackUrl(null)
-
-    // Checa fallback imediato — se existir, vai direto sem tentar nada
-    try {
-      const overrides = await loadOverrides()
-      const ov = overrides[String(animeObj.mal_id)]
-      const fbUrl = ov?.fallback?.[String(ep)]
-      if (fbUrl) {
-        console.log('[fallback imediato]', fbUrl)
-        setFallbackUrl(fbUrl)
-        setError(true)
-        setLoading(false)
-        return
-      }
-    } catch {}
+    setLoading(true); setError(false); setSources([]); setCurrentSrc('')
 
     try {
       let slug = cachedSlug
@@ -394,40 +369,35 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
-      // ── Fallback 4: animesfontes-proxy.onrender.com ───────────
+      // ── Fallback 4: animesfontes-proxy.onrender.com ──────────
       try {
         const titleQuery = animeObj.title_english || animeObj.title
         setStatus('🔄 Tentando AnimeFontes...')
-
         const afontesRes = await fetch(
           `https://animesfontes-proxy.onrender.com/episode` +
           `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
           { signal: AbortSignal.timeout(30000) }
         )
         const afontesData = await afontesRes.json()
-
         if (afontesData.sources?.length) {
           const mp4s = afontesData.sources.filter(s => !s.isM3U8)
           const best = bestQuality(mp4s.length ? mp4s : afontesData.sources)
           setSources(afontesData.sources)
           setCurrentSrc(best?.url || afontesData.sources[0].url)
           setStatus(`✅ AnimeFontes — ${best?.label || 'Auto'}`)
-          setLoading(false)
-          return
+          setLoading(false); return
         }
         if (afontesData.iframe) {
           setCurrentSrc('__embed__')
           setErrorMsg(afontesData.iframe)
           setStatus('✅ AnimeFontes (embed)')
-          setLoading(false)
-          return
+          setLoading(false); return
         }
         if (afontesData.pageUrl) {
           setCurrentSrc('__embed__')
           setErrorMsg(afontesData.pageUrl)
           setStatus('✅ AnimeFontes (página)')
-          setLoading(false)
-          return
+          setLoading(false); return
         }
       } catch (afErr) {
         console.warn('[animesfontes]', afErr.message)
@@ -465,8 +435,8 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
-    ? `https://animefire.io/animes/${afSlug}`
-    : `https://animefire.io`
+    ? `https://animefire.plus/animes/${afSlug}`
+    : `https://animefire.plus`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
@@ -507,35 +477,35 @@ export default function WatchPage() {
                    : 'Fonte: 🇧🇷 AnimeFire via Cloudflare'}
                 </p>
               </div>
-            ) : error && fallbackUrl ? (
-              // Fallback: iframe direto na URL original
-              <iframe
-                key={fallbackUrl}
-                src={fallbackUrl}
-                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
-                allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                title={`${title} EP${epNum}`}
-              />
             ) : error ? (
               <div className="player-error">
-                <span className="error-emoji">😕</span>
-                <h3>Erro ao carregar o player</h3>
-                <p className="error-hint">O player interno nao conseguiu reproduzir. Tente outra opcao abaixo.</p>
+                <span className="error-emoji">🎬</span>
+                <h3>Abra no MX Player</h3>
+                <p className="error-hint">O vídeo está disponível! Use o botão abaixo para assistir.</p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null)}>
-                    🔄 Tentar novamente
-                  </button>
                   {currentSrc && (
-                    <button className="btn btn-ghost" onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
-                      🎬 Abrir no MX Player
+                    <button className="btn btn-primary" onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
+                      🎬 Abrir MX Player
                     </button>
                   )}
+                  <button className="btn btn-ghost" onClick={() => doLoad(anime, epNum, isDub, null)}>
+                    🔄 Tentar novamente
+                  </button>
                   <a href={afExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
-                    🇧🇷 Ver no AnimeFire
+                    🇧🇷 AnimeFire
                   </a>
                 </div>
               </div>
+            ) : currentSrc === '__embed__' ? (
+              <iframe
+                key={errorMsg}
+                src={errorMsg}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
+                title="Player"
+              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
@@ -609,8 +579,8 @@ export default function WatchPage() {
                   ⬇️<span>Baixar</span>
                 </button>
                 <button className="ext-btn"
-                  onClick={() => isMobile ? openMXPlayer(currentSrc, `${title} EP${epNum}`) : openVLC(currentSrc, `${title} EP${epNum}`)}>
-                  {isMobile ? <><span>🎬</span><span>MX Player</span></> : <><span>🖥️</span><span>VLC Player</span></>}
+                  onClick={() => openMXPlayer(currentSrc, `${title} EP${epNum}`)}>
+                  🎬<span>MX Player</span>
                 </button>
               </>
             )}
