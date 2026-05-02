@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
   try {
     // Faz HEAD primeiro para pegar o redirect final
-    const head = await fetch(url, { method: 'HEAD', headers, redirect: 'follow' })
+    const head = await fetch(url, { method: 'HEAD', headers, redirect: 'follow', signal: AbortSignal.timeout(8000) })
     const finalUrl = head.url  // URL final apos redirects
 
     // Se a URL final for diferente (CDN publico), redireciona direto
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     const range = req.headers.range || 'bytes=0-'
     const rangeHeaders = { ...headers, Range: range }
 
-    const videoRes = await fetch(url, { headers: rangeHeaders })
+    const videoRes = await fetch(url, { headers: rangeHeaders, signal: AbortSignal.timeout(30000) })
     const contentLength = Number(videoRes.headers.get('Content-Length') || 0)
 
     res.setHeader('Content-Type', videoRes.headers.get('Content-Type') || 'video/mp4')
