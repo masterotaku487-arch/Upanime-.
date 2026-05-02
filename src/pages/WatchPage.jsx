@@ -599,6 +599,16 @@ export default function WatchPage() {
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
                 title={`${title} EP${epNum}`}
               />
+            ) : currentSrc === '__embed__' ? (
+              <iframe
+                key={errorMsg}
+                src={errorMsg}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
+                title="Player"
+              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
