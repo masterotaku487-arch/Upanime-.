@@ -99,16 +99,11 @@
       "dub": "shingeki-no-kyojin-the-final-season---kanketsu-hen-dublado"
     },
     "59571": {
-      "_titulo": "Shingeki no Kyojin: The Last Attack",
-      "leg": "shingeki-no-kyojin-the-last-attack",
-      "dub": "shingeki-no-kyojin-the-last-attack-dublado",
+      "_titulo": "Attack on Titan: The Last Attack",
       "sources": {
-        "animesonline": {
-          "dub": "shingeki-no-kyojin-movie-kanketsu-hen-the-last-attack-dublado"
+        "goyabu": {
+          "id": "52732"
         }
-      },
-      "fallback": {
-        "1": "https://animes.strp2p.com/#ak6nz"
       }
     },
     "61316": {
