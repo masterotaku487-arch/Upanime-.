@@ -12,9 +12,6 @@ import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
 // STREAMING via AnimeFire (animefire.io)
-// IMPORTANTE: usa /api/animefire local (não o Worker externo)
-// Assim o token CDN fica com o IP do Vercel, e o /api/proxy
-// streama do mesmo IP → CDN aceita ✅
 // ─────────────────────────────────────────────────────────
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
@@ -287,8 +284,7 @@ export default function WatchPage() {
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL proxiada — CDN (lightspeedst.net) não tem CORS headers.
-      // O /api/proxy adiciona Access-Control-Allow-Origin: * para o browser aceitar.
+      // Usa URL proxiada para garantir Referer correto
       const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
@@ -296,52 +292,7 @@ export default function WatchPage() {
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
     } catch (e) {
-      console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
-
-      // ── Fallback 0: embed direto meusanimes / goyabu ───────────
-      // Esses sites usam player JS — extracção por regex não funciona.
-      // Usa o slug/ID exato do slug-overrides e carrega em iframe proxy.
-      try {
-        const overrides  = await loadOverrides()
-        const ov         = overrides[String(animeObj.mal_id)]
-        const PROXY_BASE = 'https://animesfontes-proxy.onrender.com'
-
-        // ── meusanimes.blog ──────────────────────────────────────
-        // Padrão URL: meusanimes.blog/e/{base}-episodio-{ep}/
-        // Override guarda o slug BASE (sem -episodio-N)
-        // Ex: "akame-ga-kill-dublado-1" → /e/akame-ga-kill-dublado-1-episodio-1/
-        const maOv = ov?.sources?.meusanimes
-        if (maOv) {
-          const maBase = (dub ? maOv.dub : maOv.leg) || maOv.any
-          if (maBase) {
-            const maSlug   = `${maBase}-episodio-${ep}`
-            const embedUrl = `${PROXY_BASE}/ma/${maSlug}`
-            setCurrentSrc('__embed__')
-            setErrorMsg(embedUrl)
-            setStatus(`✅ MeusAnimes${dub ? ' 🎙️ Dublado' : ' 📖 Legendado'} — EP${ep}`)
-            setLoading(false); return
-          }
-        }
-
-        // ── goyabu.io ────────────────────────────────────────────
-        // Override guarda o id numérico (ou array ids[] por episódio)
-        const gyOv = ov?.sources?.goyabu
-        if (gyOv) {
-          const gyId = gyOv.ids
-            ? (gyOv.ids[ep - 1] || gyOv.ids[0])
-            : (gyOv.id || (dub ? gyOv.dub : gyOv.leg) || gyOv.any)
-
-          if (gyId) {
-            const embedUrl = `${PROXY_BASE}/gy/${gyId}`
-            setCurrentSrc('__embed__')
-            setErrorMsg(embedUrl)
-            setStatus(`✅ Goyabu — EP${ep}`)
-            setLoading(false); return
-          }
-        }
-      } catch (ovErr) {
-        console.warn('[fallback0 meusanimes/goyabu]', ovErr.message)
-      }
+      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
 
       // ── Fallback 1: animesonlinecc.to via Worker ──
       try {
@@ -374,7 +325,7 @@ export default function WatchPage() {
 
         if (ccData.pageUrl) {
           setCurrentSrc('__embed__')
-          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(ccData.pageUrl)}`)
+          setErrorMsg(ccData.pageUrl)
           setStatus('✅ animesonlinecc (página)')
           setLoading(false)
           return
@@ -397,10 +348,7 @@ export default function WatchPage() {
             const isEmbed = !ccData2.sources?.length
             setSources(ccData2.sources || [])
             setCurrentSrc(isEmbed ? '__embed__' : src)
-            if (isEmbed) setErrorMsg(
-              ccData2.iframe ||
-              `https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(ccData2.pageUrl)}`
-            )
+            if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
             setStatus(`✅ animesonlinecc (JP) — Auto`)
             setLoading(false)
             return
@@ -430,14 +378,14 @@ export default function WatchPage() {
         }
         if (hdData.iframe) {
           setCurrentSrc('__embed__')
-          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(hdData.iframe)}`)
+          setErrorMsg(hdData.iframe)
           setStatus('✅ animesonline.cloud (embed)')
           setLoading(false)
           return
         }
         if (hdData.pageUrl) {
           setCurrentSrc('__embed__')
-          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(hdData.pageUrl)}`)
+          setErrorMsg(hdData.pageUrl)
           setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
@@ -588,27 +536,6 @@ export default function WatchPage() {
                   </a>
                 </div>
               </div>
-            ) : currentSrc === '__embed__' ? (
-              // Embed: exibe a página do site externo em iframe (player JS funciona)
-              <iframe
-                key={errorMsg}
-                src={errorMsg}
-                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
-                allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
-                title={`${title} EP${epNum}`}
-              />
-            ) : currentSrc === '__embed__' ? (
-              <iframe
-                key={errorMsg}
-                src={errorMsg}
-                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
-                allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
-                title="Player"
-              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
