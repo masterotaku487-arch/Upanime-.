@@ -31,20 +31,18 @@ export default async function handler(req, res) {
     const head = await fetch(url, { method: 'HEAD', headers, redirect: 'follow' })
     const finalUrl = head.url  // URL final apos redirects
 
-    // Se a URL final for diferente (CDN publico), redireciona direto
-    // O MX Player e o browser fazem o request direto sem precisar do proxy
-    if (finalUrl !== url && !finalUrl.includes(videoHost)) {
-      res.setHeader('Cache-Control', 'public, max-age=300')
-      return res.redirect(302, finalUrl)
-    }
+    // Nunca redireciona o browser para o CDN directamente.
+    // O token tem ip=IP_Cloudflare — se o browser for directo, o seu IP
+    // não bate com o token e o CDN rejeita (403).
+    // Sempre fazemos stream aqui pelo proxy (Vercel fica invisível ao CDN
+    // porque o token já foi gerado com o IP do Worker Cloudflare).
+    const fetchUrl = finalUrl || url
 
-    // Se nao tiver redirect, faz proxy so do inicio (range request)
-    // Limita a 10MB por request para nao crashar a funcao
     const MAX = 10 * 1024 * 1024  // 10MB
     const range = req.headers.range || 'bytes=0-'
     const rangeHeaders = { ...headers, Range: range }
 
-    const videoRes = await fetch(url, { headers: rangeHeaders })
+    const videoRes = await fetch(fetchUrl, { headers: rangeHeaders })
     const contentLength = Number(videoRes.headers.get('Content-Length') || 0)
 
     res.setHeader('Content-Type', videoRes.headers.get('Content-Type') || 'video/mp4')
