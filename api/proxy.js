@@ -34,10 +34,10 @@ export default async function handler(req, res) {
     // Repassa Range para suporte a seek no player
     if (req.headers.range) headers['Range'] = req.headers.range
 
-    // Força Range para obter 206 — evita o CDN enviar o ficheiro completo
-    // e permite que o browser faça seek correctamente
-    const range = req.headers.range || 'bytes=0-'
-    headers['Range'] = range
+    // Força Range → CDN devolve 206, browser faz seek correctamente
+    // Sem isso o CDN envia 200 + Content-Length do ficheiro inteiro (200MB)
+    // e o Vercel faz timeout antes de enviar tudo → 502
+    if (!headers['Range']) headers['Range'] = 'bytes=0-'
 
     const videoRes = await fetch(url, { headers, redirect: 'follow' })
 
@@ -45,18 +45,18 @@ export default async function handler(req, res) {
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Cache-Control', 'public, max-age=3600')
 
-    const cr = videoRes.headers.get('Content-Range')
-    if (cr) res.setHeader('Content-Range', cr)
+    if (videoRes.headers.get('Content-Range'))
+      res.setHeader('Content-Range', videoRes.headers.get('Content-Range'))
 
-    // Só envia Content-Length se o chunk for pequeno (< 10MB)
-    // Evita que o browser espere um ficheiro de 200MB que nunca chega
-    const MAX = 10 * 1024 * 1024
+    // Só envia Content-Length se o chunk for pequeno o suficiente
+    // Evita o browser ficar à espera de 200MB que nunca chegam
+    const MAX = 10 * 1024 * 1024 // 10MB por invocação Vercel
     const cl = Number(videoRes.headers.get('Content-Length') || 0)
     if (cl && cl <= MAX) res.setHeader('Content-Length', String(cl))
 
     res.status(videoRes.status === 206 ? 206 : 200)
 
-    // Stream chunk a chunk — NUNCA guarda o vídeo inteiro na memória
+    // Stream chunk a chunk — NUNCA carrega o vídeo inteiro na memória
     const reader = videoRes.body.getReader()
     let total = 0
     while (true) {
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       if (done) break
       total += value.length
       res.write(Buffer.from(value))
-      if (total >= MAX) break  // Limita a 10MB por invocação Vercel
+      if (total >= MAX) break
     }
     res.end()
 
