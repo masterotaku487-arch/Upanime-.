@@ -283,8 +283,15 @@ export default function WatchPage() {
       }
 
       setStatus(`📡 Carregando EP${ep}...`)
-      const data = await afFetch({ action: 'video', slug, ep })
-      const srcs = (data.sources || [])
+
+      // Busca fontes VIA RENDER — token CDN fica vinculado ao IP do Render
+      // que também faz o stream. Worker só era usado aqui e causava IP mismatch.
+      const renderRes = await fetch(
+        `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
+        { signal: AbortSignal.timeout(30000) }
+      )
+      const data = await renderRes.json()
+      const srcs = data.sources || []
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
       // Usa URL proxiada para garantir Referer correto
