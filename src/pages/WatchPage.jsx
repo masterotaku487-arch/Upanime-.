@@ -300,17 +300,36 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Busca fontes VIA RENDER — token CDN fica vinculado ao IP do Render
-      // que também faz o stream. Worker só era usado aqui e causava IP mismatch.
-      const renderRes = await fetch(
-        `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
-        { signal: AbortSignal.timeout(30000) }
-      )
-      const data = await renderRes.json()
-      const srcs = data.sources || []
+      // 1ª tentativa: CF Worker busca as fontes (rápido, funciona bem)
+      // Render faz o stream via /video-proxy (mesmo IP que o Worker usou → sem 401)
+      let srcs = []
+      try {
+        const cfData = await afFetch({ action: 'video', slug, ep })
+        srcs = cfData.sources || []
+        console.log('[CF Worker] fontes:', srcs.length)
+      } catch (cfErr) {
+        console.warn('[CF Worker] falhou:', cfErr.message)
+      }
+
+      // 2ª tentativa: Render /af-sources (IP diferente, mas tenta mesmo assim)
+      if (!srcs.length) {
+        try {
+          setStatus('🔄 Buscando fontes via Render...')
+          const renderRes = await fetch(
+            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
+            { signal: AbortSignal.timeout(30000) }
+          )
+          const renderData = await renderRes.json()
+          srcs = renderData.sources || []
+          console.log('[Render af-sources] fontes:', srcs.length)
+        } catch (renderErr) {
+          console.warn('[Render af-sources] falhou:', renderErr.message)
+        }
+      }
+
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL proxiada para garantir Referer correto
+      // Stream via Render /video-proxy — mesmo IP que gerou o token
       const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
