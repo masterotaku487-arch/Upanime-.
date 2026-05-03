@@ -16,9 +16,12 @@ import './WatchPage.css'
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
-// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
+// Proxy de vídeo via Render — stream com Referer correto
+// Render não tem limite de 60s como Vercel e não usa url.parse()
+// Se o CDN bloquear, o log do Render mostra o erro exacto
+const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
-  `/api/proxy?url=${encodeURIComponent(url)}`
+  `${RENDER_PROXY}/video-proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
