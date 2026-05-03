@@ -331,9 +331,8 @@ export default function WatchPage() {
           : null
         const afEmbedSlug = afOvSlug || slug // slug pode estar definido do try anterior
         if (afEmbedSlug) {
-          // Roteia pelo Render para remover X-Frame-Options do AnimeFire
-          const afEmbedUrl = `${RENDER_PROXY}/af/${afEmbedSlug}/${ep}`
-          console.log('[AnimeFire embed via Render]', afEmbedUrl)
+          const afEmbedUrl = `https://animefire.io/animes/${afEmbedSlug}/${ep}`
+          console.log('[AnimeFire embed]', afEmbedUrl)
           setCurrentSrc('__embed__')
           setErrorMsg(afEmbedUrl)
           setStatus(`✅ AnimeFire ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — EP${ep}`)
@@ -482,13 +481,8 @@ export default function WatchPage() {
           return
         }
         if (hdData.pageUrl) {
-          // Roteia pelo Render para remover X-Frame-Options
-          const aocMatch = hdData.pageUrl.match(/animesonline\.cloud\/episodio\/([^/]+)-episodio-(\d+)/)
-          const aocUrl = aocMatch
-            ? `${RENDER_PROXY}/asc/${aocMatch[1]}/${aocMatch[2]}`
-            : hdData.pageUrl
           setCurrentSrc('__embed__')
-          setErrorMsg(aocUrl)
+          setErrorMsg(hdData.pageUrl)
           setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
