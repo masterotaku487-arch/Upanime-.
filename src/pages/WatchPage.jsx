@@ -26,7 +26,7 @@ const proxyUrl = (url) =>
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
-  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
+  const r = await fetch(`${AF}?${qs}`)
   if (!r.ok) throw new Error(`Proxy ${r.status}`)
   return r.json()
 }
@@ -152,8 +152,7 @@ const resolveSlug = async (anime, dub = false) => {
   for (const slug of candidates) {
     try {
       const r = await fetch(
-        `${RENDER_PROXY}/af-info?slug=${encodeURIComponent(slug)}`,
-        { signal: AbortSignal.timeout(20000) }
+        `${RENDER_PROXY}/af-info?slug=${encodeURIComponent(slug)}`
       )
       if (r.ok) {
         const d = await r.json()
@@ -317,8 +316,7 @@ export default function WatchPage() {
         try {
           setStatus('🔄 Buscando fontes via Render...')
           const renderRes = await fetch(
-            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
-            { signal: AbortSignal.timeout(30000) }
+            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`
           )
           const renderData = await renderRes.json()
           srcs = renderData.sources || []
@@ -330,10 +328,10 @@ export default function WatchPage() {
 
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // AF2 Worker faz o stream com o mesmo IP que buscou o token → sem 401
+      // URL direta — token já vem válido, AF2 estava quebrando o stream
       const proxiedSrcs = srcs.map(s => ({
         ...s,
-        url: proxyUrl(s.url),   // AF2 stream (mesmo IP do Worker)
+        url: s.url,
         directUrl: s.url,
       }))
       setSources(proxiedSrcs)
@@ -527,8 +525,7 @@ export default function WatchPage() {
         setStatus('🔄 Tentando AnimeFontes...')
         const afontesRes = await fetch(
           `https://animesfontes-proxy.onrender.com/episode` +
-          `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
-          { signal: AbortSignal.timeout(30000) }
+          `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
         )
         const afontesData = await afontesRes.json()
         if (afontesData.sources?.length) {
