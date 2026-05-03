@@ -145,6 +145,22 @@ const resolveSlug = async (anime, dub = false) => {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
+
+  // CF Worker falhou em todos — tenta Render /af-info como fallback
+  console.log('[AnimeFire] CF Worker sem resultado, tentando Render...')
+  for (const slug of candidates) {
+    try {
+      const r = await fetch(
+        `${RENDER_PROXY}/af-info?slug=${encodeURIComponent(slug)}`,
+        { signal: AbortSignal.timeout(20000) }
+      )
+      if (r.ok) {
+        const d = await r.json()
+        if (d.exists) { console.log('[AnimeFire] ✅ (Render)', slug); return slug }
+      }
+    } catch { /* tenta próximo */ }
+  }
+
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
@@ -331,6 +347,21 @@ export default function WatchPage() {
             setCurrentSrc('__embed__')
             setErrorMsg(embedUrl)
             setStatus(`✅ Goyabu — EP${ep}`)
+            setLoading(false); return
+          }
+        }
+
+        // AniZero — usa ID numérico do episódio (ex: sources.anizero.ids: [32724, 32725])
+        const azOv = ov?.sources?.anizero
+        if (azOv) {
+          const azId = azOv.ids
+            ? (azOv.ids[ep - 1] || azOv.ids[0])
+            : azOv.id
+          if (azId) {
+            const embedUrl = `${PROXY_BASE}/az/${azId}`
+            setCurrentSrc('__embed__')
+            setErrorMsg(embedUrl)
+            setStatus(`✅ AniZero — EP${ep}`)
             setLoading(false); return
           }
         }
