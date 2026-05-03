@@ -14,21 +14,23 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (animefire.io)
 // ─────────────────────────────────────────────────────────
 
-const AF  = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF  = 'https://animefire-proxy.masterotaku487.workers.dev'  // antigo (info/slug)
+const AFV2 = 'https://animefire-v2.masterotaku487.workers.dev'       // novo (video + stream)
 const AF2 = 'https://animefire2-proxy.masterotaku487.workers.dev'
 
 // Proxy de vídeo via Render — stream com Referer correto
 // Render não tem limite de 60s como Vercel e não usa url.parse()
 // Se o CDN bloquear, o log do Render mostra o erro exacto
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
-// Worker dedicado ao stream — mesmo IP do CF que busca o token → sem 403
-const STREAM_WORKER = 'https://animefire-stream.masterotaku487.workers.dev'
+// action=stream no MESMO worker que faz action=video → mesmo edge node → mesmo IP → sem 403
 const proxyUrl = (url) =>
-  `${STREAM_WORKER}?url=${encodeURIComponent(url)}`
+  `${AFV2}?action=stream&url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
-  const r = await fetch(`${AF}?${qs}`)
+  // action=video usa AFV2 → mesmo worker que faz stream → mesmo IP → sem 403
+  const base = (params.action === 'video') ? AFV2 : AF
+  const r = await fetch(`${base}?${qs}`)
   if (!r.ok) throw new Error(`Proxy ${r.status}`)
   return r.json()
 }
