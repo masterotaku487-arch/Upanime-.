@@ -300,38 +300,50 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // 1ª tentativa: CF Worker busca as fontes (rápido, funciona bem)
-      // Render faz o stream via /video-proxy (mesmo IP que o Worker usou → sem 401)
-      let srcs = []
-      try {
-        const cfData = await afFetch({ action: 'video', slug, ep })
-        srcs = cfData.sources || []
-        console.log('[CF Worker] fontes:', srcs.length)
-      } catch (cfErr) {
-        console.warn('[CF Worker] falhou:', cfErr.message)
-      }
+      // ─── REGRA DO TOKEN ───────────────────────────────────────────────────────
+      // lightspeedst.net vincula o token ao IP de quem BUSCOU a URL no AnimeFire.
+      // Render busca → token IP = Render → /video-proxy funciona (mesmo IP). ✅
+      // CF Worker busca → token IP = CF → Render não pode stremar (403).       ❌
+      // Solução: Render busca E faz stream. CF Worker vira fallback sem proxy.
+      // ─────────────────────────────────────────────────────────────────────────
 
-      // 2ª tentativa: Render /af-sources (IP diferente, mas tenta mesmo assim)
-      if (!srcs.length) {
-        try {
-          setStatus('🔄 Buscando fontes via Render...')
-          const renderRes = await fetch(
-            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`
-          )
+      let srcs = []
+      let srcServer = 'render'
+
+      // 1ª tentativa: Render /af-sources (token fica no IP do Render → /video-proxy ok)
+      try {
+        const renderRes = await fetch(
+          `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`
+        )
+        if (renderRes.ok) {
           const renderData = await renderRes.json()
           srcs = renderData.sources || []
           console.log('[Render af-sources] fontes:', srcs.length)
-        } catch (renderErr) {
-          console.warn('[Render af-sources] falhou:', renderErr.message)
+        }
+      } catch (renderErr) {
+        console.warn('[Render af-sources] falhou:', renderErr.message)
+      }
+
+      // 2ª tentativa: CF Worker (token fica no IP do CF → stream direto sem proxy Render)
+      if (!srcs.length) {
+        try {
+          setStatus('🔄 Buscando fontes via CF Worker...')
+          const cfData = await afFetch({ action: 'video', slug, ep })
+          srcs = cfData.sources || []
+          srcServer = 'cf'
+          console.log('[CF Worker] fontes:', srcs.length)
+        } catch (cfErr) {
+          console.warn('[CF Worker] falhou:', cfErr.message)
         }
       }
 
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Render proxy adiciona Referer/UA — CDN bloqueia request direto do <video>
+      // Render buscou → /video-proxy (mesmo IP → sem 403)
+      // CF buscou     → URL direta (token no CF, Render não pode intermediar)
       const proxiedSrcs = srcs.map(s => ({
         ...s,
-        url: proxyUrl(s.url),
+        url: srcServer === 'render' ? proxyUrl(s.url) : s.url,
         directUrl: s.url,
       }))
       setSources(proxiedSrcs)
