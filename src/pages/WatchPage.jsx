@@ -14,14 +14,15 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (animefire.io)
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF  = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF2 = 'https://animefire2-proxy.masterotaku487.workers.dev'
 
 // Proxy de vídeo via Render — stream com Referer correto
 // Render não tem limite de 60s como Vercel e não usa url.parse()
 // Se o CDN bloquear, o log do Render mostra o erro exacto
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
-  `${RENDER_PROXY}/video-proxy?url=${encodeURIComponent(url)}`
+  `${AF2}?action=stream&url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -300,18 +301,41 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Busca fontes VIA RENDER — token CDN fica vinculado ao IP do Render
-      // que também faz o stream. Worker só era usado aqui e causava IP mismatch.
-      const renderRes = await fetch(
-        `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
-        { signal: AbortSignal.timeout(30000) }
-      )
-      const data = await renderRes.json()
-      const srcs = data.sources || []
+      // 1ª tentativa: CF Worker busca as fontes (rápido, funciona bem)
+      // Render faz o stream via /video-proxy (mesmo IP que o Worker usou → sem 401)
+      let srcs = []
+      try {
+        const cfData = await afFetch({ action: 'video', slug, ep })
+        srcs = cfData.sources || []
+        console.log('[CF Worker] fontes:', srcs.length)
+      } catch (cfErr) {
+        console.warn('[CF Worker] falhou:', cfErr.message)
+      }
+
+      // 2ª tentativa: Render /af-sources (IP diferente, mas tenta mesmo assim)
+      if (!srcs.length) {
+        try {
+          setStatus('🔄 Buscando fontes via Render...')
+          const renderRes = await fetch(
+            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
+            { signal: AbortSignal.timeout(30000) }
+          )
+          const renderData = await renderRes.json()
+          srcs = renderData.sources || []
+          console.log('[Render af-sources] fontes:', srcs.length)
+        } catch (renderErr) {
+          console.warn('[Render af-sources] falhou:', renderErr.message)
+        }
+      }
+
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL proxiada para garantir Referer correto
-      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+      // AF2 Worker faz o stream com o mesmo IP que buscou o token → sem 401
+      const proxiedSrcs = srcs.map(s => ({
+        ...s,
+        url: proxyUrl(s.url),   // AF2 stream (mesmo IP do Worker)
+        directUrl: s.url,
+      }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
@@ -320,7 +344,30 @@ export default function WatchPage() {
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
 
-      // ── Fallback 0: embed direto meusanimes / goyabu ──────────
+      // ── Fallback 0-A: AnimeFire embed direto (iframe) ─────────
+      // Mais completo + URL muda com dub/leg permitindo troca
+      try {
+        const overrides = await loadOverrides()
+        const ov = overrides[String(animeObj.mal_id)]
+        // Pega slug do override ou do que já foi resolvido
+        const afOvSlug = ov
+          ? ((dub && ov.dub) ? ov.dub : ov.leg)
+          : null
+        const afEmbedSlug = afOvSlug || slug // slug pode estar definido do try anterior
+        if (afEmbedSlug) {
+          // Roteia pelo Render para remover X-Frame-Options do AnimeFire
+          const afEmbedUrl = `${RENDER_PROXY}/af/${afEmbedSlug}/${ep}`
+          console.log('[AnimeFire embed via Render]', afEmbedUrl)
+          setCurrentSrc('__embed__')
+          setErrorMsg(afEmbedUrl)
+          setStatus(`✅ AnimeFire ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — EP${ep}`)
+          setLoading(false); return
+        }
+      } catch (afEmbedErr) {
+        console.warn('[af-embed]', afEmbedErr.message)
+      }
+
+      // ── Fallback 0-B: embed direto meusanimes / goyabu ────────
       try {
         const overrides  = await loadOverrides()
         const ov         = overrides[String(animeObj.mal_id)]
@@ -459,8 +506,13 @@ export default function WatchPage() {
           return
         }
         if (hdData.pageUrl) {
+          // Roteia pelo Render para remover X-Frame-Options
+          const aocMatch = hdData.pageUrl.match(/animesonline\.cloud\/episodio\/([^/]+)-episodio-(\d+)/)
+          const aocUrl = aocMatch
+            ? `${RENDER_PROXY}/asc/${aocMatch[1]}/${aocMatch[2]}`
+            : hdData.pageUrl
           setCurrentSrc('__embed__')
-          setErrorMsg(hdData.pageUrl)
+          setErrorMsg(aocUrl)
           setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
