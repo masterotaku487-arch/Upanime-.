@@ -320,7 +320,29 @@ export default function WatchPage() {
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
 
-      // ── Fallback 0: embed direto meusanimes / goyabu ──────────
+      // ── Fallback 0-A: AnimeFire embed direto (iframe) ─────────
+      // Mais completo + URL muda com dub/leg permitindo troca
+      try {
+        const overrides = await loadOverrides()
+        const ov = overrides[String(animeObj.mal_id)]
+        // Pega slug do override ou do que já foi resolvido
+        const afOvSlug = ov
+          ? ((dub && ov.dub) ? ov.dub : ov.leg)
+          : null
+        const afEmbedSlug = afOvSlug || slug // slug pode estar definido do try anterior
+        if (afEmbedSlug) {
+          const afEmbedUrl = `https://animefire.io/animes/${afEmbedSlug}/${ep}`
+          console.log('[AnimeFire embed]', afEmbedUrl)
+          setCurrentSrc('__embed__')
+          setErrorMsg(afEmbedUrl)
+          setStatus(`✅ AnimeFire ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — EP${ep}`)
+          setLoading(false); return
+        }
+      } catch (afEmbedErr) {
+        console.warn('[af-embed]', afEmbedErr.message)
+      }
+
+      // ── Fallback 0-B: embed direto meusanimes / goyabu ────────
       try {
         const overrides  = await loadOverrides()
         const ov         = overrides[String(animeObj.mal_id)]
