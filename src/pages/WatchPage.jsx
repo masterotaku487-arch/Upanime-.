@@ -22,7 +22,7 @@ const AF2 = 'https://animefire2-proxy.masterotaku487.workers.dev'
 // Se o CDN bloquear, o log do Render mostra o erro exacto
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
-  `${AF2}?action=stream&url=${encodeURIComponent(url)}`
+  `https://animesfontes-proxy.onrender.com/video-proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -328,10 +328,10 @@ export default function WatchPage() {
 
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // URL direta — token já vem válido, AF2 estava quebrando o stream
+      // Render proxy adiciona Referer/UA — CDN bloqueia request direto do <video>
       const proxiedSrcs = srcs.map(s => ({
         ...s,
-        url: s.url,
+        url: proxyUrl(s.url),
         directUrl: s.url,
       }))
       setSources(proxiedSrcs)
