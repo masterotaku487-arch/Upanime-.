@@ -66,3 +66,79 @@
 }
 .comment-item:hover .comment-del { opacity: 1; }
 .comment-text { font-size: .83rem; line-height: 1.6; color: rgba(255,255,255,.8); word-break: break-word; }
+
+/* ── Comentário anônimo ─────────────────────────────────────── */
+.comment-anon-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.comment-anon-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: #aaa;
+}
+
+.comment-anon-label strong {
+  color: #e0e0e0;
+}
+
+.comment-anon-edit,
+.comment-anon-or,
+.comment-anon-save {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+}
+
+.comment-anon-edit {
+  color: #7b9cff;
+  text-decoration: underline;
+}
+
+.comment-anon-save {
+  color: #fff;
+  background: #7b9cff;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.comment-anon-or {
+  color: #666;
+}
+
+.comment-anon-input {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  width: 130px;
+  outline: none;
+}
+
+.comment-google-btn {
+  background: #fff;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comment-google-btn:hover {
+  background: #f0f0f0;
+}
