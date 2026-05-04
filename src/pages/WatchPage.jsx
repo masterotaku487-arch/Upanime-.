@@ -11,14 +11,13 @@ import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
-// STREAMING via AnimeFire (animefire.io)
+// STREAMING via AnimeFire v2 — scraping + stream no mesmo Worker
+// Token CDN fica vinculado ao IP do Worker → stream funciona
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF = 'https://animefirev2-proxy.masterotaku487.workers.dev'
 
-// Proxy de vídeo via Render — stream com Referer correto
-// Render não tem limite de 60s como Vercel e não usa url.parse()
-// Se o CDN bloquear, o log do Render mostra o erro exacto
+// Proxy de vídeo via Render — usado pelos fallbacks (meusanimes, goyabu etc)
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
   `${RENDER_PROXY}/video-proxy?url=${encodeURIComponent(url)}`
@@ -284,18 +283,15 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Busca fontes DO RENDER — token CDN fica vinculado ao IP do Render
-      // /video-proxy usa o mesmo IP → sem 401
-      const afRes  = await fetch(`${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`)
-      const data   = await afRes.json()
-      const srcs   = data.sources || []
+      // Worker v2 faz scraping + stream com mesmo IP → token sempre válido
+      // sources[].url já aponta para ?action=stream no Worker
+      // sources[].directUrl = URL real do CDN (para MX Player)
+      const data = await afFetch({ action: 'video', slug, ep })
+      const srcs = data.sources || []
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // sources.url = URL direta do CDN (token vinculado ao IP do Render)
-      // Passa pelo /video-proxy para manter o Referer correto
-      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
-      setSources(proxiedSrcs)
-      const best = bestQuality(proxiedSrcs)
+      setSources(srcs)
+      const best = bestQuality(srcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
