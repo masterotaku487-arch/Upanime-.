@@ -17,9 +17,10 @@ import './WatchPage.css'
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
-// Envolve URL do CDN com proxy-video do Worker — mesmo IP que gerou o token
-const afProxyUrl = (url) =>
-  `${AF}?action=proxy-video&url=${encodeURIComponent(url)}`
+// Stream URL — busca token E streama na mesma requisição do Worker
+// Mesmo IP garantido → token CDN sempre válido
+const afStreamUrl = (slug, ep, label = '') =>
+  `${AF}?action=stream&slug=${encodeURIComponent(slug)}&ep=${ep}${label ? `&label=${encodeURIComponent(label)}` : ''}`
 
 // Proxy de vídeo via Render — usado pelos fallbacks (meusanimes, goyabu etc)
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
@@ -296,16 +297,17 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Worker original: action=video retorna sources[].url com IP do Worker
-      // Envolvemos com action=proxy-video → stream pelo mesmo Worker → sem 401
+      // Busca qualidades disponíveis via action=video
       const data = await afFetch({ action: 'video', slug, ep })
       const srcs = data.sources || []
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
+      // Monta sources com action=stream — token gerado E usado na mesma requisição
+      // Garante mesmo IP do Worker → sem 401
       const proxied = srcs.map(s => ({
-        ...s,
-        directUrl: s.url,                // URL real do CDN (MX Player, download)
-        url: afProxyUrl(s.url),          // stream pelo Worker — mesmo IP do token
+        label:     s.label,
+        directUrl: s.url,                              // CDN real (MX Player)
+        url:       afStreamUrl(slug, ep, s.label),     // stream via Worker
       }))
       setSources(proxied)
       const best = bestQuality(proxied)
