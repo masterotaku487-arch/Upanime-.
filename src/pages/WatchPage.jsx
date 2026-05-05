@@ -297,11 +297,11 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Método primário: embed via proxy do Render
-      // AnimeFire JS roda no browser do usuário → token CDN no IP do usuário → sem 401
-      const embedUrl = `${RENDER_PROXY}/af/${encodeURIComponent(slug)}/${ep}`
-      setCurrentSrc('__embed__')
-      setErrorMsg(embedUrl)
+      // Abre o stream diretamente — browser trata como vídeo e abre no player do dispositivo
+      // action=stream: Worker busca token E streama na mesma requisição → IP sempre válido
+      const streamUrl = afStreamUrl(slug, ep)
+      setSources([{ url: streamUrl, label: 'AnimeFire', directUrl: streamUrl }])
+      setCurrentSrc(streamUrl)
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
       setLoading(false)
       return
@@ -567,7 +567,17 @@ export default function WatchPage() {
                 <h3>Erro ao carregar o player</h3>
                 <p className="error-hint">O player interno nao conseguiu reproduzir. Tente outra opcao abaixo.</p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null)}>
+                  {afSlug && (
+                    <a
+                      href={afStreamUrl(afSlug, epNum)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-primary"
+                    >
+                      ▶ Assistir (abre no player)
+                    </a>
+                  )}
+                  <button className="btn btn-ghost" onClick={() => doLoad(anime, epNum, isDub, null)}>
                     🔄 Tentar novamente
                   </button>
                   {currentSrc && (
@@ -612,12 +622,12 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
-                  if (directUrl && currentSrc !== directUrl) {
-                    setCurrentSrc(directUrl)
-                  } else {
-                    setError(true)
+                  const streamUrl = sources.find(s => s.url === currentSrc)?.url || currentSrc
+                  // Browser não conseguiu reproduzir inline — abre no player externo
+                  if (streamUrl) {
+                    window.open(streamUrl, '_blank')
                   }
+                  setError(true)
                 }}
               />
             ) : null}
