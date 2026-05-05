@@ -297,22 +297,12 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Busca qualidades disponíveis via action=video
-      const data = await afFetch({ action: 'video', slug, ep })
-      const srcs = data.sources || []
-      if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
-
-      // Monta sources com action=stream — token gerado E usado na mesma requisição
-      // Garante mesmo IP do Worker → sem 401
-      const proxied = srcs.map(s => ({
-        label:     s.label,
-        directUrl: s.url,                              // CDN real (MX Player)
-        url:       afStreamUrl(slug, ep, s.label),     // stream via Worker
-      }))
-      setSources(proxied)
-      const best = bestQuality(proxied)
-      setCurrentSrc(best?.url || '')
-      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+      // Método primário: embed via proxy do Render
+      // AnimeFire JS roda no browser do usuário → token CDN no IP do usuário → sem 401
+      const embedUrl = `${RENDER_PROXY}/af/${encodeURIComponent(slug)}/${ep}`
+      setCurrentSrc('__embed__')
+      setErrorMsg(embedUrl)
+      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
 
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
