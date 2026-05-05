@@ -22,11 +22,20 @@ const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
   `${RENDER_PROXY}/video-proxy?url=${encodeURIComponent(url)}`
 
-const afFetch = async (params) => {
-  const qs = new URLSearchParams(params).toString()
-  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
-  if (!r.ok) throw new Error(`Proxy ${r.status}`)
-  return r.json()
+const afFetch = async (params, retries = 2) => {
+  let lastErr
+  for (let i = 0; i < retries; i++) {
+    try {
+      const qs = new URLSearchParams(params).toString()
+      const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(45000) })
+      if (!r.ok) throw new Error(`Proxy ${r.status}`)
+      return r.json()
+    } catch (e) {
+      lastErr = e
+      if (i < retries - 1) await new Promise(res => setTimeout(res, 1000))
+    }
+  }
+  throw lastErr
 }
 
 // Converte título em slug no padrão AnimeFire
