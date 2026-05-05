@@ -303,6 +303,8 @@ export default function WatchPage() {
       setCurrentSrc('__embed__')
       setErrorMsg(embedUrl)
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+      setLoading(false)
+      return
 
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
