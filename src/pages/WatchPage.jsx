@@ -15,12 +15,12 @@ import './WatchPage.css'
 // Token CDN fica vinculado ao IP do Worker → stream funciona
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefirev2-proxy.masterotaku487.workers.dev'
+const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
 // Proxy de vídeo via Render — usado pelos fallbacks (meusanimes, goyabu etc)
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
-  `${RENDER_PROXY}/video-proxy?url=${encodeURIComponent(url)}`
+  `${AF}?action=stream&url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -283,14 +283,14 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      const data = await afFetch({ action: 'video', slug, ep })
-      const srcs = data.sources || []
-      if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
+      // Worker busca e streama internamente — token gerado e consumido
+      // pelo mesmo IP Cloudflare → CDN aceita ✅
+      const streamUrl = `${AF}?action=stream&slug=${slug}&ep=${ep}`
+      const srcs = [{ url: streamUrl, label: 'Auto' }]
 
       setSources(srcs)
-      const best = bestQuality(srcs)
-      setCurrentSrc(best?.url || '')
-      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+      setCurrentSrc(streamUrl)
+      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — EP${ep}`)
 
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
