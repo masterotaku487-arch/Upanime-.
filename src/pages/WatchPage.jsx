@@ -15,32 +15,18 @@ import './WatchPage.css'
 // Token CDN fica vinculado ao IP do Worker → stream funciona
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
-
-// Stream URL — busca token E streama na mesma requisição do Worker
-// Mesmo IP garantido → token CDN sempre válido
-const afStreamUrl = (slug, ep, label = '') =>
-  `${AF}?action=stream&slug=${encodeURIComponent(slug)}&ep=${ep}${label ? `&label=${encodeURIComponent(label)}` : ''}`
+const AF = 'https://animefirev2-proxy.masterotaku487.workers.dev'
 
 // Proxy de vídeo via Render — usado pelos fallbacks (meusanimes, goyabu etc)
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
   `${RENDER_PROXY}/video-proxy?url=${encodeURIComponent(url)}`
 
-const afFetch = async (params, retries = 2) => {
-  let lastErr
-  for (let i = 0; i < retries; i++) {
-    try {
-      const qs = new URLSearchParams(params).toString()
-      const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(45000) })
-      if (!r.ok) throw new Error(`Proxy ${r.status}`)
-      return r.json()
-    } catch (e) {
-      lastErr = e
-      if (i < retries - 1) await new Promise(res => setTimeout(res, 1000))
-    }
-  }
-  throw lastErr
+const afFetch = async (params) => {
+  const qs = new URLSearchParams(params).toString()
+  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
+  if (!r.ok) throw new Error(`Proxy ${r.status}`)
+  return r.json()
 }
 
 // Converte título em slug no padrão AnimeFire
@@ -297,47 +283,37 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Worker passa X-Forwarded-For com IP do usuário para o AnimeFire
-      // Token gerado com &ip=<IP do usuário> → browser streama DIRETO do CDN
       const data = await afFetch({ action: 'video', slug, ep })
       const srcs = data.sources || []
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // sources.url = CDN direto com token no IP do usuário — sem proxy!
       setSources(srcs)
       const best = bestQuality(srcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
-      setLoading(false)
-      return
 
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
 
-      // ── Fallback VidNest — vidnest.fun/anime/{anilistId}/{ep}/sub|dub ─────
-      // Sem IP lock, sem Cloudflare, iframe direto — muito confiável
+      // ── VidNest — primeiro fallback, iframe direto sem IP lock ────────────
       try {
         setStatus('🔄 Tentando VidNest...')
-
-        // Converte MAL ID → AniList ID via GraphQL
         const alRes = await fetch('https://graphql.anilist.co', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            query: `query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { id } }`,
+          body:    JSON.stringify({
+            query:     'query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { id } }',
             variables: { idMal: parseInt(animeObj.mal_id) },
           }),
           signal: AbortSignal.timeout(8000),
         })
-        const alData  = await alRes.json()
-        const anilistId = alData?.data?.Media?.id
-
+        const alJson    = await alRes.json()
+        const anilistId = alJson?.data?.Media?.id
         if (anilistId) {
-          const audioParam = dub ? 'dub' : 'sub'
-          const embedUrl   = `https://vidnest.fun/anime/${anilistId}/${ep}/${audioParam}`
+          const embedUrl = `https://vidnest.fun/anime/${anilistId}/${ep}/${dub ? 'dub' : 'sub'}`
           setCurrentSrc('__embed__')
           setErrorMsg(embedUrl)
-          setStatus(`✅ VidNest${dub ? ' 🎙️ Dublado' : ' 🇧🇷 Legendado'} — EP${ep}`)
+          setStatus(`✅ VidNest${dub ? ' 🎙️' : ' 🇧🇷'} — EP${ep}`)
           setLoading(false); return
         }
       } catch (vnErr) {
@@ -602,17 +578,7 @@ export default function WatchPage() {
                 <h3>Erro ao carregar o player</h3>
                 <p className="error-hint">O player interno nao conseguiu reproduzir. Tente outra opcao abaixo.</p>
                 <div className="error-btns">
-                  {afSlug && (
-                    <a
-                      href={afStreamUrl(afSlug, epNum)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-primary"
-                    >
-                      ▶ Assistir (abre no player)
-                    </a>
-                  )}
-                  <button className="btn btn-ghost" onClick={() => doLoad(anime, epNum, isDub, null)}>
+                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null)}>
                     🔄 Tentar novamente
                   </button>
                   {currentSrc && (
@@ -631,8 +597,8 @@ export default function WatchPage() {
                 src={errorMsg}
                 style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
                 allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
+                referrerPolicy="no-referrer-when-downgrade"
                 title="Player"
               />
             ) : currentSrc ? (
@@ -657,11 +623,9 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  const s = sources.find(s => s.url === currentSrc)
-                  // Token no IP do usuário — se falhou tenta próxima qualidade
-                  const next = sources.find(s => s.url !== currentSrc)
-                  if (next) {
-                    setCurrentSrc(next.url)
+                  const directUrl = sources.find(s => s.url === currentSrc)?.directUrl
+                  if (directUrl && currentSrc !== directUrl) {
+                    setCurrentSrc(directUrl)
                   } else {
                     setError(true)
                   }
