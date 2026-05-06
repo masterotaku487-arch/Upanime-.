@@ -265,3 +265,44 @@ code {
 }
 .report-ep-btn:hover { border-color: var(--red); color: var(--red); }
   
+
+/* ── Seletor de Servidores ───────────────────────────────────────────────── */
+.server-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--surface, #16161f);
+  border-bottom: 1px solid var(--border, #2a2a3a);
+  flex-wrap: wrap;
+}
+
+.server-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.server-btn {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border, #2a2a3a);
+  background: transparent;
+  color: var(--text, #e8e8f0);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+
+.server-btn:hover {
+  border-color: #e63946;
+  color: #e63946;
+}
+
+.server-btn.active {
+  background: #e63946;
+  border-color: #e63946;
+  color: #fff;
+  font-weight: 600;
+}
