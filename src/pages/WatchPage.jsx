@@ -297,17 +297,52 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // Abre o stream diretamente — browser trata como vídeo e abre no player do dispositivo
-      // action=stream: Worker busca token E streama na mesma requisição → IP sempre válido
-      const streamUrl = afStreamUrl(slug, ep)
-      setSources([{ url: streamUrl, label: 'AnimeFire', directUrl: streamUrl }])
-      setCurrentSrc(streamUrl)
-      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+      // Worker passa X-Forwarded-For com IP do usuário para o AnimeFire
+      // Token gerado com &ip=<IP do usuário> → browser streama DIRETO do CDN
+      const data = await afFetch({ action: 'video', slug, ep })
+      const srcs = data.sources || []
+      if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
+
+      // sources.url = CDN direto com token no IP do usuário — sem proxy!
+      setSources(srcs)
+      const best = bestQuality(srcs)
+      setCurrentSrc(best?.url || '')
+      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
       setLoading(false)
       return
 
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
+
+      // ── Fallback VidNest — vidnest.fun/anime/{anilistId}/{ep}/sub|dub ─────
+      // Sem IP lock, sem Cloudflare, iframe direto — muito confiável
+      try {
+        setStatus('🔄 Tentando VidNest...')
+
+        // Converte MAL ID → AniList ID via GraphQL
+        const alRes = await fetch('https://graphql.anilist.co', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            query: `query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { id } }`,
+            variables: { idMal: parseInt(animeObj.mal_id) },
+          }),
+          signal: AbortSignal.timeout(8000),
+        })
+        const alData  = await alRes.json()
+        const anilistId = alData?.data?.Media?.id
+
+        if (anilistId) {
+          const audioParam = dub ? 'dub' : 'sub'
+          const embedUrl   = `https://vidnest.fun/anime/${anilistId}/${ep}/${audioParam}`
+          setCurrentSrc('__embed__')
+          setErrorMsg(embedUrl)
+          setStatus(`✅ VidNest${dub ? ' 🎙️ Dublado' : ' 🇧🇷 Legendado'} — EP${ep}`)
+          setLoading(false); return
+        }
+      } catch (vnErr) {
+        console.warn('[VidNest]', vnErr.message)
+      }
 
       // ── Fallback 0: embed direto meusanimes / goyabu ──────────
       try {
@@ -622,12 +657,14 @@ export default function WatchPage() {
                   }
                 }}
                 onError={() => {
-                  const streamUrl = sources.find(s => s.url === currentSrc)?.url || currentSrc
-                  // Browser não conseguiu reproduzir inline — abre no player externo
-                  if (streamUrl) {
-                    window.open(streamUrl, '_blank')
+                  const s = sources.find(s => s.url === currentSrc)
+                  // Token no IP do usuário — se falhou tenta próxima qualidade
+                  const next = sources.find(s => s.url !== currentSrc)
+                  if (next) {
+                    setCurrentSrc(next.url)
+                  } else {
+                    setError(true)
                   }
-                  setError(true)
                 }}
               />
             ) : null}
