@@ -11,15 +11,14 @@ import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
-// STREAMING via AnimeFire v2 — scraping + stream no mesmo Worker
-// Token CDN fica vinculado ao IP do Worker → stream funciona
+// STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
 // ─────────────────────────────────────────────────────────
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
-// Proxy de vídeo via Render — usado pelos fallbacks (meusanimes, goyabu etc)
-const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
-const proxyUrl = (url) => url
+// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
+const proxyUrl = (url) =>
+  `/api/proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -88,18 +87,6 @@ const buildSlugCandidates = (anime, dub = false) => {
   return [...new Set([...withSeason, ...withoutSeason])]
 }
 
-// Cache do slug-overrides.json — editável no GitHub sem redeploy
-let _overridesCache = null
-const loadOverrides = async () => {
-  if (_overridesCache) return _overridesCache
-  try {
-    const res = await fetch('/slug-overrides.json?_t=' + Date.now())
-    const json = await res.json()
-    _overridesCache = json.animes || {}
-  } catch { _overridesCache = {} }
-  return _overridesCache
-}
-
 // Testa se slug existe E tem episódios no AnimeFire
 const probeSlug = async (slug, isMovie = false) => {
   try {
@@ -114,15 +101,6 @@ const probeSlug = async (slug, isMovie = false) => {
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
-
-  // Checa slug-overrides.json primeiro (editável no GitHub sem redeploy)
-  const overrides = await loadOverrides()
-  const ov = overrides[String(anime.mal_id)]
-  if (ov) {
-    const slug = (dub && ov.dub) ? ov.dub : ov.leg
-    if (slug) { console.log('[AnimeFire] ✅ (override)', slug); return slug }
-  }
-
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
 
@@ -144,26 +122,6 @@ const resolveSlug = async (anime, dub = false) => {
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
-}
-
-// Escolhe o slug que melhor bate com o título procurado
-// Evita pegar "boruto-naruto" quando procura "naruto"
-const bestSlugMatch = (slugs, title) => {
-  const clean = title.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]/g, ' ').trim()
-  const words = clean.split(/\s+/).filter(w => w.length > 2)
-
-  // Score: mais palavras do título que aparecem no slug = melhor
-  const scored = slugs.map(slug => {
-    const s = slug.toLowerCase()
-    const score = words.filter(w => s.includes(w)).length
-    // Penaliza se o slug tem palavras extras que não são do título (ex: "boruto")
-    const extraWords = s.split('-').filter(w => w.length > 3 && !clean.includes(w))
-    return { slug, score: score - extraWords.length * 0.5 }
-  })
-  scored.sort((a, b) => b.score - a.score)
-  return scored[0]?.slug || slugs[0]
 }
 
 const bestQuality = (sources = []) => {
@@ -211,7 +169,7 @@ const openVLC = (url, title) => {
 const openMXPlayer = (url, title) => {
   const directUrl = getDirectUrl(url)  // URL real sem proxy
   const titleEnc  = encodeURIComponent(title)
-  const referer   = encodeURIComponent('https://animefire.io')
+  const referer   = encodeURIComponent('https://animefire.plus')
   const ua        = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
 
   // MX Player recebe a URL direta + headers via S.headers_*
@@ -245,15 +203,12 @@ export default function WatchPage() {
   const [afSlug, setAfSlug] = useState(null)
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
-  const [activeServer, setActiveServer] = useState(0)
-  const [serverLoading, setServerLoading] = useState(false)
   const [error, setError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
   const [newAchievements, setNewAchievements] = useState([]) // toast de conquistas
   const [showBugReport,   setShowBugReport]   = useState(false)
-  const [fallbackUrl,     setFallbackUrl]     = useState(null) // URL alternativa do slug-overrides
 
   useEffect(() => {
     setAnime(null); setEpisodes([]); setAfSlug(null)
@@ -278,146 +233,35 @@ export default function WatchPage() {
   }, [id])
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
-    setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setFallbackUrl(null)
+    setLoading(true); setError(false); setSources([]); setCurrentSrc('')
 
-    // Checa fallback imediato — se existir, vai direto sem tentar nada
-    try {
-      const overrides = await loadOverrides()
-      const ov = overrides[String(animeObj.mal_id)]
-      const fbUrl = ov?.fallback?.[String(ep)]
-      if (fbUrl) {
-        console.log('[fallback imediato]', fbUrl)
-        setFallbackUrl(fbUrl)
-        setError(true)
-        setLoading(false)
-        return
-      }
-    } catch {}
-
-    // ── Servidor 1: animesonlinecc (principal) ──────────────────────────────
-    try {
-      const titleQuery = animeObj.title_english || animeObj.title
-      setStatus('🔄 Carregando Servidor 1...')
-      // Usa o MAL ID para verificar o melhor resultado
-      // Envia mal_id para o Worker poder fazer melhor matching
-      const ccRes = await fetch(
-        `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-        `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}&malId=${animeObj.mal_id || ''}`,
-        { signal: AbortSignal.timeout(30000) }
-      )
-      const ccData = await ccRes.json()
-      // Se o Worker devolver erro de "not found" com slug errado, tenta título alternativo
-      if (ccData.error && ccData.error.includes('não encontrado') && animeObj.title !== animeObj.title_english) {
-        // Retry com título japonês
-        const ccRes2 = await fetch(
-          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-          `&title=${encodeURIComponent(animeObj.title)}&ep=${ep}&dub=${dub ? '1' : '0'}&malId=${animeObj.mal_id || ''}`,
-          { signal: AbortSignal.timeout(20000) }
-        )
-        const ccData2 = await ccRes2.json()
-        if (ccData2.sources?.length || ccData2.iframe || ccData2.pageUrl) {
-          Object.assign(ccData, ccData2)
-        }
-      }
-      if (ccData.sources?.length) {
-        const mp4s = ccData.sources.filter(s => !s.isM3U8)
-        const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
-        setSources(ccData.sources); setCurrentSrc(best?.url || ccData.sources[0].url)
-        setActiveServer(0); setStatus('✅ Servidor 1'); setLoading(false); return
-      }
-      if (ccData.iframe || ccData.pageUrl) {
-        setCurrentSrc('__embed__'); setErrorMsg(ccData.iframe || ccData.pageUrl)
-        setActiveServer(0); setStatus('✅ Servidor 1'); setLoading(false); return
-      }
-    } catch (cc1Err) { console.warn('[Servidor 1]', cc1Err.message) }
-
-    // ── Servidor 2: AnimeFire ─────────────────────────────────────────────
     try {
       let slug = cachedSlug
       if (!slug) {
-        setStatus('🔍 Localizando no Servidor 2...')
+        setStatus('🔍 Localizando no AnimeFire...')
         slug = await resolveSlug(animeObj, dub)
         setAfSlug(slug)
       }
-      setStatus(`📡 Servidor 2 EP${ep}...`)
+
+      setStatus(`📡 Carregando EP${ep}...`)
       const data = await afFetch({ action: 'video', slug, ep })
-      const srcs = data.sources || []
-      if (!srcs.length) throw new Error('Sem fontes')
-      const best = bestQuality(srcs)
-      setSources(srcs); setCurrentSrc(best?.url || '')
-      setActiveServer(1); setStatus('✅ Servidor 2'); setLoading(false); return
-    } catch (afErr) { console.warn('[Servidor 2]', afErr.message) }
+      const srcs = (data.sources || [])
+      if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-    try {
-      // Fallback catch block — runs remaining fallbacks
-      throw new Error('Servidores 1 e 2 falharam')
+      // Usa URL proxiada para garantir Referer correto
+      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+      setSources(proxiedSrcs)
+      const best = bestQuality(proxiedSrcs)
+      setCurrentSrc(best?.url || '')
+      setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+
     } catch (e) {
-      console.warn('[fallbacks]', e.message)
-
-      // ── VidNest — servidor 3, iframe ────────────────────────────────────
-      try {
-        setStatus('🔄 Carregando Servidor 3...')
-        const alRes = await fetch('https://graphql.anilist.co', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body:    JSON.stringify({
-            query:     'query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { id } }',
-            variables: { idMal: parseInt(animeObj.mal_id) },
-          }),
-          signal: AbortSignal.timeout(8000),
-        })
-        const alJson    = await alRes.json()
-        const anilistId = alJson?.data?.Media?.id
-        if (anilistId) {
-          const embedUrl = `https://vidnest.fun/anime/${anilistId}/${ep}/${dub ? 'dub' : 'sub'}`
-          setCurrentSrc('__embed__')
-          setErrorMsg(embedUrl)
-          setActiveServer(2)
-          setStatus('✅ Servidor 3')
-          setLoading(false); return
-        }
-      } catch (vnErr) {
-        console.warn('[VidNest]', vnErr.message)
-      }
-
-      // ── Fallback 0: embed direto meusanimes / goyabu ──────────
-      try {
-        const overrides  = await loadOverrides()
-        const ov         = overrides[String(animeObj.mal_id)]
-        const PROXY_BASE = 'https://animesfontes-proxy.onrender.com'
-        const maOv = ov?.sources?.meusanimes
-        if (maOv) {
-          const maBase = (dub ? maOv.dub : maOv.leg) || maOv.any
-          if (maBase) {
-            const maSlug   = `${maBase}-episodio-${ep}`
-            const embedUrl = `${PROXY_BASE}/ma/${maSlug}`
-            setCurrentSrc('__embed__')
-            setErrorMsg(embedUrl)
-            setStatus('✅ Servidor 1 (embed)')
-            setLoading(false); return
-          }
-        }
-        const gyOv = ov?.sources?.goyabu
-        if (gyOv) {
-          const gyId = gyOv.ids
-            ? (gyOv.ids[ep - 1] || gyOv.ids[0])
-            : (gyOv.id || (dub ? gyOv.dub : gyOv.leg) || gyOv.any)
-          if (gyId) {
-            const embedUrl = `${PROXY_BASE}/gy/${gyId}`
-            setCurrentSrc('__embed__')
-            setErrorMsg(embedUrl)
-            setStatus('✅ Servidor 1 (embed)')
-            setLoading(false); return
-          }
-        }
-      } catch (ovErr) {
-        console.warn('[fallback0]', ovErr.message)
-      }
+      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
 
       // ── Fallback 1: animesonlinecc.to via Worker ──
       try {
         const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Servidor 1 (retry)...')
+        setStatus('🔄 Tentando animesonlinecc.to...')
 
         const ccRes = await fetch(
           `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
@@ -430,8 +274,7 @@ export default function WatchPage() {
           const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
           setSources(ccData.sources)
           setCurrentSrc(best?.url || ccData.sources[0].url)
-          setActiveServer(0)
-          setStatus('✅ Servidor 1')
+          setStatus(`✅ animesonlinecc — ${best?.label || 'Auto'}`)
           setLoading(false)
           return
         }
@@ -439,8 +282,7 @@ export default function WatchPage() {
         if (ccData.iframe) {
           setCurrentSrc('__embed__')
           setErrorMsg(ccData.iframe)
-          setActiveServer(0)
-          setStatus('✅ Servidor 1')
+          setStatus('✅ animesonlinecc (embed)')
           setLoading(false)
           return
         }
@@ -448,8 +290,7 @@ export default function WatchPage() {
         if (ccData.pageUrl) {
           setCurrentSrc('__embed__')
           setErrorMsg(ccData.pageUrl)
-          setActiveServer(0)
-          setStatus('✅ Servidor 1')
+          setStatus('✅ animesonlinecc (página)')
           setLoading(false)
           return
         }
@@ -460,7 +301,7 @@ export default function WatchPage() {
       // ── Fallback 2: título em japonês ──
       if (animeObj.title !== animeObj.title_english) {
         try {
-          setStatus('🔄 Servidor 1 (título original)...')
+          setStatus('🔄 Tentando título original...')
           const ccRes2 = await fetch(
             `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
             `&title=${encodeURIComponent(animeObj.title)}&ep=${ep}&dub=${dub ? '1' : '0'}`
@@ -472,8 +313,7 @@ export default function WatchPage() {
             setSources(ccData2.sources || [])
             setCurrentSrc(isEmbed ? '__embed__' : src)
             if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
-            setActiveServer(0)
-            setStatus('✅ Servidor 1')
+            setStatus(`✅ animesonlinecc (JP) — Auto`)
             setLoading(false)
             return
           }
@@ -483,7 +323,7 @@ export default function WatchPage() {
       // ── Fallback 3: animesonline.cloud via Worker ─────────────
       try {
         const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Carregando Servidor 4...')
+        setStatus('🔄 Tentando animesonline.cloud...')
 
         const hdRes = await fetch(
           `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
@@ -496,66 +336,26 @@ export default function WatchPage() {
           const best = bestQuality(mp4s.length ? mp4s : hdData.sources)
           setSources(hdData.sources)
           setCurrentSrc(best?.url || hdData.sources[0].url)
-          setActiveServer(3)
-          setStatus('✅ Servidor 4')
+          setStatus(`✅ animesonline.cloud — ${best?.label || 'Auto'}`)
           setLoading(false)
           return
         }
         if (hdData.iframe) {
           setCurrentSrc('__embed__')
           setErrorMsg(hdData.iframe)
-          setActiveServer(3)
-          setStatus('✅ Servidor 4')
+          setStatus('✅ animesonline.cloud (embed)')
           setLoading(false)
           return
         }
         if (hdData.pageUrl) {
           setCurrentSrc('__embed__')
           setErrorMsg(hdData.pageUrl)
-          setActiveServer(3)
-          setStatus('✅ Servidor 4')
+          setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
         }
       } catch (hdErr) {
         console.warn('[animesonlinecloud]', hdErr.message)
-      }
-
-      // ── Fallback 4: animesfontes-proxy.onrender.com ──────────
-      try {
-        const titleQuery = animeObj.title_english || animeObj.title
-        setStatus('🔄 Carregando Servidor 5...')
-        const afontesRes = await fetch(
-          `https://animesfontes-proxy.onrender.com/episode` +
-          `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
-          { signal: AbortSignal.timeout(30000) }
-        )
-        const afontesData = await afontesRes.json()
-        if (afontesData.sources?.length) {
-          const mp4s = afontesData.sources.filter(s => !s.isM3U8)
-          const best = bestQuality(mp4s.length ? mp4s : afontesData.sources)
-          setSources(afontesData.sources)
-          setCurrentSrc(best?.url || afontesData.sources[0].url)
-          setActiveServer(4)
-          setStatus('✅ Servidor 5')
-          setLoading(false); return
-        }
-        if (afontesData.iframe) {
-          setCurrentSrc('__embed__')
-          setErrorMsg(afontesData.iframe)
-          setActiveServer(4)
-          setStatus('✅ Servidor 5')
-          setLoading(false); return
-        }
-        if (afontesData.pageUrl) {
-          setCurrentSrc('__embed__')
-          setErrorMsg(afontesData.pageUrl)
-          setActiveServer(4)
-          setStatus('✅ Servidor 5')
-          setLoading(false); return
-        }
-      } catch (afErr) {
-        console.warn('[animesfontes]', afErr.message)
       }
 
       setError(true)
@@ -590,8 +390,8 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
-    ? `https://animefire.io/animes/${afSlug}`
-    : `https://animefire.io`
+    ? `https://animefire.plus/animes/${afSlug}`
+    : `https://animefire.plus`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
@@ -632,16 +432,6 @@ export default function WatchPage() {
                    : 'Fonte: 🇧🇷 AnimeFire via Cloudflare'}
                 </p>
               </div>
-            ) : error && fallbackUrl ? (
-              // Fallback: iframe direto na URL original
-              <iframe
-                key={fallbackUrl}
-                src={fallbackUrl}
-                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
-                allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                title={`${title} EP${epNum}`}
-              />
             ) : error ? (
               <div className="player-error">
                 <span className="error-emoji">😕</span>
@@ -661,16 +451,6 @@ export default function WatchPage() {
                   </a>
                 </div>
               </div>
-            ) : currentSrc === '__embed__' ? (
-              <iframe
-                key={errorMsg}
-                src={errorMsg}
-                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
-                allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
-                referrerPolicy="no-referrer-when-downgrade"
-                title="Player"
-              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
@@ -704,106 +484,6 @@ export default function WatchPage() {
             ) : null}
           </div>
 
-          {/* Seletor de Servidores */}
-          <div className="server-bar">
-            <span className="audio-label">🖥️ Servidor:</span>
-            <div className="server-btns">
-              {['Servidor 1','Servidor 2','Servidor 3','Servidor 4','Servidor 5'].map((label, idx) => (
-                <button
-                  key={idx}
-                  className={`server-btn ${activeServer === idx ? 'active' : ''}`}
-                  onClick={() => {
-                    if (serverLoading) return
-                    // Recarrega com o servidor escolhido manualmente
-                    setActiveServer(idx)
-                    setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setErrorMsg('')
-                    const serverLoaders = [
-                      // Servidor 1: animesonlinecc
-                      async () => {
-                        const titleQuery = anime?.title_english || anime?.title || ''
-                        const r = await fetch(
-                          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-                          `&title=${encodeURIComponent(titleQuery)}&ep=${epNum}&dub=${isDub ? '1' : '0'}&malId=${anime?.mal_id || ''}`,
-                          { signal: AbortSignal.timeout(30000) }
-                        )
-                        const d = await r.json()
-                        if (d.sources?.length) {
-                          const best = bestQuality(d.sources)
-                          setSources(d.sources); setCurrentSrc(best?.url || d.sources[0].url)
-                        } else if (d.iframe || d.pageUrl) {
-                          setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
-                        } else throw new Error('Sem fontes')
-                      },
-                      // Servidor 2: AnimeFire
-                      async () => {
-                        const slug = afSlug || await resolveSlug(anime, isDub)
-                        setAfSlug(slug)
-                        const data = await afFetch({ action: 'video', slug, ep: epNum })
-                        const srcs = data.sources || []
-                        if (!srcs.length) throw new Error('Sem fontes')
-                        const best = bestQuality(srcs)
-                        setSources(srcs); setCurrentSrc(best?.url || '')
-                      },
-                      // Servidor 3: VidNest
-                      async () => {
-                        const alRes = await fetch('https://graphql.anilist.co', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                          body: JSON.stringify({ query: 'query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { id } }', variables: { idMal: parseInt(id) } }),
-                          signal: AbortSignal.timeout(8000),
-                        })
-                        const alJson = await alRes.json()
-                        const anilistId = alJson?.data?.Media?.id
-                        if (!anilistId) throw new Error('AniList ID não encontrado')
-                        setCurrentSrc('__embed__')
-                        setErrorMsg(`https://vidnest.fun/anime/${anilistId}/${epNum}/${isDub ? 'dub' : 'sub'}`)
-                      },
-                      // Servidor 4: animesonline.cloud
-                      async () => {
-                        const titleQuery = anime?.title_english || anime?.title || ''
-                        const r = await fetch(
-                          `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
-                          `&title=${encodeURIComponent(titleQuery)}&ep=${epNum}`,
-                          { signal: AbortSignal.timeout(30000) }
-                        )
-                        const d = await r.json()
-                        if (d.sources?.length) {
-                          const best = bestQuality(d.sources)
-                          setSources(d.sources); setCurrentSrc(best?.url || d.sources[0].url)
-                        } else if (d.iframe || d.pageUrl) {
-                          setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
-                        } else throw new Error('Sem fontes')
-                      },
-                      // Servidor 5: AnimeFontes
-                      async () => {
-                        const titleQuery = anime?.title_english || anime?.title || ''
-                        const r = await fetch(
-                          `https://animesfontes-proxy.onrender.com/episode` +
-                          `?title=${encodeURIComponent(titleQuery)}&ep=${epNum}&dub=${isDub ? '1' : '0'}`,
-                          { signal: AbortSignal.timeout(30000) }
-                        )
-                        const d = await r.json()
-                        if (d.sources?.length) {
-                          const best = bestQuality(d.sources)
-                          setSources(d.sources); setCurrentSrc(best?.url || d.sources[0].url)
-                        } else if (d.iframe || d.pageUrl) {
-                          setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
-                        } else throw new Error('Sem fontes')
-                      },
-                    ]
-                    setServerLoading(true)
-                    setStatus(`🔄 Carregando ${label}...`)
-                    serverLoaders[idx]()
-                      .then(() => { setStatus(`✅ ${label}`); setLoading(false); setServerLoading(false) })
-                      .catch(e => { setError(true); setStatus(`❌ ${label}: ${e.message}`); setLoading(false); setServerLoading(false) })
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Dub / Leg + Qualidade */}
           <div className="audio-track-bar">
             <span className="audio-label">🎧 Áudio:</span>
@@ -825,9 +505,9 @@ export default function WatchPage() {
                 </select>
               </div>
             )}
-            {!loading && !error && status.startsWith('✅') && (
+            {afSlug && !loading && !error && (
               <span className="provider-tag" style={{ marginLeft: 'auto' }}>
-                {['🌐 S1','🔥 S2','📺 S3','☁️ S4','🎬 S5'][activeServer] || status}
+                {status.includes('animesonlinecc') ? '🌐 animesonlinecc' : '✅ AnimeFire'}
               </span>
             )}
           </div>
