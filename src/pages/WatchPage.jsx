@@ -146,6 +146,26 @@ const resolveSlug = async (anime, dub = false) => {
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
+// Escolhe o slug que melhor bate com o título procurado
+// Evita pegar "boruto-naruto" quando procura "naruto"
+const bestSlugMatch = (slugs, title) => {
+  const clean = title.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, ' ').trim()
+  const words = clean.split(/\s+/).filter(w => w.length > 2)
+
+  // Score: mais palavras do título que aparecem no slug = melhor
+  const scored = slugs.map(slug => {
+    const s = slug.toLowerCase()
+    const score = words.filter(w => s.includes(w)).length
+    // Penaliza se o slug tem palavras extras que não são do título (ex: "boruto")
+    const extraWords = s.split('-').filter(w => w.length > 3 && !clean.includes(w))
+    return { slug, score: score - extraWords.length * 0.5 }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  return scored[0]?.slug || slugs[0]
+}
+
 const bestQuality = (sources = []) => {
   const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360']
   return [...sources].sort((a, b) => {
@@ -226,6 +246,7 @@ export default function WatchPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [activeServer, setActiveServer] = useState(0)
+  const [serverLoading, setServerLoading] = useState(false)
   const [error, setError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [showShare, setShowShare] = useState(false)
@@ -277,12 +298,27 @@ export default function WatchPage() {
     try {
       const titleQuery = animeObj.title_english || animeObj.title
       setStatus('🔄 Carregando Servidor 1...')
+      // Usa o MAL ID para verificar o melhor resultado
+      // Envia mal_id para o Worker poder fazer melhor matching
       const ccRes = await fetch(
         `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-        `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
+        `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}&malId=${animeObj.mal_id || ''}`,
         { signal: AbortSignal.timeout(30000) }
       )
       const ccData = await ccRes.json()
+      // Se o Worker devolver erro de "not found" com slug errado, tenta título alternativo
+      if (ccData.error && ccData.error.includes('não encontrado') && animeObj.title !== animeObj.title_english) {
+        // Retry com título japonês
+        const ccRes2 = await fetch(
+          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+          `&title=${encodeURIComponent(animeObj.title)}&ep=${ep}&dub=${dub ? '1' : '0'}&malId=${animeObj.mal_id || ''}`,
+          { signal: AbortSignal.timeout(20000) }
+        )
+        const ccData2 = await ccRes2.json()
+        if (ccData2.sources?.length || ccData2.iframe || ccData2.pageUrl) {
+          Object.assign(ccData, ccData2)
+        }
+      }
       if (ccData.sources?.length) {
         const mp4s = ccData.sources.filter(s => !s.isM3U8)
         const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
@@ -677,7 +713,7 @@ export default function WatchPage() {
                   key={idx}
                   className={`server-btn ${activeServer === idx ? 'active' : ''}`}
                   onClick={() => {
-                    if (activeServer === idx || serverLoading) return
+                    if (serverLoading) return
                     // Recarrega com o servidor escolhido manualmente
                     setActiveServer(idx)
                     setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setErrorMsg('')
@@ -687,7 +723,7 @@ export default function WatchPage() {
                         const titleQuery = anime?.title_english || anime?.title || ''
                         const r = await fetch(
                           `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
-                          `&title=${encodeURIComponent(titleQuery)}&ep=${epNum}&dub=${isDub ? '1' : '0'}`,
+                          `&title=${encodeURIComponent(titleQuery)}&ep=${epNum}&dub=${isDub ? '1' : '0'}&malId=${anime?.mal_id || ''}`,
                           { signal: AbortSignal.timeout(30000) }
                         )
                         const d = await r.json()
@@ -755,10 +791,11 @@ export default function WatchPage() {
                         } else throw new Error('Sem fontes')
                       },
                     ]
+                    setServerLoading(true)
                     setStatus(`🔄 Carregando ${label}...`)
                     serverLoaders[idx]()
-                      .then(() => { setStatus(`✅ ${label}`); setLoading(false) })
-                      .catch(e => { setError(true); setStatus(`❌ ${label}: ${e.message}`); setLoading(false) })
+                      .then(() => { setStatus(`✅ ${label}`); setLoading(false); setServerLoading(false) })
+                      .catch(e => { setError(true); setStatus(`❌ ${label}: ${e.message}`); setLoading(false); setServerLoading(false) })
                   }}
                 >
                   {label}
@@ -788,9 +825,9 @@ export default function WatchPage() {
                 </select>
               </div>
             )}
-            {afSlug && !loading && !error && (
+            {!loading && !error && status.startsWith('✅') && (
               <span className="provider-tag" style={{ marginLeft: 'auto' }}>
-                {status.includes('animesonlinecc') ? '🌐 animesonlinecc' : '✅ AnimeFire'}
+                {['🌐 S1','🔥 S2','📺 S3','☁️ S4','🎬 S5'][activeServer] || status}
               </span>
             )}
           </div>
