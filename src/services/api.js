@@ -139,7 +139,7 @@ export const fetchSourcesWithFallback = async (anime, epNum, dub = false, cache 
 
   return {
     sources: data.sources,
-    headers: { Referer: data.domain + '/' },
+    headers: { Referer: (data.domain || 'https://animefire.io') + '/' },
     provider: data.provider || '🇧🇷 AnimeFire',
     cache: ids,
   }
@@ -159,7 +159,7 @@ export const pickBestSource = (sources = []) => {
 export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null) => {
   const slug = cachedSlug || await resolveSlug(anime, dub)
   const data = await afFetch({ action: 'info', slug })
-  return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
+  return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain || 'https://animefire.io' }
 }
 
 

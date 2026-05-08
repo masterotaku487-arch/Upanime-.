@@ -35,7 +35,7 @@ async function handleInfo(slug) {
   const titleMatch = html.match(/<h1[^>]*>([^<]+)</) || html.match(/<title>([^<|]+)/)
   const title = titleMatch ? titleMatch[1].trim() : slug
   const episodes = [...epSet].sort((a, b) => a - b).map(ep => ({ ep }))
-  return { slug, title, episodes }
+  return { slug, title, episodes, domain: AF }
 }
 
 async function handleVideo(slug, ep) {
@@ -51,7 +51,7 @@ async function handleVideo(slug, ep) {
     if (apiRes.ok) {
       const d = await apiRes.json()
       const raw = d.data || d.sources || []
-      if (raw.length) return { sources: raw.map(s => ({ url: s.src || s.file || s.url, label: s.label || 'HD' })).filter(s => s.url) }
+      if (raw.length) return { sources: raw.map(s => ({ url: s.src || s.file || s.url, label: s.label || 'HD' })).filter(s => s.url), domain: AF }
     }
   }
 
@@ -59,7 +59,7 @@ async function handleVideo(slug, ep) {
   const mp4s = [...html.matchAll(/https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/g)]
   if (mp4s.length) {
     const unique = [...new Set(mp4s.map(m => m[0]))]
-    return { sources: unique.map((url, i) => ({ url, label: i === 0 ? 'HD' : 'SD' })) }
+    return { sources: unique.map((url, i) => ({ url, label: i === 0 ? 'HD' : 'SD' })), domain: AF }
   }
 
   // Padrão 3: array sources[] no script (jwplayer/videojs)
@@ -67,7 +67,7 @@ async function handleVideo(slug, ep) {
   if (srcArr) {
     const files  = [...srcArr[1].matchAll(/file\s*:\s*["']([^"']+)["']/g)]
     const labels = [...srcArr[1].matchAll(/label\s*:\s*["']([^"']+)["']/g)]
-    if (files.length) return { sources: files.map((f, i) => ({ url: f[1], label: labels[i]?.[1] || 'HD' })) }
+    if (files.length) return { sources: files.map((f, i) => ({ url: f[1], label: labels[i]?.[1] || 'HD' })), domain: AF }
   }
 
   throw new Error(`Sem fontes: ${slug} EP${ep}`)
