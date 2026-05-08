@@ -18,7 +18,7 @@ const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 const proxyUrl = (url) =>
-  `/api/proxy?url=${encodeURIComponent(url)}`
+  `${AF}?action=stream&url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
