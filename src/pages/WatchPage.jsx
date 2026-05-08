@@ -17,8 +17,6 @@ import './WatchPage.css'
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
-const proxyUrl = (url) =>
-  `${AF}?action=proxy-video&url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -249,9 +247,9 @@ export default function WatchPage() {
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
       // Usa URL proxiada para garantir Referer correto
-      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
-      setSources(proxiedSrcs)
-      const best = bestQuality(proxiedSrcs)
+      const directSrcs = srcs.map(s => ({ ...s, directUrl: s.url }))
+      setSources(directSrcs)
+      const best = bestQuality(directSrcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
