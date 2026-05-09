@@ -1,5 +1,4 @@
 // Vercel Serverless — Proxy de video com Referer correto
-// ESTRATEGIA: redirect direto com headers quando possivel
 // Arquivo: /api/proxy.js
 
 export default async function handler(req, res) {
@@ -15,6 +14,7 @@ export default async function handler(req, res) {
   try { videoHost = new URL(url).hostname } catch {
     return res.status(400).json({ error: 'url invalida' })
   }
+  
   if (!allowed.some(d => videoHost.endsWith(d))) {
     return res.status(403).json({ error: 'Dominio nao permitido' })
   }
@@ -22,48 +22,50 @@ export default async function handler(req, res) {
   const headers = {
     'Referer': 'https://animefire.io/',
     'Origin':  'https://animefire.io',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   }
-  if (req.headers.range) headers['Range'] = req.headers.range
+  
+  if (req.headers.range) {
+    headers['Range'] = req.headers.range
+  }
 
   try {
-    // NUNCA faz redirect — token é ip-locked ao Cloudflare Worker
-    // Se o browser seguir redirect usa o seu IP → CDN rejeita com 403
-    // Vercel sempre streama — o Referer e headers ficam correctos
-    const MAX = 10 * 1024 * 1024  // 10MB
-    const range = req.headers.range || 'bytes=0-'
-    const rangeHeaders = { ...headers, Range: range }
+    const videoRes = await fetch(url, { 
+      headers, 
+      redirect: 'follow', 
+      signal: AbortSignal.timeout(60000) 
+    })
 
-    const videoRes = await fetch(url, { headers: rangeHeaders, redirect: 'follow', signal: AbortSignal.timeout(30000) })
-    const contentLength = Number(videoRes.headers.get('Content-Length') || 0)
-
+    // Repassa os headers importantes do vídeo original
     res.setHeader('Content-Type', videoRes.headers.get('Content-Type') || 'video/mp4')
     res.setHeader('Accept-Ranges', 'bytes')
-    res.setHeader('Cache-Control', 'public, max-age=3600')
-
-    if (videoRes.headers.get('Content-Range'))
+    
+    if (videoRes.headers.get('Content-Range')) {
       res.setHeader('Content-Range', videoRes.headers.get('Content-Range'))
-    if (contentLength && contentLength < MAX)
-      res.setHeader('Content-Length', String(contentLength))
+    }
+    if (videoRes.headers.get('Content-Length')) {
+      res.setHeader('Content-Length', videoRes.headers.get('Content-Length'))
+    }
 
-    res.status(videoRes.status || 206)
+    res.status(videoRes.status || 200)
 
-    // Pipe chunk a chunk sem guardar tudo na memoria
+    // Streaming direto sem limite de tamanho (corrigindo o erro de 10MB)
     const reader = videoRes.body.getReader()
-    let total = 0
+    
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      total += value.length
       res.write(Buffer.from(value))
-      if (total >= MAX) break  // Limita tamanho para nao crashar
     }
+    
     res.end()
 
   } catch (e) {
-    if (!res.headersSent)
+    console.error('[Proxy Error]', e.message)
+    if (!res.headersSent) {
       res.status(502).json({ error: e.message })
-    else
+    } else {
       res.end()
+    }
   }
 }
