@@ -138,7 +138,10 @@ export const fetchSourcesWithFallback = async (anime, epNum, dub = false, cache 
     throw new Error(`Ep ${epNum} sem sources (slug: ${ids.afSlug})`)
 
   return {
-    sources: data.sources,
+    sources: data.sources.map(s => ({
+      ...s,
+      url: `/api/proxy?url=${encodeURIComponent(s.url)}`
+    })),
     headers: { Referer: (data.domain || 'https://animefire.io') + '/' },
     provider: data.provider || '🇧🇷 AnimeFire',
     cache: ids,
