@@ -38,15 +38,6 @@ const afFetch = async (params, retries = 2) => {
   throw lastErr
 }
 
-// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
-
-const afFetch = async (params) => {
-  const qs = new URLSearchParams(params).toString()
-  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
-  if (!r.ok) throw new Error(`Proxy ${r.status}`)
-  return r.json()
-}
-
 // Converte título em slug no padrão AnimeFire
 const slugify = (s) =>
   s.toLowerCase()
