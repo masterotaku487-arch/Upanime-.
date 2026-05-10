@@ -22,8 +22,8 @@ export async function onRequest({ request }) {
     const res = await fetch(decodeURIComponent(target), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer':    'https://www.animefire.plus/',
-        'Origin':     'https://www.animefire.plus',
+        'Referer':    'https://animefire.io/',
+        'Origin':     'https://animefire.io',
         'Range':      request.headers.get('Range') || '',
       },
     })
