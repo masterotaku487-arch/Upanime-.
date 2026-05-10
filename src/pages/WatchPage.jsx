@@ -14,7 +14,29 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
+// Usa as rotas da própria Vercel — mesma origem, mesmo IP para scraping e stream
+// /api/animefire → scrapa o AnimeFire (token gerado com IP do Vercel)
+// /api/proxy     → streama o CDN (mesmo IP do Vercel que gerou o token)
+const AF = ''   // vazio = mesma origem (upanime-nine.vercel.app)
+
+const proxyUrl = (url) =>
+  `/api/proxy?url=${encodeURIComponent(url)}`
+
+const afFetch = async (params, retries = 2) => {
+  let lastErr
+  for (let i = 0; i < retries; i++) {
+    try {
+      const qs = new URLSearchParams(params).toString()
+      const r  = await fetch(`/api/animefire?${qs}`, { signal: AbortSignal.timeout(45000) })
+      if (!r.ok) throw new Error(`animefire.js ${r.status}`)
+      return r.json()
+    } catch (e) {
+      lastErr = e
+      if (i < retries - 1) await new Promise(res => setTimeout(res, 1000))
+    }
+  }
+  throw lastErr
+}
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 
@@ -246,10 +268,14 @@ export default function WatchPage() {
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL proxiada para garantir Referer correto
-      const directSrcs = srcs.map(s => ({ ...s, directUrl: s.url }))
-      setSources(directSrcs)
-      const best = bestQuality(directSrcs)
+      // Stream via /api/proxy — mesmo IP Vercel que gerou o token → sem 401
+      const proxiedSrcs = srcs.map(s => ({
+        ...s,
+        directUrl: s.url,
+        url: proxyUrl(s.url),
+      }))
+      setSources(proxiedSrcs)
+      const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
