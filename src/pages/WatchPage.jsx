@@ -255,18 +255,15 @@ export default function WatchPage() {
       }
 
       setStatus(`📡 Carregando EP${ep}...`)
-      const data = await afFetch({ action: 'video', slug, ep })
+      const tokenRes = await fetch(`/api/token?slug=${encodeURIComponent(slug)}&ep=${ep}`, { signal: AbortSignal.timeout(30000) })
+      const data = await tokenRes.json()
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Stream via /api/proxy — mesmo IP Vercel que gerou o token → sem 401
-      const proxiedSrcs = srcs.map(s => ({
-        ...s,
-        directUrl: s.url,
-        url: proxyUrl(s.url),
-      }))
-      setSources(proxiedSrcs)
-      const best = bestQuality(proxiedSrcs)
+      // Token tem ip=<IP do usuário> → browser streama DIRETO do CDN sem proxy!
+      const directSrcs = srcs.map(s => ({ ...s, directUrl: s.url }))
+      setSources(directSrcs)
+      const best = bestQuality(directSrcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
