@@ -133,47 +133,18 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   }
 
   // Carrega vídeo com Referer: https://animefire.io/ via fetch + blob URL
-  // O CDN lightspeedst.net valida o Referer — sem ele retorna 403
+  // Atualiza src do video — CDN do AnimeFire vai via /api/af-stream (adiciona Referer)
   useEffect(() => {
     if (!src || src === prevSrc.current) return
     prevSrc.current = src
-
-    // Limpa blob anterior
-    if (blobUrl.current) {
-      URL.revokeObjectURL(blobUrl.current)
-      blobUrl.current = null
-    }
-
-    // Se for URL do CDN do AnimeFire, carrega com Referer correto
-    if (src.includes('lightspeedst.net') || src.includes('animefire')) {
-      fetch(src, {
-        headers: {
-          'Referer': 'https://animefire.io/',
-          'Origin':  'https://animefire.io',
-        },
-        credentials: 'omit',
-      })
-        .then(r => r.blob())
-        .then(blob => {
-          blobUrl.current = URL.createObjectURL(blob)
-          if (videoRef.current) {
-            videoRef.current.src = blobUrl.current
-            videoRef.current.load()
-            videoRef.current.play().catch(() => {})
-          }
-        })
-        .catch(() => {
-          // Fallback: tenta direto sem proxy
-          if (videoRef.current) {
-            videoRef.current.src = src
-            videoRef.current.load()
-          }
-        })
-    } else {
-      if (videoRef.current) {
-        videoRef.current.src = src
-        videoRef.current.load()
-      }
+    if (blobUrl.current) { URL.revokeObjectURL(blobUrl.current); blobUrl.current = null }
+    if (videoRef.current) {
+      // URL direta do CDN → redireciona pelo proxy Vercel que adiciona o Referer
+      const finalSrc = (src.includes('lightspeedst.net') || src.includes('animefire.io/s3'))
+        ? `/api/af-stream?url=${encodeURIComponent(src)}`
+        : src
+      videoRef.current.src = finalSrc
+      videoRef.current.load()
     }
   }, [src])
 
