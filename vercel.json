@@ -1,21 +1,28 @@
 {
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/api/(.*)",    "destination": "/api/$1" },
+    { "source": "/(.*)",        "destination": "/" }
+  ],
+  "functions": {
+    "api/proxy.js":     { "maxDuration": 60 },
+    "api/animefire.js": { "maxDuration": 30 }
+  },
+  "headers": [
     {
-      "source": "/sitemap.xml",
-      "destination": "/api/sitemap"
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Powered-By",           "value": "Up Anime+" },
+        { "key": "Permissions-Policy",     "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Referrer-Policy",        "value": "no-referrer-when-downgrade" }
+      ]
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/"
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache" }
+      ]
     }
-  ],
-  "functions": {
-    "api/proxy.js": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
