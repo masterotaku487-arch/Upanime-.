@@ -43,6 +43,8 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const containerRef = useRef(null)
   const seekRef      = useRef(null)
   const hideTimer    = useRef(null)
+  const prevSrc      = useRef(null)
+  const blobUrl      = useRef(null)
 
   const [playing, setPlaying]           = useState(false)
   const [currentTime, setCurrentTime]   = useState(0)
@@ -130,7 +132,50 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     }
   }
 
-  const skip = (s) => { if (videoRef.current) videoRef.current.currentTime += s }
+  // Carrega vídeo com Referer: https://animefire.io/ via fetch + blob URL
+  // O CDN lightspeedst.net valida o Referer — sem ele retorna 403
+  useEffect(() => {
+    if (!src || src === prevSrc.current) return
+    prevSrc.current = src
+
+    // Limpa blob anterior
+    if (blobUrl.current) {
+      URL.revokeObjectURL(blobUrl.current)
+      blobUrl.current = null
+    }
+
+    // Se for URL do CDN do AnimeFire, carrega com Referer correto
+    if (src.includes('lightspeedst.net') || src.includes('animefire')) {
+      fetch(src, {
+        headers: {
+          'Referer': 'https://animefire.io/',
+          'Origin':  'https://animefire.io',
+        },
+        credentials: 'omit',
+      })
+        .then(r => r.blob())
+        .then(blob => {
+          blobUrl.current = URL.createObjectURL(blob)
+          if (videoRef.current) {
+            videoRef.current.src = blobUrl.current
+            videoRef.current.load()
+            videoRef.current.play().catch(() => {})
+          }
+        })
+        .catch(() => {
+          // Fallback: tenta direto sem proxy
+          if (videoRef.current) {
+            videoRef.current.src = src
+            videoRef.current.load()
+          }
+        })
+    } else {
+      if (videoRef.current) {
+        videoRef.current.src = src
+        videoRef.current.load()
+      }
+    }
+  }, [src])
 
   const skipIntro = () => { if (videoRef.current) videoRef.current.currentTime = INTRO_END }
 
@@ -203,6 +248,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         src={src}
         className="vp-video"
         autoPlay playsInline
+        referrerPolicy="no-referrer-when-downgrade"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onTimeUpdate={onTimeUpdate}
