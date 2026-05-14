@@ -1,8 +1,7 @@
 // public/sw.js
-// Service Worker — injeta Referer: https://animefire.io/ em requests para lightspeedst.net
-// Roda no browser do usuário — IP real, Referer correto → CDN aceita
+// Service Worker — usa fetch referrer option para enviar Referer: https://animefire.io/
+// "referrer" é uma opção da Fetch API (não header proibido) — funciona no SW!
 
-const ANIMEFIRE_REFERER = 'https://animefire.io/'
 const CDN_HOSTS = ['lightspeedst.net']
 
 self.addEventListener('install', () => self.skipWaiting())
@@ -10,28 +9,16 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()))
 
 self.addEventListener('fetch', (event) => {
   const url = event.request.url
-
-  // Só intercepta requests para o CDN do AnimeFire
   if (!CDN_HOSTS.some(h => url.includes(h))) return
 
   event.respondWith(
-    fetch(event.request, {
-      headers: {
-        ...Object.fromEntries(event.request.headers.entries()),
-        'Referer': ANIMEFIRE_REFERER,
-        'Origin':  'https://animefire.io',
-      },
-      mode:        'cors',
-      credentials: 'omit',
-    }).catch(() =>
-      // Fallback sem Origin se CORS falhar
-      fetch(url, {
-        headers: {
-          'Referer':    ANIMEFIRE_REFERER,
-          'User-Agent': navigator.userAgent,
-        },
-        mode: 'no-cors',
-      })
-    )
+    fetch(url, {
+      method:        event.request.method,
+      headers:       event.request.headers,
+      referrer:      'https://animefire.io/',  // fetch API option — não é header proibido!
+      referrerPolicy:'unsafe-url',
+      credentials:   'omit',
+      mode:          'cors',
+    })
   )
 })
