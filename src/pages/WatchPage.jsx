@@ -11,31 +11,42 @@ import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
-// STREAMING via AnimeFire (Cloudflare Worker → animefire.plus)
+// STREAMING via AnimeFire (animefire.io)
 // ─────────────────────────────────────────────────────────
 
-// Usa as rotas da própria Vercel — mesma origem, mesmo IP para scraping e stream
-// /api/animefire → scrapa o AnimeFire (token gerado com IP do Vercel)
-// /api/proxy     → streama o CDN (mesmo IP do Vercel que gerou o token)
-const AF = ''   // vazio = mesma origem (upanime-nine.vercel.app)
+const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 
+// ── Slugs manuais via GitHub (editável sem mexer no código) ───────────────
+// Edite: /public/anime-slugs.json no repositório
+let _slugCache = null
+const _slugCacheTs = { t: 0 }
+
+const getSlugMap = async () => {
+  // Revalida a cada 5 minutos
+  if (_slugCache && Date.now() - _slugCacheTs.t < 300000) return _slugCache
+  try {
+    const r = await fetch('/anime-slugs.json', { cache: 'no-store' })
+    if (r.ok) { _slugCache = await r.json(); _slugCacheTs.t = Date.now() }
+  } catch {}
+  return _slugCache || {}
+}
+
+const getManualSlug = async (malId, dub) => {
+  const map   = await getSlugMap()
+  const entry = map[String(malId)]
+  if (!entry) return null
+  return (dub ? entry.dub : entry.leg) || entry.all || null
+}
+
+// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 const proxyUrl = (url) =>
   `/api/proxy?url=${encodeURIComponent(url)}`
 
-const afFetch = async (params, retries = 2) => {
-  let lastErr
-  for (let i = 0; i < retries; i++) {
-    try {
-      const qs = new URLSearchParams(params).toString()
-      const r  = await fetch(`/api/animefire?${qs}`, { signal: AbortSignal.timeout(45000) })
-      if (!r.ok) throw new Error(`animefire.js ${r.status}`)
-      return r.json()
-    } catch (e) {
-      lastErr = e
-      if (i < retries - 1) await new Promise(res => setTimeout(res, 1000))
-    }
-  }
-  throw lastErr
+const afFetch = async (params) => {
+  const qs = new URLSearchParams(params).toString()
+  const r = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
+  if (!r.ok) throw new Error(`Proxy ${r.status}`)
+  return r.json()
 }
 
 // Converte título em slug no padrão AnimeFire
@@ -111,6 +122,13 @@ const probeSlug = async (slug, isMovie = false) => {
 
 // Resolve slug correto testando candidatos
 const resolveSlug = async (anime, dub = false) => {
+  // 1. Tenta slug manual do JSON (editável no GitHub)
+  const manual = await getManualSlug(anime.mal_id, dub)
+  if (manual) {
+    console.log('[AnimeFire] slug manual:', manual)
+    return manual
+  }
+
   const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
   const candidates = buildSlugCandidates(anime, dub)
   console.log('[AnimeFire] testando slugs:', candidates.join(', '))
@@ -180,7 +198,7 @@ const openVLC = (url, title) => {
 const openMXPlayer = (url, title) => {
   const directUrl = getDirectUrl(url)  // URL real sem proxy
   const titleEnc  = encodeURIComponent(title)
-  const referer   = encodeURIComponent('https://animefire.plus')
+  const referer   = encodeURIComponent('https://animefire.io')
   const ua        = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
 
   // MX Player recebe a URL direta + headers via S.headers_*
@@ -255,12 +273,13 @@ export default function WatchPage() {
       }
 
       setStatus(`📡 Carregando EP${ep}...`)
-      const tokenRes = await fetch(`/api/token?slug=${encodeURIComponent(slug)}&ep=${ep}`, { signal: AbortSignal.timeout(30000) })
-      const data = await tokenRes.json()
+      const data = await afFetch({ action: 'video', slug, ep })
       const srcs = (data.sources || [])
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Token tem ip=<IP do usuário> → browser streama DIRETO do CDN sem proxy!
+      // Usa URL proxiada para garantir Referer correto
+      // URL direta funciona! curl -I confirmou HTTP/2 200 com Referer: https://animefire.io/
+      // Sem proxy — browser acessa o CDN diretamente com Referer correto
       const directSrcs = srcs.map(s => ({ ...s, directUrl: s.url }))
       setSources(directSrcs)
       const best = bestQuality(directSrcs)
@@ -402,8 +421,8 @@ export default function WatchPage() {
   const title = anime?.title_english || anime?.title || ''
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const afExternal = afSlug
-    ? `https://animefire.plus/animes/${afSlug}`
-    : `https://animefire.plus`
+    ? `https://animefire.io/animes/${afSlug}`
+    : `https://animefire.io`
   const prevEp = epNum > 1 ? epNum - 1 : null
   const nextEp = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
