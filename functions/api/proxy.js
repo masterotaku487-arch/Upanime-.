@@ -29,6 +29,9 @@ export async function onRequest(context) {
 
   try {
 
+    const range =
+      request.headers.get("range") || "bytes=0-"
+
     const response = await fetch(
       decodeURIComponent(target),
       {
@@ -37,25 +40,22 @@ export async function onRequest(context) {
 
         headers: {
 
-          // Navegador real
           "user-agent":
             request.headers.get("user-agent") ||
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135 Safari/537.36",
 
-          // AnimeFire real
           "referer":
             "https://animefire.io/",
 
           "origin":
             "https://animefire.io",
 
-          // Streaming
-          "accept": "*/*",
+          "accept":
+            "*/*",
 
           "range":
-            request.headers.get("range") || "bytes=0-",
+            range,
 
-          // Simular browser
           "accept-language":
             "pt-BR,pt;q=0.9,en;q=0.8",
 
@@ -68,16 +68,13 @@ export async function onRequest(context) {
           "sec-fetch-site":
             "cross-site",
 
-          // Cloudflare passthrough
           "cf-connecting-ip":
             request.headers.get("cf-connecting-ip") || "",
 
           "x-forwarded-for":
             request.headers.get("x-forwarded-for") || "",
-
         },
 
-        // Cloudflare config
         cf: {
           cacheEverything: false,
           cacheTtl: 0,
@@ -89,28 +86,22 @@ export async function onRequest(context) {
       }
     )
 
-    // Copiar headers originais
     const headers = new Headers(response.headers)
 
-    // CORS
     Object.entries(cors).forEach(([k, v]) => {
       headers.set(k, v)
     })
 
-    // Streaming
     headers.set("Accept-Ranges", "bytes")
 
-    // Evitar cache/token velho
     headers.set(
       "Cache-Control",
       "no-store, no-cache, must-revalidate"
     )
 
-    // Segurança
     headers.delete("content-security-policy")
     headers.delete("x-frame-options")
 
-    // Stream direto
     return new Response(
       response.body,
       {
