@@ -306,7 +306,6 @@ export default function WatchPage() {
         } else if (d.iframe || d.pageUrl) {
           setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
         } else throw new Error('Sem fontes')
-      }
       } else if (idx === 3) {
         // Servidor 4: animesfontes-proxy (meusanimes.blog + goyabu.io)
         const title = anime?.title_english || anime?.title || ''
