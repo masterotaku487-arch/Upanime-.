@@ -39,9 +39,7 @@ const getManualSlug = async (malId, dub) => {
 }
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
-// Worker proxy-video — mesmo IP Cloudflare do token, Referer correto
-const proxyUrl = (url) =>
-  `${AF}?action=proxy-video&url=${encodeURIComponent(url)}`
+const proxyUrl = (url) => url  // URL directa — CDN verifica Referer, não IP
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -281,10 +279,9 @@ export default function WatchPage() {
       // Usa URL proxiada para garantir Referer correto
       // URL direta funciona! curl -I confirmou HTTP/2 200 com Referer: https://animefire.io/
       // Sem proxy — browser acessa o CDN diretamente com Referer correto
-      // Stream via Worker proxy-video — Cloudflare → lightspeedst.net (mesma rede)
-      const proxiedSrcs = srcs.map(s => ({ ...s, directUrl: s.url, url: proxyUrl(s.url) }))
-      setSources(proxiedSrcs)
-      const best = bestQuality(proxiedSrcs)
+      const directSrcs = srcs.map(s => ({ ...s, directUrl: s.url }))
+      setSources(directSrcs)
+      const best = bestQuality(directSrcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
