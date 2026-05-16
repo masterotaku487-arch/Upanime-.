@@ -232,6 +232,8 @@ export default function WatchPage() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('🇧🇷 Conectando ao AnimeFire...')
   const [error, setError] = useState(false)
+  const [activeServer, setActiveServer] = useState(0)
+  const [serverLoading, setServerLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -259,6 +261,61 @@ export default function WatchPage() {
       document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD'
     }
   }, [id])
+
+  const loadServer = async (idx) => {
+    if (serverLoading || !anime) return
+    setServerLoading(true)
+    setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setErrorMsg('')
+    try {
+      const title = anime?.title_english || anime?.title || ''
+      if (idx === 0) {
+        // Servidor 1: AnimeFire
+        let slug = afSlug || await resolveSlug(anime, isDub)
+        setAfSlug(slug)
+        const data = await afFetch({ action: 'video', slug, ep: epNum })
+        const srcs = data.sources || []
+        if (!srcs.length) throw new Error('Sem fontes')
+        const directSrcs = srcs.map(s => ({ ...s, directUrl: s.url }))
+        setSources(directSrcs)
+        setCurrentSrc(bestQuality(directSrcs)?.url || '')
+      } else if (idx === 1) {
+        // Servidor 2: animesonlinecc
+        const r = await fetch(
+          `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+          `&title=${encodeURIComponent(title)}&ep=${epNum}&dub=${isDub ? '1' : '0'}`,
+          { signal: AbortSignal.timeout(30000) }
+        )
+        const d = await r.json()
+        if (d.sources?.length) {
+          const best = bestQuality(d.sources.filter(s => !s.isM3U8).length ? d.sources.filter(s => !s.isM3U8) : d.sources)
+          setSources(d.sources); setCurrentSrc(best?.url || d.sources[0].url)
+        } else if (d.iframe || d.pageUrl) {
+          setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
+        } else throw new Error('Sem fontes')
+      } else if (idx === 2) {
+        // Servidor 3: animesonline.cloud
+        const r = await fetch(
+          `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
+          `&title=${encodeURIComponent(title)}&ep=${epNum}`,
+          { signal: AbortSignal.timeout(30000) }
+        )
+        const d = await r.json()
+        if (d.sources?.length) {
+          const best = bestQuality(d.sources.filter(s => !s.isM3U8).length ? d.sources.filter(s => !s.isM3U8) : d.sources)
+          setSources(d.sources); setCurrentSrc(best?.url || d.sources[0].url)
+        } else if (d.iframe || d.pageUrl) {
+          setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
+        } else throw new Error('Sem fontes')
+      }
+      setActiveServer(idx)
+      setStatus(`✅ Servidor ${idx + 1}`)
+    } catch (e) {
+      setError(true); setErrorMsg(e.message)
+      setStatus(`❌ Servidor ${idx + 1}: ${e.message}`)
+    } finally {
+      setLoading(false); setServerLoading(false)
+    }
+  }
 
   const doLoad = async (animeObj, ep, dub, cachedSlug) => {
     setLoading(true); setError(false); setSources([]); setCurrentSrc('')
@@ -512,6 +569,25 @@ export default function WatchPage() {
                 }}
               />
             ) : null}
+          </div>
+
+          {/* Seletor de Servidores */}
+          <div className="server-bar">
+            <span className="audio-label">🖥️</span>
+            {[
+              { label: 'Servidor 1', id: 'animefire' },
+              { label: 'Servidor 2', id: 'animesonlinecc' },
+              { label: 'Servidor 3', id: 'animesonlinecloud' },
+            ].map((sv, idx) => (
+              <button
+                key={sv.id}
+                className={`track-btn${activeServer === idx ? ' active' : ''}`}
+                disabled={serverLoading}
+                onClick={() => loadServer(idx)}
+              >
+                {sv.label}
+              </button>
+            ))}
           </div>
 
           {/* Dub / Leg + Qualidade */}
