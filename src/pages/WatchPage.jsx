@@ -307,6 +307,22 @@ export default function WatchPage() {
           setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
         } else throw new Error('Sem fontes')
       }
+      } else if (idx === 3) {
+        // Servidor 4: animesfontes-proxy (meusanimes.blog + goyabu.io)
+        const title = anime?.title_english || anime?.title || ''
+        const r = await fetch(
+          `https://animesfontes-proxy.onrender.com/episode` +
+          `?title=${encodeURIComponent(title)}&ep=${epNum}&dub=${isDub ? '1' : '0'}`,
+          { signal: AbortSignal.timeout(30000) }
+        )
+        const d = await r.json()
+        if (d.sources?.length) {
+          const best = bestQuality(d.sources.filter(s => !s.isM3U8).length ? d.sources.filter(s => !s.isM3U8) : d.sources)
+          setSources(d.sources); setCurrentSrc(best?.url || d.sources[0].url)
+        } else if (d.iframe || d.pageUrl) {
+          setCurrentSrc('__embed__'); setErrorMsg(d.iframe || d.pageUrl)
+        } else throw new Error('Sem fontes')
+      }
       setActiveServer(idx)
       setStatus(`✅ Servidor ${idx + 1}`)
     } catch (e) {
@@ -578,6 +594,7 @@ export default function WatchPage() {
               { label: 'Servidor 1', id: 'animefire' },
               { label: 'Servidor 2', id: 'animesonlinecc' },
               { label: 'Servidor 3', id: 'animesonlinecloud' },
+              { label: 'Servidor 4', id: 'animesfontes' },
             ].map((sv, idx) => (
               <button
                 key={sv.id}
