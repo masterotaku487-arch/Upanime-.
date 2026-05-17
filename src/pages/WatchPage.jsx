@@ -14,11 +14,15 @@ import './WatchPage.css'
 // STREAMING via AnimeFire (animefire.io)
 // ─────────────────────────────────────────────────────────
 
-const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF  = 'https://animefire-proxy.masterotaku487.workers.dev'
+const AF2 = 'https://animefire2-proxy.masterotaku487.workers.dev'
 
-// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
+// Proxy de vídeo via Render — stream com Referer correto
+// Render não tem limite de 60s como Vercel e não usa url.parse()
+// Se o CDN bloquear, o log do Render mostra o erro exacto
+const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
 const proxyUrl = (url) =>
-  `/api/proxy?url=${encodeURIComponent(url)}`
+  `${AF2}?action=stream&url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -142,6 +146,22 @@ const resolveSlug = async (anime, dub = false) => {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
+
+  // CF Worker falhou em todos — tenta Render /af-info como fallback
+  console.log('[AnimeFire] CF Worker sem resultado, tentando Render...')
+  for (const slug of candidates) {
+    try {
+      const r = await fetch(
+        `${RENDER_PROXY}/af-info?slug=${encodeURIComponent(slug)}`,
+        { signal: AbortSignal.timeout(20000) }
+      )
+      if (r.ok) {
+        const d = await r.json()
+        if (d.exists) { console.log('[AnimeFire] ✅ (Render)', slug); return slug }
+      }
+    } catch { /* tenta próximo */ }
+  }
+
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
@@ -280,19 +300,121 @@ export default function WatchPage() {
       }
 
       setStatus(`📡 Carregando EP${ep}...`)
-      const data = await afFetch({ action: 'video', slug, ep })
-      const srcs = (data.sources || [])
+
+      // 1ª tentativa: CF Worker busca as fontes (rápido, funciona bem)
+      // Render faz o stream via /video-proxy (mesmo IP que o Worker usou → sem 401)
+      let srcs = []
+      try {
+        const cfData = await afFetch({ action: 'video', slug, ep })
+        srcs = cfData.sources || []
+        console.log('[CF Worker] fontes:', srcs.length)
+      } catch (cfErr) {
+        console.warn('[CF Worker] falhou:', cfErr.message)
+      }
+
+      // 2ª tentativa: Render /af-sources (IP diferente, mas tenta mesmo assim)
+      if (!srcs.length) {
+        try {
+          setStatus('🔄 Buscando fontes via Render...')
+          const renderRes = await fetch(
+            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
+            { signal: AbortSignal.timeout(30000) }
+          )
+          const renderData = await renderRes.json()
+          srcs = renderData.sources || []
+          console.log('[Render af-sources] fontes:', srcs.length)
+        } catch (renderErr) {
+          console.warn('[Render af-sources] falhou:', renderErr.message)
+        }
+      }
+
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // Usa URL proxiada para garantir Referer correto
-      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+      // AF2 Worker faz o stream com o mesmo IP que buscou o token → sem 401
+      const proxiedSrcs = srcs.map(s => ({
+        ...s,
+        url: proxyUrl(s.url),   // AF2 stream (mesmo IP do Worker)
+        directUrl: s.url,
+      }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
       setStatus(`✅ ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
 
     } catch (e) {
-      console.warn('[AnimeFire] falhou, tentando animesonlinecc...', e.message)
+      console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
+
+      // ── Fallback 0-A: AnimeFire embed direto (iframe) ─────────
+      // Mais completo + URL muda com dub/leg permitindo troca
+      try {
+        const overrides = await loadOverrides()
+        const ov = overrides[String(animeObj.mal_id)]
+        // Pega slug do override ou do que já foi resolvido
+        const afOvSlug = ov
+          ? ((dub && ov.dub) ? ov.dub : ov.leg)
+          : null
+        const afEmbedSlug = afOvSlug || slug // slug pode estar definido do try anterior
+        if (afEmbedSlug) {
+          // Roteia pelo Render para remover X-Frame-Options do AnimeFire
+          const afEmbedUrl = `${RENDER_PROXY}/af/${afEmbedSlug}/${ep}`
+          console.log('[AnimeFire embed via Render]', afEmbedUrl)
+          setCurrentSrc('__embed__')
+          setErrorMsg(afEmbedUrl)
+          setStatus(`✅ AnimeFire ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — EP${ep}`)
+          setLoading(false); return
+        }
+      } catch (afEmbedErr) {
+        console.warn('[af-embed]', afEmbedErr.message)
+      }
+
+      // ── Fallback 0-B: embed direto meusanimes / goyabu ────────
+      try {
+        const overrides  = await loadOverrides()
+        const ov         = overrides[String(animeObj.mal_id)]
+        const PROXY_BASE = 'https://animesfontes-proxy.onrender.com'
+        const maOv = ov?.sources?.meusanimes
+        if (maOv) {
+          const maBase = (dub ? maOv.dub : maOv.leg) || maOv.any
+          if (maBase) {
+            const maSlug   = `${maBase}-episodio-${ep}`
+            const embedUrl = `${PROXY_BASE}/ma/${maSlug}`
+            setCurrentSrc('__embed__')
+            setErrorMsg(embedUrl)
+            setStatus(`✅ MeusAnimes${dub ? ' 🎙️ Dublado' : ' 📖 Legendado'} — EP${ep}`)
+            setLoading(false); return
+          }
+        }
+        const gyOv = ov?.sources?.goyabu
+        if (gyOv) {
+          const gyId = gyOv.ids
+            ? (gyOv.ids[ep - 1] || gyOv.ids[0])
+            : (gyOv.id || (dub ? gyOv.dub : gyOv.leg) || gyOv.any)
+          if (gyId) {
+            const embedUrl = `${PROXY_BASE}/gy/${gyId}`
+            setCurrentSrc('__embed__')
+            setErrorMsg(embedUrl)
+            setStatus(`✅ Goyabu — EP${ep}`)
+            setLoading(false); return
+          }
+        }
+
+        // AniZero — usa ID numérico do episódio (ex: sources.anizero.ids: [32724, 32725])
+        const azOv = ov?.sources?.anizero
+        if (azOv) {
+          const azId = azOv.ids
+            ? (azOv.ids[ep - 1] || azOv.ids[0])
+            : azOv.id
+          if (azId) {
+            const embedUrl = `${PROXY_BASE}/az/${azId}`
+            setCurrentSrc('__embed__')
+            setErrorMsg(embedUrl)
+            setStatus(`✅ AniZero — EP${ep}`)
+            setLoading(false); return
+          }
+        }
+      } catch (ovErr) {
+        console.warn('[fallback0]', ovErr.message)
+      }
 
       // ── Fallback 1: animesonlinecc.to via Worker ──
       try {
@@ -384,14 +506,53 @@ export default function WatchPage() {
           return
         }
         if (hdData.pageUrl) {
+          // Roteia pelo Render para remover X-Frame-Options
+          const aocMatch = hdData.pageUrl.match(/animesonline\.cloud\/episodio\/([^/]+)-episodio-(\d+)/)
+          const aocUrl = aocMatch
+            ? `${RENDER_PROXY}/asc/${aocMatch[1]}/${aocMatch[2]}`
+            : hdData.pageUrl
           setCurrentSrc('__embed__')
-          setErrorMsg(hdData.pageUrl)
+          setErrorMsg(aocUrl)
           setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
         }
       } catch (hdErr) {
         console.warn('[animesonlinecloud]', hdErr.message)
+      }
+
+      // ── Fallback 4: animesfontes-proxy.onrender.com ──────────
+      try {
+        const titleQuery = animeObj.title_english || animeObj.title
+        setStatus('🔄 Tentando AnimeFontes...')
+        const afontesRes = await fetch(
+          `https://animesfontes-proxy.onrender.com/episode` +
+          `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
+          { signal: AbortSignal.timeout(30000) }
+        )
+        const afontesData = await afontesRes.json()
+        if (afontesData.sources?.length) {
+          const mp4s = afontesData.sources.filter(s => !s.isM3U8)
+          const best = bestQuality(mp4s.length ? mp4s : afontesData.sources)
+          setSources(afontesData.sources)
+          setCurrentSrc(best?.url || afontesData.sources[0].url)
+          setStatus(`✅ AnimeFontes — ${best?.label || 'Auto'}`)
+          setLoading(false); return
+        }
+        if (afontesData.iframe) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(afontesData.iframe)
+          setStatus('✅ AnimeFontes (embed)')
+          setLoading(false); return
+        }
+        if (afontesData.pageUrl) {
+          setCurrentSrc('__embed__')
+          setErrorMsg(afontesData.pageUrl)
+          setStatus('✅ AnimeFontes (página)')
+          setLoading(false); return
+        }
+      } catch (afErr) {
+        console.warn('[animesfontes]', afErr.message)
       }
 
       setError(true)
@@ -469,14 +630,13 @@ export default function WatchPage() {
                 </p>
               </div>
             ) : error && fallbackUrl ? (
-              // Fallback: iframe com proxy anti-ads
+              // Fallback: iframe direto na URL original
               <iframe
                 key={fallbackUrl}
-                src={`/api/embed?url=${encodeURIComponent(fallbackUrl)}`}
+                src={fallbackUrl}
                 style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
                 allowFullScreen
-                allow="autoplay; fullscreen; encrypted-media"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups-to-escape-sandbox"
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                 title={`${title} EP${epNum}`}
               />
             ) : error ? (
@@ -498,6 +658,16 @@ export default function WatchPage() {
                   </a>
                 </div>
               </div>
+            ) : currentSrc === '__embed__' ? (
+              <iframe
+                key={errorMsg}
+                src={errorMsg}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
+                title="Player"
+              />
             ) : currentSrc ? (
               <VideoPlayer
                 key={currentSrc}
