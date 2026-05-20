@@ -91,12 +91,21 @@ export default function FanDubDetailPage() {
   }
 
   const toggleFS = () => {
-    const el = document.getElementById('fandub-iframe')
+    const el = document.getElementById('fandub-iframe-wrap')
+    const fsEl = el || document.documentElement
     if (!document.fullscreenElement) {
-      el?.requestFullscreen?.()
+      const req = fsEl.requestFullscreen
+        || fsEl.webkitRequestFullscreen
+        || fsEl.mozRequestFullScreen
+        || fsEl.msRequestFullscreen
+      req?.call(fsEl)
       setFullscreen(true)
     } else {
-      document.exitFullscreen?.()
+      const exit = document.exitFullscreen
+        || document.webkitExitFullscreen
+        || document.mozCancelFullScreen
+        || document.msExitFullscreen
+      exit?.call(document)
       setFullscreen(false)
     }
   }
@@ -161,13 +170,15 @@ export default function FanDubDetailPage() {
           </div>
 
           {/* iframe */}
-          <div className="fddetail-iframe-wrap">
+          <div id="fandub-iframe-wrap" className="fddetail-iframe-wrap">
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
               src={embedUrl}
               allowFullScreen
-              allow="autoplay; fullscreen; encrypted-media"
+              webkitallowfullscreen="true"
+              mozallowfullscreen="true"
+              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
