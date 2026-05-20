@@ -8,9 +8,9 @@ const API = 'https://studio-proxy.masterotaku487.workers.dev'
 function driveToEmbed(url) {
   if (!url) return url
   const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
+  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview?rm=minimal`
   const matchOpen = url.match(/[?&]id=([^&]+)/)
-  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
+  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview?rm=minimal`
   return url
 }
 
