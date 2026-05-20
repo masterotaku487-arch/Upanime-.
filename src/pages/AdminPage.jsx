@@ -193,12 +193,12 @@ export default function AdminPage() {
                 )}
 
                 <div className="admin-card-btns">
-                  <button className="admin-approve" onClick={() => acao('fandub', d.id, 'aprovar')}>
+                  <button className="admin-approve" onClick={() => acao('fanDub', d.id, 'aprovar')}>
                     ✅ Aprovar
                   </button>
                   <button className="admin-reject" onClick={() => {
                     const motivo = prompt('Motivo da recusa (opcional):') || ''
-                    acao('fandub', d.id, 'recusar', motivo)
+                    acao('fanDub', d.id, 'recusar', motivo)
                   }}>
                     ❌ Recusar
                   </button>
