@@ -8,9 +8,9 @@ const API = 'https://studio-proxy.masterotaku487.workers.dev'
 function driveToEmbed(url) {
   if (!url) return url
   const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview?rm=minimal`
+  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
   const matchOpen = url.match(/[?&]id=([^&]+)/)
-  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview?rm=minimal`
+  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
   return url
 }
 
@@ -91,13 +91,12 @@ export default function FanDubDetailPage() {
   }
 
   const toggleFS = () => {
-    const el = document.getElementById('fandub-iframe-wrap')
-    const fsEl = el || document.documentElement
+    const el = document.getElementById('fandub-iframe')
     if (!document.fullscreenElement) {
-      ;(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen || fsEl.mozRequestFullScreen)?.call(fsEl)
+      el?.requestFullscreen?.()
       setFullscreen(true)
     } else {
-      ;(document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen)?.call(document)
+      document.exitFullscreen?.()
       setFullscreen(false)
     }
   }
@@ -162,53 +161,16 @@ export default function FanDubDetailPage() {
           </div>
 
           {/* iframe */}
-          <div id="fandub-iframe-wrap" className="fddetail-iframe-wrap">
+          <div className="fddetail-iframe-wrap">
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
               src={embedUrl}
               allowFullScreen
-              webkitallowfullscreen="true"
-              mozallowfullscreen="true"
-              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-            {/* Overlay transparente: captura o 1º clique, abre fullscreen e some */}
-            <div
-              className="fddetail-iframe-overlay"
-              onClick={(e) => {
-                e.currentTarget.style.display = 'none'
-                const el = document.getElementById('fandub-iframe-wrap')
-                const fsEl = el || document.documentElement
-                ;(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen || fsEl.mozRequestFullScreen)?.call(fsEl)
-                setFullscreen(true)
-              }}
-            />
-            <iframe
-              id="fandub-iframe"
-              className="fddetail-iframe"
-              src={embedUrl}
-              allowFullScreen
-              webkitallowfullscreen="true"
-              mozallowfullscreen="true"
-              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+              allow="autoplay; fullscreen; encrypted-media"
               referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
-
-          {/* Fallback: abrir no app */}
-          {(() => {
-            const rawUrl = epData?.url || fanDub.embedUrl || ''
-            const m = rawUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-            const fileId = m ? m[1] : null
-            if (!fileId) return null
-            return (
-              <a href={`https://drive.google.com/file/d/${fileId}/view`}
-                target="_blank" rel="noreferrer" className="fddetail-open-btn">
-                📱 Não carregou? Abrir no app
-              </a>
-            )
-          })()}
 
           {/* Navegação de episódios */}
           {totalEps > 1 && (
