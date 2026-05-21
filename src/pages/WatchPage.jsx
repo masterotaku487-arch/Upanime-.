@@ -12,17 +12,17 @@ import './WatchPage.css'
 
 // ─────────────────────────────────────────────────────────
 // STREAMING via AnimeFire (animefire.io)
+// IMPORTANTE: usa /api/animefire local (não o Worker externo)
+// Assim o token CDN fica com o IP do Vercel, e o /api/proxy
+// streama do mesmo IP → CDN aceita ✅
 // ─────────────────────────────────────────────────────────
 
-const AF  = 'https://animefire-proxy.masterotaku487.workers.dev'
-const AF2 = 'https://animefire2-proxy.masterotaku487.workers.dev'
-
-// Proxy de vídeo via Render — stream com Referer correto
-// Render não tem limite de 60s como Vercel e não usa url.parse()
-// Se o CDN bloquear, o log do Render mostra o erro exacto
+const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
+
+// Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 const proxyUrl = (url) =>
-  `${AF2}?action=stream&url=${encodeURIComponent(url)}`
+  `/api/proxy?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -146,22 +146,6 @@ const resolveSlug = async (anime, dub = false) => {
     const found = await probeSlug(slug, isMovie)
     if (found) { console.log('[AnimeFire] ✅', slug); return found }
   }
-
-  // CF Worker falhou em todos — tenta Render /af-info como fallback
-  console.log('[AnimeFire] CF Worker sem resultado, tentando Render...')
-  for (const slug of candidates) {
-    try {
-      const r = await fetch(
-        `${RENDER_PROXY}/af-info?slug=${encodeURIComponent(slug)}`,
-        { signal: AbortSignal.timeout(20000) }
-      )
-      if (r.ok) {
-        const d = await r.json()
-        if (d.exists) { console.log('[AnimeFire] ✅ (Render)', slug); return slug }
-      }
-    } catch { /* tenta próximo */ }
-  }
-
   throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
@@ -301,41 +285,36 @@ export default function WatchPage() {
 
       setStatus(`📡 Carregando EP${ep}...`)
 
-      // 1ª tentativa: CF Worker busca as fontes (rápido, funciona bem)
-      // Render faz o stream via /video-proxy (mesmo IP que o Worker usou → sem 401)
+      // ── Fonte principal: Render /af-sources ──────────────────
       let srcs = []
       try {
-        const cfData = await afFetch({ action: 'video', slug, ep })
-        srcs = cfData.sources || []
-        console.log('[CF Worker] fontes:', srcs.length)
-      } catch (cfErr) {
-        console.warn('[CF Worker] falhou:', cfErr.message)
+        setStatus('📡 Buscando fontes (Render)...')
+        const renderRes = await fetch(
+          `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
+          { signal: AbortSignal.timeout(30000) }
+        )
+        const renderData = await renderRes.json()
+        srcs = renderData.sources || []
+        console.log('[Render af-sources] fontes:', srcs.length, srcs.map(s => s.label))
+      } catch (renderErr) {
+        console.warn('[Render af-sources] falhou:', renderErr.message)
       }
 
-      // 2ª tentativa: Render /af-sources (IP diferente, mas tenta mesmo assim)
+      // ── Fallback: CF Worker ───────────────────────────────────
       if (!srcs.length) {
         try {
-          setStatus('🔄 Buscando fontes via Render...')
-          const renderRes = await fetch(
-            `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
-            { signal: AbortSignal.timeout(30000) }
-          )
-          const renderData = await renderRes.json()
-          srcs = renderData.sources || []
-          console.log('[Render af-sources] fontes:', srcs.length)
-        } catch (renderErr) {
-          console.warn('[Render af-sources] falhou:', renderErr.message)
+          setStatus('🔄 Buscando fontes (Worker)...')
+          const data = await afFetch({ action: 'video', slug, ep })
+          srcs = data.sources || []
+          console.log('[CF Worker] fontes:', srcs.length)
+        } catch (cfErr) {
+          console.warn('[CF Worker] falhou:', cfErr.message)
         }
       }
 
       if (!srcs.length) throw new Error(`EP${ep} sem fontes (slug: ${slug})`)
 
-      // AF2 Worker faz o stream com o mesmo IP que buscou o token → sem 401
-      const proxiedSrcs = srcs.map(s => ({
-        ...s,
-        url: proxyUrl(s.url),   // AF2 stream (mesmo IP do Worker)
-        directUrl: s.url,
-      }))
+      const proxiedSrcs = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
       setSources(proxiedSrcs)
       const best = bestQuality(proxiedSrcs)
       setCurrentSrc(best?.url || '')
@@ -344,34 +323,18 @@ export default function WatchPage() {
     } catch (e) {
       console.warn('[AnimeFire] falhou, tentando fontes alternativas...', e.message)
 
-      // ── Fallback 0-A: AnimeFire embed direto (iframe) ─────────
-      // Mais completo + URL muda com dub/leg permitindo troca
-      try {
-        const overrides = await loadOverrides()
-        const ov = overrides[String(animeObj.mal_id)]
-        // Pega slug do override ou do que já foi resolvido
-        const afOvSlug = ov
-          ? ((dub && ov.dub) ? ov.dub : ov.leg)
-          : null
-        const afEmbedSlug = afOvSlug || slug // slug pode estar definido do try anterior
-        if (afEmbedSlug) {
-          // Roteia pelo Render para remover X-Frame-Options do AnimeFire
-          const afEmbedUrl = `${RENDER_PROXY}/af/${afEmbedSlug}/${ep}`
-          console.log('[AnimeFire embed via Render]', afEmbedUrl)
-          setCurrentSrc('__embed__')
-          setErrorMsg(afEmbedUrl)
-          setStatus(`✅ AnimeFire ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — EP${ep}`)
-          setLoading(false); return
-        }
-      } catch (afEmbedErr) {
-        console.warn('[af-embed]', afEmbedErr.message)
-      }
-
-      // ── Fallback 0-B: embed direto meusanimes / goyabu ────────
+      // ── Fallback 0: embed direto meusanimes / goyabu ───────────
+      // Esses sites usam player JS — extracção por regex não funciona.
+      // Usa o slug/ID exato do slug-overrides e carrega em iframe proxy.
       try {
         const overrides  = await loadOverrides()
         const ov         = overrides[String(animeObj.mal_id)]
         const PROXY_BASE = 'https://animesfontes-proxy.onrender.com'
+
+        // ── meusanimes.blog ──────────────────────────────────────
+        // Padrão URL: meusanimes.blog/e/{base}-episodio-{ep}/
+        // Override guarda o slug BASE (sem -episodio-N)
+        // Ex: "akame-ga-kill-dublado-1" → /e/akame-ga-kill-dublado-1-episodio-1/
         const maOv = ov?.sources?.meusanimes
         if (maOv) {
           const maBase = (dub ? maOv.dub : maOv.leg) || maOv.any
@@ -384,11 +347,15 @@ export default function WatchPage() {
             setLoading(false); return
           }
         }
+
+        // ── goyabu.io ────────────────────────────────────────────
+        // Override guarda o id numérico (ou array ids[] por episódio)
         const gyOv = ov?.sources?.goyabu
         if (gyOv) {
           const gyId = gyOv.ids
             ? (gyOv.ids[ep - 1] || gyOv.ids[0])
             : (gyOv.id || (dub ? gyOv.dub : gyOv.leg) || gyOv.any)
+
           if (gyId) {
             const embedUrl = `${PROXY_BASE}/gy/${gyId}`
             setCurrentSrc('__embed__')
@@ -397,23 +364,8 @@ export default function WatchPage() {
             setLoading(false); return
           }
         }
-
-        // AniZero — usa ID numérico do episódio (ex: sources.anizero.ids: [32724, 32725])
-        const azOv = ov?.sources?.anizero
-        if (azOv) {
-          const azId = azOv.ids
-            ? (azOv.ids[ep - 1] || azOv.ids[0])
-            : azOv.id
-          if (azId) {
-            const embedUrl = `${PROXY_BASE}/az/${azId}`
-            setCurrentSrc('__embed__')
-            setErrorMsg(embedUrl)
-            setStatus(`✅ AniZero — EP${ep}`)
-            setLoading(false); return
-          }
-        }
       } catch (ovErr) {
-        console.warn('[fallback0]', ovErr.message)
+        console.warn('[fallback0 meusanimes/goyabu]', ovErr.message)
       }
 
       // ── Fallback 1: animesonlinecc.to via Worker ──
@@ -447,7 +399,7 @@ export default function WatchPage() {
 
         if (ccData.pageUrl) {
           setCurrentSrc('__embed__')
-          setErrorMsg(ccData.pageUrl)
+          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(ccData.pageUrl)}`)
           setStatus('✅ animesonlinecc (página)')
           setLoading(false)
           return
@@ -470,7 +422,10 @@ export default function WatchPage() {
             const isEmbed = !ccData2.sources?.length
             setSources(ccData2.sources || [])
             setCurrentSrc(isEmbed ? '__embed__' : src)
-            if (isEmbed) setErrorMsg(ccData2.iframe || ccData2.pageUrl)
+            if (isEmbed) setErrorMsg(
+              ccData2.iframe ||
+              `https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(ccData2.pageUrl)}`
+            )
             setStatus(`✅ animesonlinecc (JP) — Auto`)
             setLoading(false)
             return
@@ -500,19 +455,14 @@ export default function WatchPage() {
         }
         if (hdData.iframe) {
           setCurrentSrc('__embed__')
-          setErrorMsg(hdData.iframe)
+          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(hdData.iframe)}`)
           setStatus('✅ animesonline.cloud (embed)')
           setLoading(false)
           return
         }
         if (hdData.pageUrl) {
-          // Roteia pelo Render para remover X-Frame-Options
-          const aocMatch = hdData.pageUrl.match(/animesonline\.cloud\/episodio\/([^/]+)-episodio-(\d+)/)
-          const aocUrl = aocMatch
-            ? `${RENDER_PROXY}/asc/${aocMatch[1]}/${aocMatch[2]}`
-            : hdData.pageUrl
           setCurrentSrc('__embed__')
-          setErrorMsg(aocUrl)
+          setErrorMsg(`https://animesfontes-proxy.onrender.com/res?url=${encodeURIComponent(hdData.pageUrl)}`)
           setStatus('✅ animesonline.cloud (página)')
           setLoading(false)
           return
@@ -521,35 +471,40 @@ export default function WatchPage() {
         console.warn('[animesonlinecloud]', hdErr.message)
       }
 
-      // ── Fallback 4: animesfontes-proxy.onrender.com ──────────
+      // ── Fallback 4: animesfontes-proxy.onrender.com ───────────
       try {
         const titleQuery = animeObj.title_english || animeObj.title
         setStatus('🔄 Tentando AnimeFontes...')
+
         const afontesRes = await fetch(
           `https://animesfontes-proxy.onrender.com/episode` +
           `?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
           { signal: AbortSignal.timeout(30000) }
         )
         const afontesData = await afontesRes.json()
+
         if (afontesData.sources?.length) {
           const mp4s = afontesData.sources.filter(s => !s.isM3U8)
           const best = bestQuality(mp4s.length ? mp4s : afontesData.sources)
           setSources(afontesData.sources)
           setCurrentSrc(best?.url || afontesData.sources[0].url)
           setStatus(`✅ AnimeFontes — ${best?.label || 'Auto'}`)
-          setLoading(false); return
+          setLoading(false)
+          return
         }
         if (afontesData.iframe) {
           setCurrentSrc('__embed__')
           setErrorMsg(afontesData.iframe)
           setStatus('✅ AnimeFontes (embed)')
-          setLoading(false); return
+          setLoading(false)
+          return
         }
         if (afontesData.pageUrl) {
           setCurrentSrc('__embed__')
           setErrorMsg(afontesData.pageUrl)
           setStatus('✅ AnimeFontes (página)')
-          setLoading(false); return
+          setLoading(false)
+          return
         }
       } catch (afErr) {
         console.warn('[animesfontes]', afErr.message)
@@ -659,6 +614,17 @@ export default function WatchPage() {
                 </div>
               </div>
             ) : currentSrc === '__embed__' ? (
+              // Embed: exibe a página do site externo em iframe (player JS funciona)
+              <iframe
+                key={errorMsg}
+                src={errorMsg}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-presentation"
+                title={`${title} EP${epNum}`}
+              />
+            ) : currentSrc === '__embed__' ? (
               <iframe
                 key={errorMsg}
                 src={errorMsg}
@@ -715,11 +681,15 @@ export default function WatchPage() {
             {sources.length > 1 && (
               <div className="quality-wrap">
                 <span>📺</span>
-                <select className="quality-select" value={currentSrc} onChange={e => setCurrentSrc(e.target.value)}>
-                  {sources.map(s => (
-                    <option key={s.url} value={s.url}>{s.label || 'Auto'}</option>
-                  ))}
-                </select>
+                {sources.map((s, i) => (
+                  <button
+                    key={s.url}
+                    className={`track-btn${currentSrc === s.url ? ' active' : ''}`}
+                    onClick={() => setCurrentSrc(s.url)}
+                  >
+                    {s.label || `Fonte ${i + 1}`}
+                  </button>
+                ))}
               </div>
             )}
             {afSlug && !loading && !error && (
