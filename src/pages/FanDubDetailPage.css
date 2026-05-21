@@ -29,6 +29,7 @@
 
 .fddetail-iframe-wrap { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; background: #000; border-radius: 12px; overflow: hidden; }
 .fddetail-iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; display: block; }
+.fddetail-open-btn { display: block; text-align: center; margin: 8px 0 0; padding: 10px 16px; background: var(--card2,#161616); border: 1px solid var(--border,#222); border-radius: 10px; color: var(--accent,#e63946); font-size: .85rem; font-weight: 600; text-decoration: none; }
 
 /* Navegação eps */
 .fddetail-ep-nav { display: flex; align-items: center; justify-content: space-between; background: var(--card,#111); border-radius: 12px; padding: 10px 16px; border: 1px solid var(--border,#222); }

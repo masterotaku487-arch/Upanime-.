@@ -183,6 +183,24 @@ export default function FanDubDetailPage() {
             />
           </div>
 
+          {/* Fallback: abrir no app */}
+          {(() => {
+            const rawUrl = epData?.url || fanDub.embedUrl || ''
+            const m = rawUrl.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+            const fileId = m ? m[1] : null
+            if (!fileId) return null
+            return (
+              <a
+                href={`https://drive.google.com/file/d/${fileId}/view`}
+                target="_blank"
+                rel="noreferrer"
+                className="fddetail-open-btn"
+              >
+                📱 Não carregou? Abrir no app
+              </a>
+            )
+          })()}
+
           {/* Navegação de episódios */}
           {totalEps > 1 && (
             <div className="fddetail-ep-nav">
