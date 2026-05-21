@@ -162,18 +162,28 @@ export default function FanDubDetailPage() {
           </div>
 
           {/* iframe */}
-          <div
-            id="fandub-iframe-wrap"
-            className="fddetail-iframe-wrap"
-            onClick={() => {
-              const el = document.getElementById('fandub-iframe-wrap')
-              const fsEl = el || document.documentElement
-              if (!document.fullscreenElement) {
+          <div id="fandub-iframe-wrap" className="fddetail-iframe-wrap">
+            <iframe
+              id="fandub-iframe"
+              className="fddetail-iframe"
+              src={embedUrl}
+              allowFullScreen
+              webkitallowfullscreen="true"
+              mozallowfullscreen="true"
+              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            {/* Overlay transparente: captura o 1º clique, abre fullscreen e some */}
+            <div
+              className="fddetail-iframe-overlay"
+              onClick={(e) => {
+                e.currentTarget.style.display = 'none'
+                const el = document.getElementById('fandub-iframe-wrap')
+                const fsEl = el || document.documentElement
                 ;(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen || fsEl.mozRequestFullScreen)?.call(fsEl)
                 setFullscreen(true)
-              }
-            }}
-          >
+              }}
+            />
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
