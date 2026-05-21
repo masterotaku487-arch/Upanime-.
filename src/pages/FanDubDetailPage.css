@@ -27,8 +27,8 @@
 .fddetail-ep-titulo { font-size: .85rem; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fddetail-fs-btn { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; background: var(--card,#111); border: 1px solid var(--border,#222); color: var(--text,#f0f0f0); font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 
-.fddetail-iframe-wrap { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; background: #000; border-radius: 12px; overflow: hidden; }
-.fddetail-iframe { position: absolute; top: -46px; left: 0; width: 100%; height: calc(100% + 92px); border: none; display: block; }
+.fddetail-iframe-wrap { position: relative; width: 100%; padding-bottom: 62%; height: 0; background: #000; border-radius: 12px; overflow: hidden; }
+.fddetail-iframe { position: absolute; top: -38px; left: 0; width: 100%; height: calc(100% + 38px); border: none; display: block; }
 .fddetail-open-btn { display: block; text-align: center; margin: 8px 0 0; padding: 10px 16px; background: var(--card2,#161616); border: 1px solid var(--border,#222); border-radius: 10px; color: var(--accent,#e63946); font-size: .85rem; font-weight: 600; text-decoration: none; }
 
 /* Navegação eps */
