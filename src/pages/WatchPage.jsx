@@ -283,27 +283,26 @@ export default function WatchPage() {
         setAfSlug(slug)
       }
 
-      setStatus(`📡 Carregando EP${ep}...`)
+      setStatus(`📡 Buscando fontes...`)
 
       // ── Fonte principal: Render /af-sources ──────────────────
       let srcs = []
       try {
-        setStatus('📡 Buscando fontes (Render)...')
         const renderRes = await fetch(
           `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
-          { signal: AbortSignal.timeout(30000) }
+          { signal: AbortSignal.timeout(35000) }
         )
         const renderData = await renderRes.json()
         srcs = renderData.sources || []
-        console.log('[Render af-sources] fontes:', srcs.length, srcs.map(s => s.label))
+        console.log('[Render] fontes:', srcs.length, srcs.map(s => s.label))
       } catch (renderErr) {
-        console.warn('[Render af-sources] falhou:', renderErr.message)
+        console.warn('[Render] falhou:', renderErr.message)
       }
 
       // ── Fallback: CF Worker ───────────────────────────────────
       if (!srcs.length) {
         try {
-          setStatus('🔄 Buscando fontes (Worker)...')
+          setStatus('🔄 Tentando fonte alternativa...')
           const data = await afFetch({ action: 'video', slug, ep })
           srcs = data.sources || []
           console.log('[CF Worker] fontes:', srcs.length)
