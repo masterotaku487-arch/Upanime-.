@@ -162,7 +162,18 @@ export default function FanDubDetailPage() {
           </div>
 
           {/* iframe */}
-          <div id="fandub-iframe-wrap" className="fddetail-iframe-wrap">
+          <div
+            id="fandub-iframe-wrap"
+            className="fddetail-iframe-wrap"
+            onClick={() => {
+              const el = document.getElementById('fandub-iframe-wrap')
+              const fsEl = el || document.documentElement
+              if (!document.fullscreenElement) {
+                ;(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen || fsEl.mozRequestFullScreen)?.call(fsEl)
+                setFullscreen(true)
+              }
+            }}
+          >
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
