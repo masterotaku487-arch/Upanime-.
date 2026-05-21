@@ -94,18 +94,10 @@ export default function FanDubDetailPage() {
     const el = document.getElementById('fandub-iframe-wrap')
     const fsEl = el || document.documentElement
     if (!document.fullscreenElement) {
-      const req = fsEl.requestFullscreen
-        || fsEl.webkitRequestFullscreen
-        || fsEl.mozRequestFullScreen
-        || fsEl.msRequestFullscreen
-      req?.call(fsEl)
+      ;(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen || fsEl.mozRequestFullScreen)?.call(fsEl)
       setFullscreen(true)
     } else {
-      const exit = document.exitFullscreen
-        || document.webkitExitFullscreen
-        || document.mozCancelFullScreen
-        || document.msExitFullscreen
-      exit?.call(document)
+      ;(document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen)?.call(document)
       setFullscreen(false)
     }
   }
@@ -190,12 +182,8 @@ export default function FanDubDetailPage() {
             const fileId = m ? m[1] : null
             if (!fileId) return null
             return (
-              <a
-                href={`https://drive.google.com/file/d/${fileId}/view`}
-                target="_blank"
-                rel="noreferrer"
-                className="fddetail-open-btn"
-              >
+              <a href={`https://drive.google.com/file/d/${fileId}/view`}
+                target="_blank" rel="noreferrer" className="fddetail-open-btn">
                 📱 Não carregou? Abrir no app
               </a>
             )
