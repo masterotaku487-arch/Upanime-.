@@ -165,7 +165,7 @@ export default function FanDubDetailPage() {
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
-              src={embedUrl}
+              src={`${embedUrl}#toolbar=0`}
               allowFullScreen
             />
           </div>
