@@ -27,8 +27,11 @@
 .fddetail-ep-titulo { font-size: .85rem; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fddetail-fs-btn { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; background: var(--card,#111); border: 1px solid var(--border,#222); color: var(--text,#f0f0f0); font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 
-.fddetail-iframe-wrap { width: 100%; }
+.fddetail-iframe-wrap { width: 100%; background: #000; border-radius: 12px; overflow: hidden; }
 .fddetail-iframe { width: 100%; aspect-ratio: 16/9; border: none; border-radius: 12px; display: block; }
+.fddetail-video-loading { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; color: #888; font-size: .9rem; }
+.fddetail-video-err { width: 100%; aspect-ratio: 16/9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #888; font-size: .9rem; }
+.fddetail-video-err a { color: #e63946; font-weight: 600; text-decoration: none; }
 
 /* Navegação eps */
 .fddetail-ep-nav { display: flex; align-items: center; justify-content: space-between; background: var(--card,#111); border-radius: 12px; padding: 10px 16px; border: 1px solid var(--border,#222); }
