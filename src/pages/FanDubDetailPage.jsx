@@ -75,7 +75,7 @@ export default function FanDubDetailPage() {
     if (!fileId) return
     setVideoSrc(null)
     setVideoErr(false)
-    fetch(`${API}/api/drive-src?id=${fileId}`)
+    fetch(`https://fan-proxy.masterotaku487.workers.dev/drive-src?id=${fileId}`)
       .then(r => r.json())
       .then(d => {
         if (d.sources?.length) setVideoSrc(d.sources[0].url)
