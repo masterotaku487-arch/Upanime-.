@@ -8,10 +8,10 @@ const API = 'https://studio-proxy.masterotaku487.workers.dev'
 function driveToEmbed(url) {
   if (!url) return url
   const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (matchFile) return matchFile[1]
+  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
   const matchOpen = url.match(/[?&]id=([^&]+)/)
-  if (matchOpen) return matchOpen[1]
-  return null
+  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
+  return url
 }
 
 function discordUrl(raw) {
@@ -31,8 +31,6 @@ export default function FanDubDetailPage() {
   const [loading,   setLoading]   = useState(true)
   const [tab,       setTab]       = useState('assistir')
   const [fullscreen, setFullscreen] = useState(false)
-  const [videoSrc,  setVideoSrc]  = useState(null)
-  const [videoErr,  setVideoErr]  = useState(false)
 
   // Carrega o fan-dub
   useEffect(() => {
@@ -69,20 +67,7 @@ export default function FanDubDetailPage() {
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
 
   const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
-  const fileId = driveToEmbed(epData?.url || fanDub?.embedUrl)
-
-  useEffect(() => {
-    if (!fileId) return
-    setVideoSrc(null)
-    setVideoErr(false)
-    fetch(`https://fan-proxy.masterotaku487.workers.dev/drive-src?id=${fileId}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.sources?.length) setVideoSrc(d.sources[0].url)
-        else setVideoErr(true)
-      })
-      .catch(() => setVideoErr(true))
-  }, [fileId])
+  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
   const totalEps = episodios.length
 
   const goEp = (n) => setSp({ ep: n })
@@ -175,27 +160,16 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* Player de vídeo direto */}
+          {/* iframe */}
           <div className="fddetail-iframe-wrap">
-            {videoSrc ? (
-              <video
-                key={videoSrc}
-                className="fddetail-iframe"
-                src={videoSrc}
-                controls
-                autoPlay
-                playsInline
-                onError={() => setVideoErr(true)}
-              />
-            ) : videoErr ? (
-              <div className="fddetail-video-err">
-                <p>⚠️ Não foi possível carregar o vídeo</p>
-                <a href={`https://drive.google.com/file/d/${fileId}/view`}
-                   target="_blank" rel="noreferrer">📱 Abrir no Drive</a>
-              </div>
-            ) : (
-              <div className="fddetail-video-loading">⏳ Carregando vídeo...</div>
-            )}
+            <iframe
+              id="fandub-iframe"
+              className="fddetail-iframe"
+              src={embedUrl}
+              allowFullScreen
+              allow="autoplay; fullscreen; encrypted-media"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
 
           {/* Navegação de episódios */}
