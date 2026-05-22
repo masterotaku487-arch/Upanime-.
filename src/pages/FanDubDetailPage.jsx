@@ -5,13 +5,13 @@ import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-function driveToEmbed(url) {
-  if (!url) return url
-  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
+function driveToSrc(url) {
+  if (!url) return null
+  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
+  if (matchFile) return `https://drive.google.com/uc?export=download&id=${matchFile[1]}&confirm=t`
   const matchOpen = url.match(/[?&]id=([^&]+)/)
-  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
-  return url
+  if (matchOpen) return `https://drive.google.com/uc?export=download&id=${matchOpen[1]}&confirm=t`
+  return null
 }
 
 function discordUrl(raw) {
@@ -66,8 +66,9 @@ export default function FanDubDetailPage() {
     ? fanDub.listaEpisodios
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
 
-  const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
-  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
+  const epData  = episodios.find(e => e.ep === epAtual) || episodios[0]
+  const videoSrc = driveToSrc(epData?.url || fanDub.embedUrl)
+  const fileId   = videoSrc?.match(/id=([^&]+)/)?.[1]
   const totalEps = episodios.length
 
   const goEp = (n) => setSp({ ep: n })
@@ -160,16 +161,24 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* iframe */}
+          {/* Player nativo — URL direta do Drive */}
           <div className="fddetail-iframe-wrap">
-            <iframe
-              id="fandub-iframe"
-              className="fddetail-iframe"
-              src={embedUrl}
-              allowFullScreen
-              allow="autoplay; fullscreen; encrypted-media"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            {videoSrc ? (
+              <video
+                key={videoSrc}
+                className="fddetail-iframe"
+                src={videoSrc}
+                controls
+                autoPlay
+                playsInline
+                onError={() => {
+                  // fallback: abre no Drive se não carregar
+                  if (fileId) window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank')
+                }}
+              />
+            ) : (
+              <div className="fddetail-video-loading">⏳ Carregando...</div>
+            )}
           </div>
 
           {/* Navegação de episódios */}
