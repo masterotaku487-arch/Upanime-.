@@ -167,8 +167,6 @@ export default function FanDubDetailPage() {
               className="fddetail-iframe"
               src={embedUrl}
               allowFullScreen
-              allow="autoplay; fullscreen; encrypted-media"
-              referrerPolicy="no-referrer-when-downgrade"
             />
           </div>
 
