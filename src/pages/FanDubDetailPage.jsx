@@ -90,6 +90,27 @@ export default function FanDubDetailPage() {
     }, 2000)
   }
 
+  const openInPlayer = (player) => {
+    const rawUrl = epData?.url || fanDub.embedUrl || ''
+    const m = rawUrl.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
+    const fileId = m ? m[1] : null
+    const videoUrl = fileId
+      ? `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`
+      : rawUrl
+
+    if (player === 'mx') {
+      window.location.href = `intent:${videoUrl}#Intent;package=com.mxtech.videoplayer.ad;end`
+      setTimeout(() => {
+        if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.mxtech.videoplayer.ad', '_blank')
+      }, 2000)
+    } else if (player === 'vlc') {
+      window.location.href = `vlc://${videoUrl}`
+      setTimeout(() => {
+        if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=org.videolan.vlc', '_blank')
+      }, 2000)
+    }
+  }
+
   const toggleFS = () => {
     const el = document.getElementById('fandub-iframe')
     if (!document.fullscreenElement) {
@@ -199,6 +220,12 @@ export default function FanDubDetailPage() {
             </button>
             <button className="fddetail-acao-btn" onClick={toggleFS}>
               ⛶ <span>Tela cheia</span>
+            </button>
+            <button className="fddetail-acao-btn" onClick={() => openInPlayer('mx')}>
+              🎬 <span>MX Player</span>
+            </button>
+            <button className="fddetail-acao-btn" onClick={() => openInPlayer('vlc')}>
+              🔺 <span>VLC</span>
             </button>
           </div>
 
