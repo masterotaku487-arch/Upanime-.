@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Comments from '../components/Comments'
+import '@vidstack/react/player/styles/default/theme.css'
+import '@vidstack/react/player/styles/default/layouts/video.css'
+import { MediaPlayer, MediaProvider } from '@vidstack/react'
+import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default'
 import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-function driveToEmbed(url) {
-  if (!url) return url
-  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
-  const matchOpen = url.match(/[?&]id=([^&]+)/)
-  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
+function driveToSrc(url) {
+  if (!url) return null
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
+  if (m) return `https://drive.usercontent.google.com/download?id=${m[1]}&export=download&confirm=t`
+  const m2 = url.match(/[?&]id=([^&]+)/)
+  if (m2) return `https://drive.usercontent.google.com/download?id=${m2[1]}&export=download&confirm=t`
   return url
 }
 
@@ -67,7 +71,7 @@ export default function FanDubDetailPage() {
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
 
   const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
-  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
+  const videoSrc = driveToSrc(epData?.url || fanDub.embedUrl)
   const totalEps = episodios.length
 
   const goEp = (n) => setSp({ ep: n })
@@ -88,27 +92,6 @@ export default function FanDubDetailPage() {
     setTimeout(() => {
       if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo', '_blank')
     }, 2000)
-  }
-
-  const openInPlayer = (player) => {
-    const rawUrl = epData?.url || fanDub.embedUrl || ''
-    const m = rawUrl.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-    const fileId = m ? m[1] : null
-    const videoUrl = fileId
-      ? `https://drive.google.com/file/d/${fileId}/preview`
-      : rawUrl
-
-    if (player === 'mx') {
-      window.location.href = `intent:${videoUrl}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(fanDub.titulo || '')};end`
-      setTimeout(() => {
-        if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.mxtech.videoplayer.ad', '_blank')
-      }, 2000)
-    } else if (player === 'vlc') {
-      window.location.href = `intent:${videoUrl}#Intent;package=org.videolan.vlc;end`
-      setTimeout(() => {
-        if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=org.videolan.vlc', '_blank')
-      }, 2000)
-    }
   }
 
   const toggleFS = () => {
@@ -181,16 +164,22 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* iframe */}
+          {/* Vidstack Player */}
           <div className="fddetail-iframe-wrap">
-            <iframe
-              id="fandub-iframe"
-              className="fddetail-iframe"
-              src={embedUrl}
-              allowFullScreen
-              allow="autoplay; fullscreen; encrypted-media"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            {videoSrc ? (
+              <MediaPlayer
+                src={videoSrc}
+                title={epData?.titulo || fanDub.titulo}
+                className="fddetail-iframe"
+                crossOrigin
+                playsInline
+              >
+                <MediaProvider />
+                <DefaultVideoLayout icons={defaultLayoutIcons} />
+              </MediaPlayer>
+            ) : (
+              <div className="fddetail-video-loading">⏳ Carregando...</div>
+            )}
           </div>
 
           {/* Navegação de episódios */}
@@ -220,12 +209,6 @@ export default function FanDubDetailPage() {
             </button>
             <button className="fddetail-acao-btn" onClick={toggleFS}>
               ⛶ <span>Tela cheia</span>
-            </button>
-            <button className="fddetail-acao-btn" onClick={() => openInPlayer('mx')}>
-              🎬 <span>MX Player</span>
-            </button>
-            <button className="fddetail-acao-btn" onClick={() => openInPlayer('vlc')}>
-              🔺 <span>VLC</span>
             </button>
           </div>
 
