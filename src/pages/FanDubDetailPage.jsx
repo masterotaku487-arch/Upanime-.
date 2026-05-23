@@ -160,32 +160,16 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* iframe + overlay bloqueando UI do Drive */}
+          {/* iframe */}
           <div className="fddetail-iframe-wrap">
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
               src={embedUrl}
+              allowFullScreen
               allow="autoplay; fullscreen; encrypted-media"
               referrerPolicy="no-referrer-when-downgrade"
             />
-            {/* Overlay bloqueia cliques na UI do Drive */}
-            <div className="fddetail-overlay" onClick={() => {
-              const iframe = document.getElementById('fandub-iframe')
-              // envia espaço pro iframe para play/pause
-              iframe?.contentWindow?.postMessage('playPause', '*')
-              // tenta via click no centro
-              const ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
-              iframe?.dispatchEvent(ev)
-            }} />
-            {/* Nossos controles */}
-            <div className="fddetail-controls">
-              <button className="fddetail-ctrl-btn" onClick={() => {
-                const iframe = document.getElementById('fandub-iframe')
-                iframe?.contentWindow?.postMessage(' ', '*')
-              }}>▶ / ⏸</button>
-              <button className="fddetail-ctrl-btn" onClick={toggleFS}>⛶ Tela cheia</button>
-            </div>
           </div>
 
           {/* Navegação de episódios */}
