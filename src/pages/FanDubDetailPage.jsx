@@ -112,15 +112,23 @@ export default function FanDubDetailPage() {
   }
 
   const toggleFS = () => {
-    const el = document.getElementById('fandub-iframe')
+    const el = document.getElementById('fandub-iframe-wrap')
+    const fsEl = el || document.documentElement
     if (!document.fullscreenElement) {
-      el?.requestFullscreen?.()
+      ;(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen || fsEl.mozRequestFullScreen)?.call(fsEl)
       setFullscreen(true)
     } else {
-      document.exitFullscreen?.()
+      ;(document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen)?.call(document)
       setFullscreen(false)
     }
   }
+
+  // Modo cinema (desktop) — esconde tudo exceto o vídeo
+  const [cinema, setCinema] = useState(false)
+  useEffect(() => {
+    document.body.classList.toggle('fddetail-cinema-mode', cinema)
+    return () => document.body.classList.remove('fddetail-cinema-mode')
+  }, [cinema])
 
   const discord = discordUrl(studioData?.discord)
 
@@ -182,15 +190,25 @@ export default function FanDubDetailPage() {
           </div>
 
           {/* iframe */}
-          <div className="fddetail-iframe-wrap">
-            <iframe
-              id="fandub-iframe"
-              className="fddetail-iframe"
-              src={embedUrl}
-              allowFullScreen
-              allow="autoplay; fullscreen; encrypted-media"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+          <div className={`fddetail-cinema-wrap${cinema ? ' active' : ''}`}>
+            {cinema && (
+              <button className="fddetail-cinema-exit" onClick={() => setCinema(false)}>✕ Sair</button>
+            )}
+            <div id="fandub-iframe-wrap" className="fddetail-iframe-wrap">
+              <iframe
+                id="fandub-iframe"
+                className="fddetail-iframe"
+                src={embedUrl}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+            {!cinema && (
+              <button className="fddetail-cinema-btn" onClick={() => setCinema(true)}>
+                🖥️ Modo cinema
+              </button>
+            )}
           </div>
 
           {/* Navegação de episódios */}
