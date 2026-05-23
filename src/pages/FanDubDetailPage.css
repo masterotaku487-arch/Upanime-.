@@ -82,14 +82,3 @@
 .fddetail-acoes::-webkit-scrollbar { display:none; }
 .fddetail-acao-btn { flex-shrink:0; display:flex; align-items:center; gap:5px; padding:8px 14px; border-radius:100px; background:var(--card,#111); border:1px solid var(--border,#222); color:var(--text,#f0f0f0); font-size:.8rem; font-weight:700; cursor:pointer; transition:all .15s; white-space:nowrap; }
 .fddetail-acao-btn:active { border-color:var(--yellow,#FFD600); color:var(--yellow,#FFD600); }
-
-/* Modo cinema */
-.fddetail-cinema-wrap { position: relative; width: 100%; }
-.fddetail-cinema-btn { display: none; }
-@media (min-width: 768px) {
-  .fddetail-cinema-btn { display: block; margin: 8px 0 0; padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border,#222); background: var(--card,#111); color: var(--text,#f0f0f0); font-size: .82rem; cursor: pointer; }
-  .fddetail-cinema-wrap.active { position: fixed; inset: 0; z-index: 9999; background: #000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-  .fddetail-cinema-wrap.active .fddetail-iframe-wrap { width: 90vw; max-width: 1400px; aspect-ratio: 16/9; }
-  .fddetail-cinema-exit { position: fixed; top: 16px; right: 16px; z-index: 10000; padding: 8px 16px; border-radius: 8px; border: none; background: rgba(255,255,255,0.15); color: #fff; font-size: .9rem; cursor: pointer; backdrop-filter: blur(4px); }
-  body.fddetail-cinema-mode { overflow: hidden; }
-}
