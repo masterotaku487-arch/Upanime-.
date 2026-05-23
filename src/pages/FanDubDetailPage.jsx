@@ -5,17 +5,12 @@ import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-function toEmbedUrl(url) {
-  if (!url) return null
-  // Streamable → usa iframe embed
-  const sm = url.match(/streamable\.com\/([a-z0-9]+)/)
-  if (sm) return `https://streamable.com/e/${sm[1]}`
-  // Drive → usa /preview normal
-  const df = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (df) return `https://drive.google.com/file/d/${df[1]}/preview`
-  const do_ = url.match(/[?&]id=([^&]+)/)
-  if (do_) return `https://drive.google.com/file/d/${do_[1]}/preview`
-  // URL direta
+function driveToEmbed(url) {
+  if (!url) return url
+  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
+  const matchOpen = url.match(/[?&]id=([^&]+)/)
+  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
   return url
 }
 
@@ -72,7 +67,7 @@ export default function FanDubDetailPage() {
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
 
   const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
-  const embedUrl = toEmbedUrl(epData?.url || fanDub.embedUrl)
+  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
   const totalEps = episodios.length
 
   const goEp = (n) => setSp({ ep: n })
@@ -165,16 +160,32 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* iframe */}
+          {/* iframe + overlay bloqueando UI do Drive */}
           <div className="fddetail-iframe-wrap">
             <iframe
               id="fandub-iframe"
               className="fddetail-iframe"
               src={embedUrl}
-              allowFullScreen
               allow="autoplay; fullscreen; encrypted-media"
               referrerPolicy="no-referrer-when-downgrade"
             />
+            {/* Overlay bloqueia cliques na UI do Drive */}
+            <div className="fddetail-overlay" onClick={() => {
+              const iframe = document.getElementById('fandub-iframe')
+              // envia espaço pro iframe para play/pause
+              iframe?.contentWindow?.postMessage('playPause', '*')
+              // tenta via click no centro
+              const ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
+              iframe?.dispatchEvent(ev)
+            }} />
+            {/* Nossos controles */}
+            <div className="fddetail-controls">
+              <button className="fddetail-ctrl-btn" onClick={() => {
+                const iframe = document.getElementById('fandub-iframe')
+                iframe?.contentWindow?.postMessage(' ', '*')
+              }}>▶ / ⏸</button>
+              <button className="fddetail-ctrl-btn" onClick={toggleFS}>⛶ Tela cheia</button>
+            </div>
           </div>
 
           {/* Navegação de episódios */}
