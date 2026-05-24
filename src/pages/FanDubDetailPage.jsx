@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Comments from '../components/Comments'
-import '@vidstack/react/player/styles/default/theme.css'
-import '@vidstack/react/player/styles/default/layouts/video.css'
-import { MediaPlayer, MediaProvider } from '@vidstack/react'
-import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default'
 import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-const FAN_PROXY = 'https://fan-proxy.masterotaku487.workers.dev'
-
-function driveToSrc(url) {
-  if (!url) return null
-  const m = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m) return `${FAN_PROXY}/stream?id=${m[1]}`
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return `${FAN_PROXY}/stream?id=${m2[1]}`
+function driveToEmbed(url) {
+  if (!url) return url
+  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
+  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
+  const matchOpen = url.match(/[?&]id=([^&]+)/)
+  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
   return url
 }
 
@@ -73,7 +67,7 @@ export default function FanDubDetailPage() {
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
 
   const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
-  const videoSrc = driveToSrc(epData?.url || fanDub.embedUrl)
+  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
   const totalEps = episodios.length
 
   const goEp = (n) => setSp({ ep: n })
@@ -166,22 +160,16 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* Vidstack Player via fan-proxy */}
+          {/* iframe */}
           <div className="fddetail-iframe-wrap">
-            {videoSrc ? (
-              <MediaPlayer
-                src={videoSrc}
-                title={epData?.titulo || fanDub.titulo}
-                className="fddetail-iframe"
-                playsInline
-                crossOrigin
-              >
-                <MediaProvider />
-                <DefaultVideoLayout icons={defaultLayoutIcons} />
-              </MediaPlayer>
-            ) : (
-              <div className="fddetail-video-loading">⏳ Carregando...</div>
-            )}
+            <iframe
+              id="fandub-iframe"
+              className="fddetail-iframe"
+              src={embedUrl}
+              allowFullScreen
+              allow="autoplay; fullscreen; encrypted-media"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
 
           {/* Navegação de episódios */}
