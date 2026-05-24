@@ -5,12 +5,12 @@ import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
-function driveToEmbed(url) {
-  if (!url) return url
-  const matchFile = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)
-  if (matchFile) return `https://drive.google.com/file/d/${matchFile[1]}/preview`
-  const matchOpen = url.match(/[?&]id=([^&]+)/)
-  if (matchOpen) return `https://drive.google.com/file/d/${matchOpen[1]}/preview`
+function driveToSrc(url) {
+  if (!url) return null
+  const m = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
+  if (m) return `${API}/api/stream?id=${m[1]}`
+  const m2 = url.match(/[?&]id=([^&]+)/)
+  if (m2) return `${API}/api/stream?id=${m2[1]}`
   return url
 }
 
@@ -67,7 +67,7 @@ export default function FanDubDetailPage() {
     : [{ ep: 1, titulo: fanDub.titulo, url: fanDub.embedUrl }]
 
   const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
-  const embedUrl = driveToEmbed(epData?.url || fanDub.embedUrl)
+  const videoSrc = driveToSrc(epData?.url || fanDub.embedUrl)
   const totalEps = episodios.length
 
   const goEp = (n) => setSp({ ep: n })
@@ -176,15 +176,16 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* iframe */}
+          {/* Player nativo via studio-proxy */}
           <div className="fddetail-iframe-wrap">
-            <iframe
-              id="fandub-iframe"
+            <video
+              key={videoSrc}
               className="fddetail-iframe"
-              src={embedUrl}
-              allowFullScreen
-              allow="autoplay; fullscreen; encrypted-media"
-              referrerPolicy="no-referrer-when-downgrade"
+              src={videoSrc}
+              controls
+              autoPlay
+              playsInline
+              preload="metadata"
             />
           </div>
 
