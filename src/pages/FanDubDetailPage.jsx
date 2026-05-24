@@ -9,12 +9,14 @@ import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
+const FAN_PROXY = 'https://fan-proxy.masterotaku487.workers.dev'
+
 function driveToSrc(url) {
   if (!url) return null
   const m = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m) return `https://drive.usercontent.google.com/download?id=${m[1]}&export=download&confirm=t`
+  if (m) return `${FAN_PROXY}/stream?id=${m[1]}`
   const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return `https://drive.usercontent.google.com/download?id=${m2[1]}&export=download&confirm=t`
+  if (m2) return `${FAN_PROXY}/stream?id=${m2[1]}`
   return url
 }
 
@@ -164,15 +166,15 @@ export default function FanDubDetailPage() {
             )}
           </div>
 
-          {/* Vidstack Player */}
+          {/* Vidstack Player via fan-proxy */}
           <div className="fddetail-iframe-wrap">
             {videoSrc ? (
               <MediaPlayer
                 src={videoSrc}
                 title={epData?.titulo || fanDub.titulo}
                 className="fddetail-iframe"
-                crossOrigin
                 playsInline
+                crossOrigin
               >
                 <MediaProvider />
                 <DefaultVideoLayout icons={defaultLayoutIcons} />

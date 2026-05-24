@@ -28,7 +28,7 @@
 .fddetail-fs-btn { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; background: var(--card,#111); border: 1px solid var(--border,#222); color: var(--text,#f0f0f0); font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 
 .fddetail-iframe-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; }
-.fddetail-iframe { width: 100%; height: 100%; --video-brand: #e63946; }
+.fddetail-iframe { width: 100%; height: 100%; --video-brand: #e63946; --video-focus-ring-color: #e63946; }
 .fddetail-video-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: .9rem; }
 
 /* Navegação eps */
