@@ -5,12 +5,14 @@ import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
+const STUDIO_PROXY = 'https://studio-proxy.masterotaku487.workers.dev'
+
 function driveToSrc(url) {
   if (!url) return null
   const m = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m) return `${API}/api/stream?id=${m[1]}`
+  if (m) return `${STUDIO_PROXY}/api/stream?id=${m[1]}`
   const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return `${API}/api/stream?id=${m2[1]}`
+  if (m2) return `${STUDIO_PROXY}/api/stream?id=${m2[1]}`
   return url
 }
 
@@ -97,8 +99,6 @@ export default function FanDubDetailPage() {
       if (!document.hidden) window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank')
     }, 2000)
   }
-
-  const openCastTV = () => {
     const url = window.location.href
     window.location.href = `intent:${url}#Intent;package=com.instantbits.cast.webvideo;end`
     setTimeout(() => {
