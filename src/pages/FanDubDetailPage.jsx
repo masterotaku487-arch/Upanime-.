@@ -82,7 +82,21 @@ export default function FanDubDetailPage() {
     }
   }
 
-  const openCastTV = () => {
+  const openNativePlayer = () => {
+    const rawUrl = epData?.url || fanDub.embedUrl || ''
+    const m = rawUrl.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
+    const fileId = m ? m[1] : null
+    if (!fileId) return
+
+    const videoUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`
+
+    // Tenta abrir no player nativo do Android
+    window.location.href = `intent:${videoUrl}#Intent;action=android.intent.action.VIEW;type=video/mp4;end`
+    setTimeout(() => {
+      // Fallback: abre no Drive se não abrir player
+      if (!document.hidden) window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank')
+    }, 2000)
+  }
     const url = window.location.href
     window.location.href = `intent:${url}#Intent;package=com.instantbits.cast.webvideo;end`
     setTimeout(() => {
@@ -199,6 +213,9 @@ export default function FanDubDetailPage() {
             </button>
             <button className="fddetail-acao-btn" onClick={toggleFS}>
               ⛶ <span>Tela cheia</span>
+            </button>
+            <button className="fddetail-acao-btn" onClick={openNativePlayer}>
+              📱 <span>Player</span>
             </button>
           </div>
 
