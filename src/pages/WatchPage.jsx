@@ -26,30 +26,15 @@ const DA        = 'https://drivea.masterotaku487.workers.dev'
 const AD_BASE   = 'https://animesdrive.online'
 
 // ── Dub URL transform ────────────────────────────────────────────────────────
-/**
- * Converte URL de MP4 legendado → dublado inserindo /Dub/ antes do arquivo.
- * LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
- * Só aplica em URLs aniplay.online (padrão confirmado).
- */
+// Insere /Dub/ antes do último segmento da URL (nome do arquivo)
+// LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
 const toDubUrl = (url) => {
-  try {
-    const u = new URL(url)
-    if (!u.hostname.includes('aniplay.online')) return url
-    // Insere /Dub/ antes do último segmento (nome do arquivo)
-    const parts = u.pathname.split('/')
-    const file  = parts.pop()
-    parts.push('Dub', file)
-    u.pathname = parts.join('/')
-    return u.toString()
-  } catch { return url }
+  const i = url.lastIndexOf('/')
+  return url.slice(0, i) + '/Dub' + url.slice(i)
 }
 
 // ── Dub URL transform ────────────────────────────────────────────────────────
 /**
- * Converte URL de MP4 legendado → dublado inserindo /Dub/ antes do arquivo.
- * LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
- * Só aplica em URLs aniplay.online (padrão confirmado).
- */
 
 
 // Fallbacks legados
@@ -447,18 +432,17 @@ export default function WatchPage() {
 
       if (picked.type === 'mp4' && picked.sources.length > 0) {
         // MP4 direto via proxy chunked ✅
-        // Se dublado: transforma URL inserindo /Dub/ antes do arquivo
+        // Se dublado: insere /Dub/ antes do nome do arquivo
         const finalSources = dub
-          ? picked.sources.map(s => ({
-              ...s,
-              url:       `${DA}/?proxy=${encodeURIComponent(toDubUrl(s.directUrl))}`,
-              directUrl: toDubUrl(s.directUrl),
-            }))
+          ? picked.sources.map(s => {
+              const dubDirect = toDubUrl(s.directUrl)
+              return { ...s, directUrl: dubDirect, url: `${DA}/?proxy=${encodeURIComponent(dubDirect)}` }
+            })
           : picked.sources
         setSources(finalSources)
         const best = bestQuality(finalSources)
         setCurrentSrc(best?.url || finalSources[0].url)
-        setStatus(`✅ animesdrive.online — ${best?.label || 'Auto'}`)
+        setStatus(`✅ animesdrive.online — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
         setProvider('DriveA')
         setLoading(false)
         return
