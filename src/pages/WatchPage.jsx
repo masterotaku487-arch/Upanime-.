@@ -25,6 +25,33 @@ import './WatchPage.css'
 const DA        = 'https://drivea.masterotaku487.workers.dev'
 const AD_BASE   = 'https://animesdrive.online'
 
+// ── Dub URL transform ────────────────────────────────────────────────────────
+/**
+ * Converte URL de MP4 legendado → dublado inserindo /Dub/ antes do arquivo.
+ * LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
+ * Só aplica em URLs aniplay.online (padrão confirmado).
+ */
+const toDubUrl = (url) => {
+  try {
+    const u = new URL(url)
+    if (!u.hostname.includes('aniplay.online')) return url
+    // Insere /Dub/ antes do último segmento (nome do arquivo)
+    const parts = u.pathname.split('/')
+    const file  = parts.pop()
+    parts.push('Dub', file)
+    u.pathname = parts.join('/')
+    return u.toString()
+  } catch { return url }
+}
+
+// ── Dub URL transform ────────────────────────────────────────────────────────
+/**
+ * Converte URL de MP4 legendado → dublado inserindo /Dub/ antes do arquivo.
+ * LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
+ * Só aplica em URLs aniplay.online (padrão confirmado).
+ */
+
+
 // Fallbacks legados
 const AF            = 'https://animefire-proxy.masterotaku487.workers.dev'
 const RENDER_PROXY  = 'https://animesfontes-proxy.onrender.com'
@@ -420,9 +447,17 @@ export default function WatchPage() {
 
       if (picked.type === 'mp4' && picked.sources.length > 0) {
         // MP4 direto via proxy chunked ✅
-        setSources(picked.sources)
-        const best = bestQuality(picked.sources)
-        setCurrentSrc(best?.url || picked.sources[0].url)
+        // Se dublado: transforma URL inserindo /Dub/ antes do arquivo
+        const finalSources = dub
+          ? picked.sources.map(s => ({
+              ...s,
+              url:       `${DA}/?proxy=${encodeURIComponent(toDubUrl(s.directUrl))}`,
+              directUrl: toDubUrl(s.directUrl),
+            }))
+          : picked.sources
+        setSources(finalSources)
+        const best = bestQuality(finalSources)
+        setCurrentSrc(best?.url || finalSources[0].url)
         setStatus(`✅ animesdrive.online — ${best?.label || 'Auto'}`)
         setProvider('DriveA')
         setLoading(false)
