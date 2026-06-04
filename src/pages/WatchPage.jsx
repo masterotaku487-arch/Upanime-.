@@ -19,6 +19,7 @@ import './WatchPage.css'
 
 const AF = 'https://animefire-proxy.masterotaku487.workers.dev'
 const RENDER_PROXY = 'https://animesfontes-proxy.onrender.com'
+const DRIVE_WORKER = 'https://drivea.masterotaku487.workers.dev'
 
 // Redireciona vídeo pelo Vercel proxy (adiciona Referer correto)
 const proxyUrl = (url) =>
@@ -158,6 +159,87 @@ const bestQuality = (sources = []) => {
   })[0] || sources[0]
 }
 
+// ─────────────────────────────────────────────────────────
+// AnimeDrive (animesdrive.online) via drivea.masterotaku487.workers.dev
+// Rotas do worker:
+//   ?url=<pagina>      → extrai players (Blogger / MP4 direto)
+//   ?blogger=<embed>   → resolve Blogger → MP4 real
+//   ?proxy=<mp4>       → proxy chunked com Range
+// ─────────────────────────────────────────────────────────
+const buildDriveCandidates = (anime, ep, dub = false) => {
+  const titles = [
+    anime.title_english,
+    anime.title,
+    ...(anime.titles || []).map(t => t.title),
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
+
+  const candidates = []
+  for (const t of titles) {
+    const base = slugify(stripSeason(t))
+    if (!base || base.length < 2) continue
+    if (dub) {
+      candidates.push(`https://animesdrive.online/animes/${base}-dublado/episodio-${ep}/`)
+      candidates.push(`https://animesdrive.online/animes/${base}-dub/episodio-${ep}/`)
+    }
+    candidates.push(`https://animesdrive.online/animes/${base}/episodio-${ep}/`)
+    // Filmes
+    if (dub) candidates.push(`https://animesdrive.online/filmes/${base}-dublado/`)
+    candidates.push(`https://animesdrive.online/filmes/${base}/`)
+  }
+  return [...new Set(candidates)]
+}
+
+const resolveDrive = async (anime, ep, dub = false) => {
+  const pages = buildDriveCandidates(anime, ep, dub)
+  console.log('[DriveA] testando páginas:', pages)
+
+  for (const pageUrl of pages) {
+    try {
+      const res = await fetch(
+        `${DRIVE_WORKER}/?url=${encodeURIComponent(pageUrl)}`,
+        { signal: AbortSignal.timeout(15000) }
+      )
+      const data = await res.json()
+      if (!data.success || !data.results?.length) continue
+
+      console.log('[DriveA] ✅', pageUrl, '→', data.results.length, 'players')
+
+      // Resolve cada player → fonte final
+      const sources = []
+      await Promise.all(data.results.map(async (player) => {
+        try {
+          if (player.isBlogger && player.resolveUrl) {
+            // Resolve Blogger → extrai MP4 real
+            const bRes = await fetch(player.resolveUrl, { signal: AbortSignal.timeout(10000) })
+            const bData = await bRes.json()
+            if (bData.success && bData.sources?.length) {
+              bData.sources.forEach((s, i) => {
+                sources.push({
+                  label: `Drive ${player.option}.${i + 1}`,
+                  url: `${DRIVE_WORKER}/?proxy=${encodeURIComponent(s.url)}`,
+                  directUrl: s.url,
+                })
+              })
+            }
+          } else if (player.proxyUrl) {
+            // MP4 direto via proxy chunked do worker
+            sources.push({
+              label: `Drive ${player.option}`,
+              url: player.proxyUrl,
+              directUrl: player.url,
+            })
+          }
+        } catch (e) {
+          console.warn('[DriveA] player', player.option, 'falhou:', e.message)
+        }
+      }))
+
+      if (sources.length) return sources
+    } catch { /* tenta próxima candidata */ }
+  }
+  throw new Error('AnimeDrive: nenhuma fonte encontrada')
+}
+
 const getDirectUrl = (url) => {
   // Se for URL do proxy Vercel (/api/proxy?url=...), extrai a URL real
   try {
@@ -276,6 +358,23 @@ export default function WatchPage() {
     } catch {}
 
     try {
+      // ── Fonte principal: AnimeDrive via Worker ────────────────
+      try {
+        setStatus('🎬 Buscando no AnimeDrive...')
+        const driveSrcs = await resolveDrive(animeObj, ep, dub)
+        if (driveSrcs?.length) {
+          setSources(driveSrcs)
+          const best = bestQuality(driveSrcs)
+          setCurrentSrc(best?.url || '')
+          setStatus(`✅ AnimeDrive ${dub ? '🎙️ Dublado' : '📖 Legendado'} — ${best?.label || 'Auto'}`)
+          setLoading(false)
+          return
+        }
+      } catch (driveErr) {
+        console.warn('[DriveA] falhou:', driveErr.message)
+      }
+
+      // ── Fallback: AnimeFire (Render + CF Worker) ──────────────
       let slug = cachedSlug
       if (!slug) {
         setStatus('🔍 Localizando no AnimeFire...')
@@ -283,9 +382,8 @@ export default function WatchPage() {
         setAfSlug(slug)
       }
 
-      setStatus(`📡 Buscando fontes...`)
+      setStatus(`📡 Buscando fontes AnimeFire...`)
 
-      // ── Fonte principal: Render /af-sources ──────────────────
       let srcs = []
       try {
         const renderRes = await fetch(
@@ -299,7 +397,6 @@ export default function WatchPage() {
         console.warn('[Render] falhou:', renderErr.message)
       }
 
-      // ── Fallback: CF Worker ───────────────────────────────────
       if (!srcs.length) {
         try {
           setStatus('🔄 Tentando fonte alternativa...')
@@ -577,7 +674,8 @@ export default function WatchPage() {
                 <img src="/logo.png" className="loading-logo" alt="" />
                 <p className="loading-text">{status}</p>
                 <p className="loading-sub">
-                  {status.includes('animesonlinecc') ? 'Fonte: 🌐 animesonlinecc.to'
+                  {status.includes('AnimeDrive') ? 'Fonte: 🎬 AnimeDrive via Cloudflare'
+                   : status.includes('animesonlinecc') ? 'Fonte: 🌐 animesonlinecc.to'
                    : status.includes('animesonlinecloud') ? 'Fonte: ☁️ animesonline.cloud'
                    : status.includes('Tentando')     ? '🔄 Buscando fontes...'
                    : 'Fonte: 🇧🇷 AnimeFire via Cloudflare'}
