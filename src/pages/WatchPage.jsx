@@ -29,6 +29,7 @@ const AD_BASE   = 'https://animesdrive.online'
 // Insere /Dub/ antes do último segmento da URL (nome do arquivo)
 // LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
 const toDubUrl = (url) => {
+  if (url.includes('/Dub/')) return url  // já está dublado
   const i = url.lastIndexOf('/')
   return url.slice(0, i) + '/Dub' + url.slice(i)
 }
