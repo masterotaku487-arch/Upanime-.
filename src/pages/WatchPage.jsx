@@ -66,7 +66,7 @@ const stripSeasonAD = (s) =>
  *   "rezero-kara-hajimeru-isekai-seikatsu-4th-season"  (mantém 4th-season)
  *   "kimetsu-no-yaiba-movie-mugen-jou-hen"             (movie sem episodio)
  */
-const buildDriveACandidates = (anime) => {
+const buildDriveACandidates = (anime, dub = false) => {
   // Romaji (title) é o padrão do site; en como fallback
   const titles = [
     anime.title,           // romaji japonês — prioritário
@@ -82,6 +82,15 @@ const buildDriveACandidates = (anime) => {
       const s = slugifyAD(v)
       if (s && s.length > 1) bases.add(s)
     }
+  }
+
+  // Dublado → tenta slug com -dublado primeiro, depois sem (fallback)
+  // LEG: rezero-kara-hajimeru-isekai-seikatsu-4th-season
+  // DUB: rezero-kara-hajimeru-isekai-seikatsu-4th-season-dublado
+  if (dub) {
+    const withDub    = [...bases].map(b => b + '-dublado')
+    const withoutDub = [...bases]
+    return [...new Set([...withDub, ...withoutDub])]
   }
   return [...new Set([...bases])]
 }
@@ -115,9 +124,9 @@ const probeDriveA = async (slug, ep, isMovie = false) => {
 }
 
 /** Resolve slug correto testando candidatos em ordem. */
-const resolveDriveA = async (anime, ep) => {
+const resolveDriveA = async (anime, ep, dub = false) => {
   const isMovie    = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
-  const candidates = buildDriveACandidates(anime)
+  const candidates = buildDriveACandidates(anime, dub)
   console.log('[DriveA] testando slugs:', candidates.join(', '))
 
   for (const slug of candidates) {
@@ -402,7 +411,7 @@ export default function WatchPage() {
       }
       if (!adResult) {
         setStatus('🔍 Localizando no animesdrive.online...')
-        adResult = await resolveDriveA(animeObj, ep)
+        adResult = await resolveDriveA(animeObj, ep, dub)
         setAdSlug(adResult.slug)
       }
 
