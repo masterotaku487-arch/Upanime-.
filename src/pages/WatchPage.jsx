@@ -32,36 +32,44 @@ const RENDER_PROXY  = 'https://animesfontes-proxy.onrender.com'
 // ── Slug helpers ──────────────────────────────────────────────────────────────
 
 /** Converte string em slug no padrão animesdrive.online (romaji com hifens) */
+/**
+ * Converte string em slug no padrão animesdrive.online.
+ *
+ * Regras observadas nos exemplos reais do site:
+ *   "Re:Zero kara..."   → "rezero-kara-..."    (dois-pontos removido SEM espaço)
+ *   "Naruto"            → "naruto"
+ *   "Kimetsu no Yaiba"  → "kimetsu-no-yaiba"
+ *   "4th Season"        → "4th-season"         (mantém número de season)
+ */
 const slugifyAD = (s) =>
   s.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // remove acentos
-    .replace(/['":`★☆♪•]/g, '')                          // remove símbolos comuns
-    .replace(/[^a-z0-9\s-]/g, ' ')                      // remove tudo que não é alfanum
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
+    .replace(/[:.!?★☆♪•'"]/g, '')                      // remove pontuação sem espaço
+    .replace(/[^a-z0-9\s-]/g, ' ')                     // resto vira espaço
     .trim().replace(/\s+/g, '-').replace(/-+/g, '-')
 
-/** Remove sufixos de temporada estilo EN (season 2, 2nd season…) */
-const stripSeasonEN = (s) =>
-  s.replace(/\s*[-–:]\s*(season|parte?|part|cour)\s*\d*/gi, '')
-   .replace(/\s+\d+(st|nd|rd|th)\s*(season|cour)/gi, '')
-   .replace(/\s+(the\s+)?(final|last|new)\s+season/gi, '')
-   .replace(/\s+(season|parte?|part)\s*\d*/gi, '')
-   .replace(/\s+\d+$/g, '').trim()
-
-const stripSubtitle = (s) => s.replace(/\s*[:–]\s*.+$/, '').trim()
+/**
+ * Remove sufixos de season SOMENTE se for string genérica como "Season 2",
+ * mas mantém casos como "4th Season" que fazem parte do título oficial.
+ * O animesdrive.online mantém "4th-season" no slug.
+ */
+const stripSeasonAD = (s) =>
+  s.replace(/\s+(the\s+)?(final|last|new)\s+season/gi, '')
+   .replace(/\s*[-–]\s*(season|parte?|part|cour)\s*\d+/gi, '')
+   .trim()
 
 /**
  * Gera candidatos de slug para animesdrive.online.
- * Prioriza título japonês (romaji) pois o site usa esse padrão.
  *
- * Exemplos reais do site:
- *   isekai-nonbiri-nouka-2   (mantém número da season)
- *   overlord                 (sem number)
- *   one-punch-man-3          (com number)
+ * Exemplos reais confirmados:
+ *   "naruto"                                           (simples)
+ *   "rezero-kara-hajimeru-isekai-seikatsu-4th-season"  (mantém 4th-season)
+ *   "kimetsu-no-yaiba-movie-mugen-jou-hen"             (movie sem episodio)
  */
 const buildDriveACandidates = (anime) => {
-  // Prioriza título japonês romaji; en como fallback
+  // Romaji (title) é o padrão do site; en como fallback
   const titles = [
-    anime.title,          // japonês romaji (prioritário no site)
+    anime.title,           // romaji japonês — prioritário
     anime.title_english,
     anime.title_portuguese,
     ...(anime.titles || []).map(t => t.title),
@@ -69,9 +77,8 @@ const buildDriveACandidates = (anime) => {
 
   const bases = new Set()
   for (const t of titles) {
-    const noSeason   = stripSeasonEN(t)
-    const noSubtitle = stripSubtitle(noSeason)
-    for (const v of [t, noSeason, noSubtitle]) {
+    const stripped = stripSeasonAD(t)
+    for (const v of [t, stripped]) {
       const s = slugifyAD(v)
       if (s && s.length > 1) bases.add(s)
     }
@@ -83,20 +90,20 @@ const buildDriveACandidates = (anime) => {
 const epStr = (ep) => String(ep).padStart(2, '0')
 
 /**
- * Monta a URL de episódio do animesdrive.online:
- *   https://animesdrive.online/episodio/{slug}-episodio-{ep}
+ * Monta a URL de episódio do animesdrive.online.
+ * Filmes/OVAs não têm -episodio-NN (ex: kimetsu-no-yaiba-movie-mugen-jou-hen)
+ * Séries: {slug}-episodio-{ep2d}
  */
-const buildEpisodeUrl = (slug, ep) =>
-  `${AD_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
+const buildEpisodeUrl = (slug, ep, isMovie = false) =>
+  isMovie
+    ? `${AD_BASE}/episodio/${slug}`
+    : `${AD_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
 
 // ── DriveA fetch ──────────────────────────────────────────────────────────────
 
-/**
- * Testa se um slug+ep existe no animesdrive.online via DriveA worker.
- * Retorna os results se success, null caso contrário.
- */
-const probeDriveA = async (slug, ep) => {
-  const epUrl  = buildEpisodeUrl(slug, ep)
+/** Testa se um slug+ep existe no animesdrive.online via DriveA worker. */
+const probeDriveA = async (slug, ep, isMovie = false) => {
+  const epUrl     = buildEpisodeUrl(slug, ep, isMovie)
   const workerUrl = `${DA}/?url=${encodeURIComponent(epUrl)}`
   try {
     const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(20000) })
@@ -107,16 +114,14 @@ const probeDriveA = async (slug, ep) => {
   return null
 }
 
-/**
- * Resolve slug correto para animesdrive.online testando candidatos.
- * Retorna { slug, results } com os players do episódio.
- */
+/** Resolve slug correto testando candidatos em ordem. */
 const resolveDriveA = async (anime, ep) => {
+  const isMovie    = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
   const candidates = buildDriveACandidates(anime)
   console.log('[DriveA] testando slugs:', candidates.join(', '))
 
   for (const slug of candidates) {
-    const found = await probeDriveA(slug, ep)
+    const found = await probeDriveA(slug, ep, isMovie)
     if (found) {
       console.log('[DriveA] ✅ slug encontrado:', slug)
       return found
@@ -126,36 +131,56 @@ const resolveDriveA = async (anime, ep) => {
 }
 
 /**
- * Dado um result do DriveA worker, retorna a fonte de vídeo preferida.
- * Prefere MP4 direto; se só tiver Blogger, resolve via ?blogger=.
+ * Classifica e retorna fontes do DriveA worker.
+ *
+ * Tipos de result confirmados no response real:
+ *   type:"mp4"    isBlogger:false  proxyUrl:✅  → usar proxyUrl direto (MP4 via chunked proxy)
+ *   type:"iframe" isBlogger:true   resolveUrl:✅ → resolver via ?blogger= → obter MP4
+ *   type:"iframe" isBlogger:false  proxyUrl:✅  → embed JS (animeshd.cloud, strp2p) → iframe
+ *
+ * Prioridade: MP4 direto > Blogger resolvido > iframe embed
  */
 const pickBestDriveASource = async (results) => {
-  // Separa diretos (MP4) de Blogger
-  const directs  = results.filter(r => !r.isBlogger)
-  const bloggers = results.filter(r =>  r.isBlogger)
-
-  // 1. Usa MP4 direto preferencial — passa pelo proxy chunked do worker
-  if (directs.length > 0) {
-    return directs.map(r => ({
-      label:    r.label,
-      url:      r.proxyUrl,   // já é ?proxy=<mp4>, entregue pelo próprio worker
-      directUrl: r.url,
-    }))
+  // ── 1. MP4 direto → proxyUrl já pronto ──────────────────────────────────
+  const mp4s = results.filter(r => r.type === 'mp4' && !r.isBlogger && r.proxyUrl)
+  if (mp4s.length > 0) {
+    return {
+      type: 'mp4',
+      sources: mp4s.map(r => ({
+        label:     r.label,
+        url:       r.proxyUrl,    // ?proxy=<mp4> — chunked range support
+        directUrl: r.url,
+      }))
+    }
   }
 
-  // 2. Resolve Blogger → obtém MP4 real
+  // ── 2. Blogger → resolve ?blogger= → extrai MP4 ─────────────────────────
+  const bloggers = results.filter(r => r.isBlogger && r.resolveUrl)
   for (const r of bloggers) {
     try {
       const res  = await fetch(r.resolveUrl, { signal: AbortSignal.timeout(15000) })
       const data = await res.json()
       if (data.success && data.sources?.length > 0) {
-        return data.sources.map((s, i) => ({
-          label:    `Opção ${i + 1}`,
-          url:      `${DA}/?proxy=${encodeURIComponent(s.url)}`,
-          directUrl: s.url,
-        }))
+        return {
+          type: 'mp4',
+          sources: data.sources.map((s, i) => ({
+            label:     `Blogger ${i + 1}`,
+            url:       `${DA}/?proxy=${encodeURIComponent(s.url)}`,
+            directUrl: s.url,
+          }))
+        }
       }
     } catch { /* tenta próximo */ }
+  }
+
+  // ── 3. iframe embed (animeshd.cloud, strp2p…) → carrega no <iframe> ─────
+  const iframes = results.filter(r => r.type === 'iframe' && !r.isBlogger && r.url)
+  if (iframes.length > 0) {
+    return {
+      type:   'iframe',
+      embedUrl: iframes[0].url,  // carrega o primeiro como embed
+      sources:  iframes.map((r, i) => ({ label: r.label || `Opção ${i + 1}`, url: r.url }))
+    }
   }
 
   throw new Error('Nenhuma fonte de vídeo válida retornada pelo DriveA')
@@ -368,11 +393,12 @@ export default function WatchPage() {
     try {
       setStatus('📡 Conectando ao DriveA...')
 
+      const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(animeObj.type)
+
       let adResult
       if (cachedAdSlug) {
-        // Reutiliza slug já resolvido (troca de ep)
-        adResult = await probeDriveA(cachedAdSlug, ep)
-        if (!adResult) cachedAdSlug = null  // slug não cobre esse ep
+        adResult = await probeDriveA(cachedAdSlug, ep, isMovie)
+        if (!adResult) cachedAdSlug = null
       }
       if (!adResult) {
         setStatus('🔍 Localizando no animesdrive.online...')
@@ -381,13 +407,24 @@ export default function WatchPage() {
       }
 
       setStatus('📡 Carregando vídeo...')
-      const srcs = await pickBestDriveASource(adResult.results)
+      const picked = await pickBestDriveASource(adResult.results)
 
-      if (srcs.length > 0) {
-        setSources(srcs)
-        const best = bestQuality(srcs)
-        setCurrentSrc(best?.url || srcs[0].url)
+      if (picked.type === 'mp4' && picked.sources.length > 0) {
+        // MP4 direto via proxy chunked ✅
+        setSources(picked.sources)
+        const best = bestQuality(picked.sources)
+        setCurrentSrc(best?.url || picked.sources[0].url)
         setStatus(`✅ animesdrive.online — ${best?.label || 'Auto'}`)
+        setProvider('DriveA')
+        setLoading(false)
+        return
+      }
+
+      if (picked.type === 'iframe' && picked.embedUrl) {
+        // Embed JS (animeshd.cloud, strp2p…) — carrega em iframe
+        setCurrentSrc('__embed__')
+        setErrorMsg(picked.embedUrl)
+        setStatus('✅ animesdrive.online (embed)')
         setProvider('DriveA')
         setLoading(false)
         return
