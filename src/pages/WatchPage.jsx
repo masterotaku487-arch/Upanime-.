@@ -1000,23 +1000,6 @@ export default function WatchPage() {
             )}
           </div>
 
-          {/* Status dos Servidores */}
-          <div className="server-status-bar">
-            <span className="srv-label">Servidores:</span>
-            <span className={`srv-chip${provider === 'DriveA' ? ' active' : ''}`}
-              title="animesdrive.online">
-              {srvDot(serverStatus.driveA)} S1 AnimesDrive
-            </span>
-            <span className={`srv-chip${provider === 'AnimeQ' ? ' active' : ''}`}
-              title="animeq.net">
-              {srvDot(serverStatus.animeQ)} S2 AnimeQ
-            </span>
-            <span className={`srv-chip${provider === 'AniTube' ? ' active' : ''}`}
-              title="anitube.zip">
-              {srvDot(serverStatus.aniTube)} S3 AniTube
-            </span>
-          </div>
-
           {/* Ações */}
           <div className="ext-actions">
             {currentSrc && (
