@@ -284,52 +284,6 @@ const resolveAnimeQ = async (anime, ep, dub = false) => {
 
 
 
-// ── AnimeQ (aq.masterotaku487.workers.dev) ────────────────────────────────────
-// Mesmo worker Dooplay do DriveA, mas aponta para animeq.net
-// Padrão confirmado: animeq.net/episodio/{slug}-episodio-{ep}/
-//   LEG: gachiakuta-episodio-16
-//   DUB: jibaku-shounen-hanako-kun-2-part-2-dublado-episodio-01
-
-const buildAnimeQUrl = (slug, ep, dub = false) => {
-  const dubPart  = dub ? '-dublado' : ''
-  return `${AQ_BASE}/episodio/${slug}${dubPart}-episodio-${ep}/`
-}
-
-const probeAnimeQ = async (slug, ep, dub = false) => {
-  const epUrl     = buildAnimeQUrl(slug, ep, dub)
-  const workerUrl = `${AQ}/?url=${encodeURIComponent(epUrl)}`
-  try {
-    const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(18000) })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data.success && data.results?.length > 0) return { slug, results: data.results }
-  } catch {}
-  return null
-}
-
-const resolveAnimeQ = async (anime, ep, dub = false) => {
-  // Checa override primeiro
-  const overrides = await loadOverrides()
-  const ov = overrides[String(anime.mal_id)]
-  if (ov?.animeq) {
-    const slug = (dub && ov.animeq.dub) ? ov.animeq.dub : ov.animeq.leg
-    if (slug) {
-      const found = await probeAnimeQ(slug, ep, false) // dub já no slug do override
-      if (found) { console.log('[AnimeQ] ✅ (override)', slug); return found }
-    }
-  }
-
-  // Tenta candidatos automáticos (mesmo slugify do DriveA — padrão romaji)
-  const candidates = buildDriveACandidates(anime, false) // sem -dublado: o dub vai no buildAnimeQUrl
-  console.log('[AnimeQ] testando slugs:', candidates.join(', '))
-
-  for (const slug of candidates) {
-    const found = await probeAnimeQ(slug, ep, dub)
-    if (found) { console.log('[AnimeQ] ✅', slug); return found }
-  }
-  throw new Error(`"${anime.title}" não encontrado no AnimeQ`)
-}
-
 // ── AniTube (at.masterotaku487.workers.dev) ───────────────────────────────────
 // Worker proxy: extrai HLS/MP4 de qualquer página anitube.zip e proxeia
 // URLs do anitube são hash-based (ex: anitube.zip/939915b/) → requer override
