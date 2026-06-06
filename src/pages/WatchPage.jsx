@@ -22,8 +22,15 @@ import './WatchPage.css'
 //   ?proxy=<mp4>     → proxy chunked com Range support
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DA        = 'https://drivea.masterotaku487.workers.dev'
-const AD_BASE   = 'https://animesdrive.online'
+// ── Workers / Servidores ─────────────────────────────────────────────────────
+const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
+const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
+const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
+
+// Sites
+const AD_BASE = 'https://animesdrive.online'
+const AQ_BASE = 'https://animeq.net'
+const AT_BASE = 'https://www.anitube.zip'
 
 // ── Dub URL transform ────────────────────────────────────────────────────────
 // Insere /Dub/ antes do último segmento da URL (nome do arquivo)
@@ -33,10 +40,6 @@ const toDubUrl = (url) => {
   const i = url.lastIndexOf('/')
   return url.slice(0, i) + '/Dub' + url.slice(i)
 }
-
-// ── Dub URL transform ────────────────────────────────────────────────────────
-/**
-
 
 // Fallbacks legados
 const AF            = 'https://animefire-proxy.masterotaku487.workers.dev'
@@ -138,7 +141,22 @@ const probeDriveA = async (slug, ep, isMovie = false) => {
 
 /** Resolve slug correto testando candidatos em ordem. */
 const resolveDriveA = async (anime, ep, dub = false) => {
-  const isMovie    = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+  const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+
+  // 1. Checa slug-overrides.json primeiro (editável no GitHub sem redeploy)
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  if (ov?.drivea) {
+    const slug = (dub && ov.drivea.dub) ? ov.drivea.dub : ov.drivea.leg
+    if (slug) {
+      console.log('[DriveA] ✅ (override)', slug)
+      const found = await probeDriveA(slug, ep, isMovie)
+      if (found) return found
+      console.warn('[DriveA] override slug falhou, tentando candidatos...')
+    }
+  }
+
+  // 2. Testa candidatos gerados automaticamente
   const candidates = buildDriveACandidates(anime, dub)
   console.log('[DriveA] testando slugs:', candidates.join(', '))
 
@@ -208,9 +226,131 @@ const pickBestDriveASource = async (results) => {
   throw new Error('Nenhuma fonte de vídeo válida retornada pelo DriveA')
 }
 
+// ── AnimeQ (Servidor 2) ───────────────────────────────────────────────────────
+// animeq.net é outro site Dooplay — mesmo padrão de slug do animesdrive
+
+const buildAnimeQCandidates = (anime, dub = false) => {
+  // AnimeQ usa slugs em português/romanizado — mesmo helper do DriveA
+  return buildDriveACandidates(anime, dub).map(s => s)
+}
+
+const resolveAnimeQ = async (anime, ep, dub = false) => {
+  const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+
+  // Override dedicado para AnimeQ
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  if (ov?.animeq) {
+    const slug = (dub && ov.animeq.dub) ? ov.animeq.dub : ov.animeq.leg
+    if (slug) {
+      const epUrl = isMovie
+        ? `${AQ_BASE}/episodio/${slug}`
+        : `${AQ_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
+      const workerUrl = `${AQ}/?url=${encodeURIComponent(epUrl)}`
+      try {
+        const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(20000) })
+        const data = await res.json()
+        if (data.success && data.results?.length) {
+          console.log('[AnimeQ] ✅ (override)', slug)
+          return { slug, results: data.results, worker: AQ }
+        }
+      } catch {}
+    }
+  }
+
+  const candidates = buildAnimeQCandidates(anime, dub)
+  console.log('[AnimeQ] testando slugs:', candidates.join(', '))
+  for (const slug of candidates) {
+    const epUrl = isMovie
+      ? `${AQ_BASE}/episodio/${slug}`
+      : `${AQ_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
+    const workerUrl = `${AQ}/?url=${encodeURIComponent(epUrl)}`
+    try {
+      const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(20000) })
+      if (!res.ok) continue
+      const data = await res.json()
+      if (data.success && data.results?.length) {
+        console.log('[AnimeQ] ✅', slug)
+        return { slug, results: data.results, worker: AQ }
+      }
+    } catch {}
+  }
+  throw new Error(`"${anime.title}" não encontrado no AnimeQ`)
+}
+
+// ── Anitube (Servidor 3) ──────────────────────────────────────────────────────
+// anitube.zip usa URLs de página por episódio — resolução via override ou slug
+// O worker extrai o vídeo (HLS m3u8 ou MP4) e faz proxy automático
+
+
+
+// ── AnimeQ (aq.masterotaku487.workers.dev) ────────────────────────────────────
+// Mesmo worker Dooplay do DriveA, mas aponta para animeq.net
+// Padrão confirmado: animeq.net/episodio/{slug}-episodio-{ep}/
+//   LEG: gachiakuta-episodio-16
+//   DUB: jibaku-shounen-hanako-kun-2-part-2-dublado-episodio-01
+
+const buildAnimeQUrl = (slug, ep, dub = false) => {
+  const dubPart  = dub ? '-dublado' : ''
+  return `${AQ_BASE}/episodio/${slug}${dubPart}-episodio-${ep}/`
+}
+
+const probeAnimeQ = async (slug, ep, dub = false) => {
+  const epUrl     = buildAnimeQUrl(slug, ep, dub)
+  const workerUrl = `${AQ}/?url=${encodeURIComponent(epUrl)}`
+  try {
+    const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(18000) })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data.success && data.results?.length > 0) return { slug, results: data.results }
+  } catch {}
+  return null
+}
+
+const resolveAnimeQ = async (anime, ep, dub = false) => {
+  // Checa override primeiro
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  if (ov?.animeq) {
+    const slug = (dub && ov.animeq.dub) ? ov.animeq.dub : ov.animeq.leg
+    if (slug) {
+      const found = await probeAnimeQ(slug, ep, false) // dub já no slug do override
+      if (found) { console.log('[AnimeQ] ✅ (override)', slug); return found }
+    }
+  }
+
+  // Tenta candidatos automáticos (mesmo slugify do DriveA — padrão romaji)
+  const candidates = buildDriveACandidates(anime, false) // sem -dublado: o dub vai no buildAnimeQUrl
+  console.log('[AnimeQ] testando slugs:', candidates.join(', '))
+
+  for (const slug of candidates) {
+    const found = await probeAnimeQ(slug, ep, dub)
+    if (found) { console.log('[AnimeQ] ✅', slug); return found }
+  }
+  throw new Error(`"${anime.title}" não encontrado no AnimeQ`)
+}
+
+// ── AniTube (at.masterotaku487.workers.dev) ───────────────────────────────────
+// Worker proxy: extrai HLS/MP4 de qualquer página anitube.zip e proxeia
+// URLs do anitube são hash-based (ex: anitube.zip/939915b/) → requer override
+// O src retornado é o próprio worker (stream direto, não JSON)
+
+const resolveAniTube = async (anime, ep, dub) => {
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  const atOv = ov?.anitube
+  if (!atOv) throw new Error('AniTube: sem override para este anime')
+  const epUrl = dub
+    ? (atOv.dub?.[String(ep)] || atOv.leg?.[String(ep)])
+    : (atOv.leg?.[String(ep)] || atOv.dub?.[String(ep)])
+  if (!epUrl) throw new Error(`AniTube: sem URL para EP ${ep}`)
+  return `${AT}/?url=${encodeURIComponent(epUrl)}`
+}
+
+
 // ── AnimeFire legado ──────────────────────────────────────────────────────────
 
-const proxyUrl = (url) => `/api/proxy?url=${encodeURIComponent(url)}`
+const proxyUrl = (url) => `https://at.masterotaku487.workers.dev/?url=${encodeURIComponent(url)}`
 
 const afFetch = async (params) => {
   const qs = new URLSearchParams(params).toString()
@@ -263,7 +403,11 @@ let _overridesCache = null
 const loadOverrides = async () => {
   if (_overridesCache) return _overridesCache
   try {
-    const res  = await fetch('/slug-overrides.json?_t=' + Date.now())
+    const SLUG_CID = window.__SLUG_CID__ || localStorage.getItem('slug_cid') || ''
+    const SLUG_URL = SLUG_CID
+      ? `https://${SLUG_CID}.ipfs.dweb.link/slug-overrides.json`
+      : '/slug-overrides.json'
+    const res  = await fetch(SLUG_URL + '?_t=' + Date.now())
     const json = await res.json()
     _overridesCache = json.animes || {}
   } catch { _overridesCache = {} }
@@ -315,7 +459,7 @@ const bestQuality = (sources = []) => {
 const getDirectUrl = (url) => {
   try {
     const u = new URL(url, window.location.origin)
-    if (u.pathname.includes('/api/proxy')) {
+    if (u.hostname.includes('at.masterotaku487') || u.pathname.includes('/api/proxy')) {
       const real = u.searchParams.get('url')
       if (real) return decodeURIComponent(real)
     }
@@ -352,6 +496,24 @@ const openADM = (url, fn) => {
   setTimeout(() => window.open(url, '_blank'), 900)
 }
 
+
+// ── Server status ping ────────────────────────────────────────────────────────
+const checkServers = async () => {
+  // Worker online = qualquer resposta HTTP (mesmo 400 = URL inválida = worker rodando)
+  const ping = async (url) => {
+    try {
+      await fetch(url, { signal: AbortSignal.timeout(8000) })
+      return true  // respondeu = online
+    } catch { return false }
+  }
+  const [s1, s2, s3] = await Promise.all([
+    ping(DA).catch(() => false),
+    ping(AQ).catch(() => false),
+    ping(AT).catch(() => false),
+  ])
+  return { driveA: s1, animeQ: s2, aniTube: s3 }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WatchPage() {
   const { id } = useParams()
@@ -368,6 +530,7 @@ export default function WatchPage() {
   const [currentSrc,   setCurrentSrc]   = useState('')
   const [afSlug,       setAfSlug]       = useState(null)
   const [adSlug,       setAdSlug]       = useState(null)   // slug animesdrive cacheado
+  const [aqSlug,       setAqSlug]       = useState(null)   // slug animeq cacheado
   const [loading,      setLoading]      = useState(true)
   const [status,       setStatus]       = useState('📡 Conectando ao DriveA...')
   const [error,        setError]        = useState(false)
@@ -378,9 +541,14 @@ export default function WatchPage() {
   const [showBugReport,   setShowBugReport]   = useState(false)
   const [fallbackUrl,     setFallbackUrl]     = useState(null)
   const [provider,        setProvider]        = useState('DriveA')
+  const [serverStatus,    setServerStatus]    = useState({ driveA: null, animeQ: null, aniTube: null })
 
   useEffect(() => {
-    setAnime(null); setEpisodes([]); setAfSlug(null); setAdSlug(null)
+    checkServers().then(setServerStatus)
+  }, [])
+
+  useEffect(() => {
+    setAnime(null); setEpisodes([]); setAfSlug(null); setAdSlug(null); setAqSlug(null)
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
       if (d.status === 'fulfilled') {
         const a = d.value.data
@@ -397,7 +565,7 @@ export default function WatchPage() {
     return () => { document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD' }
   }, [id])
 
-  const doLoad = async (animeObj, ep, dub, cachedAdSlug, cachedAfSlug) => {
+  const doLoad = async (animeObj, ep, dub, cachedAdSlug, cachedAqSlug, cachedAfSlug) => {
     setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setFallbackUrl(null)
 
     // Fallback imediato do slug-overrides
@@ -462,7 +630,67 @@ export default function WatchPage() {
       console.warn('[DriveA] falhou:', daErr.message)
     }
 
-    // ── FONTE 2: AnimeFire (Render proxy + CF Worker) ─────────────────────────
+    // ── FONTE 2: AnimeQ (aq.masterotaku487.workers.dev) ─────────────────────────
+    try {
+      setStatus('📡 Tentando AnimeQ...')
+
+      let aqResult
+      if (cachedAqSlug) {
+        aqResult = await probeAnimeQ(cachedAqSlug, ep, dub)
+        if (!aqResult) cachedAqSlug = null
+      }
+      if (!aqResult) {
+        setStatus('🔍 Localizando no AnimeQ...')
+        aqResult = await resolveAnimeQ(animeObj, ep, dub)
+        setAqSlug(aqResult.slug)
+      }
+
+      setStatus('📡 Carregando AnimeQ...')
+      const aqPicked = await pickBestDriveASource(aqResult.results)
+
+      if (aqPicked.type === 'mp4' && aqPicked.sources.length > 0) {
+        const finalSrcs = dub
+          ? aqPicked.sources.map(s => {
+              const dubDirect = toDubUrl(s.directUrl)
+              return { ...s, directUrl: dubDirect, url: `${AQ}/?proxy=${encodeURIComponent(dubDirect)}` }
+            })
+          : aqPicked.sources
+        setSources(finalSrcs)
+        const best = bestQuality(finalSrcs)
+        setCurrentSrc(best?.url || finalSrcs[0].url)
+        setStatus(`✅ AnimeQ — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+        setProvider('AnimeQ')
+        setLoading(false)
+        return
+      }
+
+      if (aqPicked.type === 'iframe' && aqPicked.embedUrl) {
+        setCurrentSrc('__embed__')
+        setErrorMsg(aqPicked.embedUrl)
+        setStatus('✅ AnimeQ (embed)')
+        setProvider('AnimeQ')
+        setLoading(false)
+        return
+      }
+    } catch (aqErr) {
+      console.warn('[AnimeQ] falhou:', aqErr.message)
+    }
+
+    // ── FONTE 3: AniTube (at.masterotaku487.workers.dev) ─────────────────────
+    try {
+      setStatus('📡 Tentando AniTube...')
+      const atSrc = await resolveAniTube(animeObj, ep, dub)
+      setCurrentSrc(atSrc)
+      setSources([{ label: 'AniTube', url: atSrc }])
+      setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+      setProvider('AniTube')
+      setLoading(false)
+      return
+    } catch (atErr) {
+      console.warn('[AniTube] falhou:', atErr.message)
+    }
+
+    // ── FONTE 4: AnimeFire (Render proxy + CF Worker) ─────────────────────────
     try {
       let slug = cachedAfSlug
       if (!slug) {
@@ -508,7 +736,7 @@ export default function WatchPage() {
       console.warn('[AnimeFire] falhou:', afErr.message)
     }
 
-    // ── FONTE 3: meusanimes / goyabu (override) ───────────────────────────────
+    // ── FONTE 5: meusanimes / goyabu (override) ───────────────────────────────
     try {
       const overrides  = await loadOverrides()
       const ov         = overrides[String(animeObj.mal_id)]
@@ -543,7 +771,7 @@ export default function WatchPage() {
       console.warn('[fallback meusanimes/goyabu]', ovErr.message)
     }
 
-    // ── FONTE 4: animesonlinecc.to ────────────────────────────────────────────
+    // ── FONTE 6: animesonlinecc.to ────────────────────────────────────────────
     try {
       const titleQuery = animeObj.title_english || animeObj.title
       setStatus('🔄 Tentando animesonlinecc.to...')
@@ -575,7 +803,7 @@ export default function WatchPage() {
       console.warn('[animesonlinecc]', ccErr.message)
     }
 
-    // ── FONTE 5: animesonline.cloud ───────────────────────────────────────────
+    // ── FONTE 7: animesonline.cloud ───────────────────────────────────────────
     try {
       const titleQuery = animeObj.title_english || animeObj.title
       setStatus('🔄 Tentando animesonline.cloud...')
@@ -602,7 +830,7 @@ export default function WatchPage() {
       console.warn('[animesonlinecloud]', hdErr.message)
     }
 
-    // ── FONTE 6: animesfontes-proxy ───────────────────────────────────────────
+    // ── FONTE 8: animesfontes-proxy ───────────────────────────────────────────
     try {
       const titleQuery = animeObj.title_english || animeObj.title
       setStatus('🔄 Tentando AnimeFontes...')
@@ -636,7 +864,7 @@ export default function WatchPage() {
 
   useEffect(() => {
     if (anime) {
-      doLoad(anime, epNum, isDub, adSlug, afSlug)
+      doLoad(anime, epNum, isDub, adSlug, aqSlug, afSlug)
       const t = anime.title_english || anime.title || 'Anime'
       document.title = `${t} EP ${epNum} - Assistir | Up Anime+`
       saveHistory(anime, epNum)
@@ -644,7 +872,7 @@ export default function WatchPage() {
   }, [anime, epNum, isDub])
 
   const goEp = (n) => setSearchParams({ ep: n, ...(isDub ? { dub: '1' } : {}) })
-  const toggleDub = () => { setAfSlug(null); setAdSlug(null); setSearchParams({ ep: epNum, ...(!isDub ? { dub: '1' } : {}) }) }
+  const toggleDub = () => { setAfSlug(null); setAdSlug(null); setAqSlug(null); setSearchParams({ ep: epNum, ...(!isDub ? { dub: '1' } : {}) }) }
 
   const loadMoreEps = async () => {
     const next = epPage + 1
@@ -669,14 +897,19 @@ export default function WatchPage() {
 
   // Badge de provider para mostrar na UI
   const providerLabel = {
-    'DriveA':          '🚀 animesdrive.online',
-    'AnimeFire':       '🇧🇷 AnimeFire',
-    'MeusAnimes':      '📺 MeusAnimes',
-    'Goyabu':          '🎌 Goyabu',
-    'animesonlinecc':  '🌐 animesonlinecc',
-    'animesonline.cloud': '☁️ animesonline.cloud',
-    'AnimeFontes':     '🔁 AnimeFontes',
+    'DriveA':            '🚀 S1 AnimesDrive',
+    'AnimeQ':            '⚡ S2 AnimeQ',
+    'AniTube':           '📺 S3 AniTube',
+    'AnimeFire':         '🇧🇷 AnimeFire',
+    'MeusAnimes':        '📺 MeusAnimes',
+    'Goyabu':            '🎌 Goyabu',
+    'animesonlinecc':    '🌐 animesonlinecc',
+    'animesonline.cloud':'☁️ animesonline.cloud',
+    'AnimeFontes':       '🔁 AnimeFontes',
   }[provider] || provider
+
+  const srvDot = (ok) =>
+    ok === null ? '⚪' : ok ? '🟢' : '🔴'
 
   return (
     <div className="watch-page">
@@ -811,6 +1044,23 @@ export default function WatchPage() {
                 {providerLabel}
               </span>
             )}
+          </div>
+
+          {/* Status dos Servidores */}
+          <div className="server-status-bar">
+            <span className="srv-label">Servidores:</span>
+            <span className={`srv-chip${provider === 'DriveA' ? ' active' : ''}`}
+              title="animesdrive.online">
+              {srvDot(serverStatus.driveA)} S1 AnimesDrive
+            </span>
+            <span className={`srv-chip${provider === 'AnimeQ' ? ' active' : ''}`}
+              title="animeq.net">
+              {srvDot(serverStatus.animeQ)} S2 AnimeQ
+            </span>
+            <span className={`srv-chip${provider === 'AniTube' ? ' active' : ''}`}
+              title="anitube.zip">
+              {srvDot(serverStatus.aniTube)} S3 AniTube
+            </span>
           </div>
 
           {/* Ações */}
