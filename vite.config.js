@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: './',   // ← obrigatório para IPFS (caminhos relativos)
+  base: '/',
   server: {
     port: 3000,
   },
