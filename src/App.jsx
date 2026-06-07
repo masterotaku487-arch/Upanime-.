@@ -31,6 +31,7 @@ import { checkNewEpisodes, notifEnabled } from './services/notifications'
 import { loadAchievements, saveAchievements } from './services/achievements'
 import { FiAlertTriangle } from "react-icons/fi"
 import WelcomeBanner from './components/WelcomeBanner'
+import { useVidmolySync } from './hooks/useVidmolySync'
 import './App.css'
 
 function NotifChecker() {
@@ -58,6 +59,7 @@ function BetaAchievement() {
 function AppInner() {
   const { pathname } = useLocation()
   const isWatch = pathname.startsWith('/watch/')
+  useVidmolySync()
   const [showFeedback, setShowFeedback] = useState(false)
 
   return (
