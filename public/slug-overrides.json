@@ -62,6 +62,11 @@
     },
     "32995": {
       "leg": "yuri-on-ice",
+      "anitube": {
+        "leg": {
+          "1": "https://www.anitube.zip/video/959781/"
+        }
+      },
       "sources": {
         "animesonlinecc": {
           "leg": "yuri-on-ice"
@@ -98,15 +103,20 @@
     },
     "59571": {
       "_titulo": "Shingeki no Kyojin: The Last Attack",
+      "anitube": {
+        "leg": {
+          "1": "https://www.anitube.zip/video/1001420/"
+        },
+        "dub": {
+          "1": "https://www.anitube.zip/video/1001424/"
+        }
+      },
       "leg": "shingeki-no-kyojin-the-last-attack",
       "dub": "shingeki-no-kyojin-the-last-attack-dublado",
       "sources": {
         "animesonline": {
           "dub": "shingeki-no-kyojin-movie-kanketsu-hen-the-last-attack-dublado"
         }
-      },
-      "fallback": {
-        "1": "https://animes.strp2p.com/#ak6nz"
       }
     },
     "61316": {
@@ -127,6 +137,16 @@
           "dub": {
             "1": "https://aniplay.online/Midias/Animes/Letra-C/Chainsaw-Man-Movie/Dub/01.mp4"
           }
+        }
+      }
+    },
+    "60988": {
+      "_titulo": "MAL-60988",
+      "anitube": {
+        "leg": {
+          "1": "https://vidmoly.me/v/kmpx9yzm6snp",
+          "2": "https://vidmoly.me/v/e1p297to8oz6",
+          "3": "https://vidmoly.me/v/ay74gitd6pkt"
         }
       }
     }
