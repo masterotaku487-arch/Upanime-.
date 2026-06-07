@@ -147,6 +147,24 @@ const resolveDriveA = async (anime, ep, dub = false) => {
   const overrides = await loadOverrides()
   const ov = overrides[String(anime.mal_id)]
   if (ov?.drivea) {
+    // Suporte a directUrl: MP4 direto via ?proxy= (filmes do aniplay.online etc)
+    const directUrls = dub ? ov.drivea.directUrl?.dub : ov.drivea.directUrl?.leg
+    if (directUrls) {
+      const mp4 = directUrls[String(ep)] ?? directUrls['1']
+      if (mp4) {
+        console.log('[DriveA] ✅ (directUrl override)', mp4)
+        return {
+          slug: 'direct',
+          results: [{
+            type:      'mp4',
+            url:       mp4,
+            proxyUrl:  `${DA}/?proxy=${encodeURIComponent(mp4)}`,
+            isBlogger: false,
+            label:     dub ? 'Dublado' : 'Legendado',
+          }]
+        }
+      }
+    }
     const slug = (dub && ov.drivea.dub) ? ov.drivea.dub : ov.drivea.leg
     if (slug) {
       console.log('[DriveA] ✅ (override)', slug)
