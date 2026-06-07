@@ -116,6 +116,19 @@
     "62568": {
       "leg": "dr-stone-science-future-part-3",
       "dub": "dr-stone-science-future-part-3-dublado"
+    },
+    "44511": {
+      "_titulo": "Chainsaw Man: The Movie - Reze Arc",
+      "drivea": {
+        "directUrl": {
+          "leg": {
+            "1": "https://aniplay.online/Midias/Animes/Letra-C/Chainsaw-Man-Movie/01.mp4"
+          },
+          "dub": {
+            "1": "https://aniplay.online/Midias/Animes/Letra-C/Chainsaw-Man-Movie/Dub/01.mp4"
+          }
+        }
+      }
     }
   }
 }
