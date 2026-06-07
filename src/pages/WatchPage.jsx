@@ -316,6 +316,10 @@ const resolveAniTube = async (anime, ep, dub) => {
     ? (atOv.dub?.[String(ep)] || atOv.leg?.[String(ep)])
     : (atOv.leg?.[String(ep)] || atOv.dub?.[String(ep)])
   if (!epUrl) throw new Error(`AniTube: sem URL para EP ${ep}`)
+  // Se for embed direto (vidmoly, etc) — não passa pelo worker
+  if (epUrl.includes('vidmoly') || epUrl.includes('.html')) {
+    return { type: 'directEmbed', embedUrl: epUrl }
+  }
   return `${AT}/?url=${encodeURIComponent(epUrl)}`
 }
 
@@ -652,6 +656,15 @@ export default function WatchPage() {
     try {
       setStatus('📡 Tentando AniTube...')
       const atSrc = await resolveAniTube(animeObj, ep, dub)
+      // Embed direto (Vidmoly etc)
+      if (atSrc?.type === 'directEmbed') {
+        setCurrentSrc('__embed__')
+        setErrorMsg(atSrc.embedUrl)
+        setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+        setProvider('AniTube')
+        setLoading(false)
+        return
+      }
       setCurrentSrc(atSrc)
       setSources([{ label: 'AniTube', url: atSrc }])
       setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
