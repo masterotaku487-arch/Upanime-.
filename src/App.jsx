@@ -32,6 +32,9 @@ import { loadAchievements, saveAchievements } from './services/achievements'
 import { FiAlertTriangle } from "react-icons/fi"
 import WelcomeBanner from './components/WelcomeBanner'
 import { useVidmolySync } from './hooks/useVidmolySync'
+import GuestModal from './components/GuestModal'
+import UserProfilePage from './pages/UserProfilePage'
+import { useReferral } from './hooks/useReferral'
 import './App.css'
 
 function NotifChecker() {
@@ -60,6 +63,7 @@ function AppInner() {
   const { pathname } = useLocation()
   const isWatch = pathname.startsWith('/watch/')
   useVidmolySync()
+  useReferral()
   const [showFeedback, setShowFeedback] = useState(false)
 
   return (
@@ -84,6 +88,8 @@ function AppInner() {
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
           <Route path="/perfil"            element={<ProfilePage />} />
+          <Route path="/u/:userId"         element={<UserProfilePage />} />
+          <Route path="/meu-perfil"        element={<UserProfilePage />} />
           {/* Novas rotas */}
           <Route path="/fandubs"           element={<FanDubsPage />} />
           <Route path="/fandub/:id"        element={<FanDubDetailPage />} />
@@ -115,6 +121,7 @@ function AppInner() {
 export default function App() {
   return (
     <AuthProvider>
+      <GuestModal />
       <WelcomeBanner />
       <FavoritesProvider>
         <NotifChecker />
