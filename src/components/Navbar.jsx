@@ -120,6 +120,9 @@ export default function Navbar() {
                         <span>{user.email}</span>
                       </div>
                     </div>
+                    <Link to="/meu-perfil" className="user-dropdown-item" onClick={() => setShowUserMenu(false)}>
+                      <FiUser /> Meu Perfil
+                    </Link>
                     <Link to="/favoritos" className="user-dropdown-item" onClick={() => setShowUserMenu(false)}>
                       <FiHeart /> Meus Favoritos
                     </Link>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { FiHome, FiCompass, FiHeart, FiCalendar, FiSettings } from 'react-icons/fi'
+import { FiHome, FiCompass, FiHeart, FiCalendar, FiUser } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
 import './BottomNav.css'
 
@@ -8,7 +8,7 @@ const items = [
   { label: 'Explorar',  path: '/genres',    icon: FiCompass },
   { label: 'Favoritos', path: '/favoritos', icon: FiHeart },
   { label: 'Novidades', path: '/novidades', icon: FiCalendar },
-  { label: 'Config',    path: '/config',    icon: FiSettings },
+  { label: 'Perfil',    path: '/meu-perfil', icon: FiUser },
 ]
 
 export default function BottomNav() {

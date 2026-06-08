@@ -1,5 +1,6 @@
 // src/components/Comments.jsx
 import { useState, useEffect, useRef } from 'react'
+import { FiHeart, FiTrash2, FiSend } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
 import {
   getComments, addComment, deleteComment,
@@ -74,14 +75,6 @@ function GifPicker({ onSelect, onClose }) {
 }
 
 function CommentItem({ c, currentUserId, isAdmin, onDelete }) {
-  const [hearts, setHearts]   = useState(c._hearts || 0)
-  const [hearted, setHearted] = useState(false)
-
-  const handleHeart = () => {
-    setHearted(h => !h)
-    setHearts(n => hearted ? n - 1 : n + 1)
-  }
-
   const canDelete = isAdmin || c.user_id === currentUserId
 
   return (
@@ -103,11 +96,10 @@ function CommentItem({ c, currentUserId, isAdmin, onDelete }) {
           <img src={c.gif_url} alt="gif" className="cmnt-gif" loading="lazy" />
         )}
         <div className="cmnt-actions">
-          <button className={`cmnt-heart ${hearted ? 'active' : ''}`} onClick={handleHeart}>
-            {hearted ? '❤️' : '🤍'} {hearts > 0 && hearts}
-          </button>
           {canDelete && (
-            <button className="cmnt-delete" onClick={() => onDelete(c.id, c.user_id)}>🗑️</button>
+            <button className="cmnt-delete" onClick={() => onDelete(c.id, c.user_id)} title="Apagar">
+              <FiTrash2 size={13} />
+            </button>
           )}
         </div>
       </div>
@@ -193,12 +185,12 @@ export default function Comments({ animeId, ep = '1' }) {
 
   return (
     <div className="comments-wrap">
-      {/* Likes do episódio */}
-      <div className="ep-likes">
-        <button className={`ep-like-btn ${liked ? 'active' : ''}`} onClick={handleLike}>
-          {liked ? '❤️' : '🤍'} {likes.length > 0 && <span>{likes.length}</span>}
+      {/* Header comentários + like */}
+      <div className="comments-header">
+        <h3 className="comments-title">💬 Comentários <span>({comments.length})</span></h3>
+        <button className={`ep-like-btn ${liked ? 'liked' : ''}`} onClick={handleLike}>
+          <FiHeart /> {likes.length > 0 && <span>{likes.length}</span>} {liked ? 'Curtido' : 'Curtir EP'}
         </button>
-        <span className="ep-likes-label">curtidas neste episódio</span>
       </div>
 
       {/* Input de comentário */}
