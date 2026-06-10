@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getTopAnimeViews } from '../services/supabase'
 import { Link } from 'react-router-dom'
 import Hero from '../components/Hero'
 import AnimeCard from '../components/AnimeCard'
@@ -64,6 +65,7 @@ function AnimeRow({ title, link, animes, loading }) {
 }
 
 export default function Home() {
+  const [topWatched, setTopWatched] = useState([])
   const [seasonal, setSeasonal] = useState([])
   const [top,      setTop]      = useState([])
   const [popular,  setPopular]  = useState([])
@@ -111,7 +113,19 @@ export default function Home() {
     ],
   })
 
-  const heroAnimes = top.length > 0 ? top : seasonal
+  useEffect(() => {
+    getTopAnimeViews(6).then(data => { if (data?.length) setTopWatched(data) })
+  }, [])
+
+  const heroAnimes = topWatched.length >= 3
+    ? topWatched.map(a => ({
+        mal_id: a.anime_id,
+        title: a.anime_title,
+        title_english: a.anime_title,
+        images: { jpg: { large_image_url: a.anime_image, image_url: a.anime_image } },
+        _views: a.views,
+      }))
+    : (top.length > 0 ? top : seasonal)
 
   return (
     <div className="home">
