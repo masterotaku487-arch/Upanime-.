@@ -119,3 +119,82 @@
   transition: all .15s;
 }
 .profile-resgate-btn:hover { background: rgba(229,57,53,.15); border-style: solid; }
+
+/* ── VIP Card ─────────────────────────────────────────────── */
+.profile-vip-card {
+  padding: 1rem; border-radius: 12px;
+  background: rgba(255,215,0,.06);
+  border: 1px solid rgba(255,215,0,.2);
+  display: flex; flex-direction: column; gap: .6rem;
+  margin-bottom: 4px;
+}
+.profile-vip-header {
+  display: flex; justify-content: space-between;
+  font-weight: 700; font-size: .9rem;
+}
+.profile-vip-count { color: gold; }
+.profile-vip-bar {
+  height: 6px; background: rgba(255,255,255,.08);
+  border-radius: 3px; overflow: hidden;
+}
+.profile-vip-fill {
+  height: 100%;
+  background: linear-gradient(90deg, gold, #ffd700);
+  border-radius: 3px; transition: width .4s;
+}
+.profile-vip-desc { font-size: .8rem; color: #aaa; margin: 0; }
+.profile-ref-row { display: flex; gap: .4rem; }
+.profile-ref-input {
+  flex: 1; padding: .45rem .7rem;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px; color: #ccc;
+  font-size: .78rem; outline: none;
+}
+.profile-ref-copy {
+  display: flex; align-items: center; gap: .3rem;
+  padding: .45rem .8rem;
+  background: rgba(255,215,0,.15);
+  border: 1px solid rgba(255,215,0,.3);
+  border-radius: 8px; color: gold;
+  font-size: .8rem; cursor: pointer; white-space: nowrap;
+  transition: background .2s;
+}
+.profile-ref-copy:hover { background: rgba(255,215,0,.25); }
+.profile-vip-perks {
+  margin: 0; padding-left: 1.1rem;
+  display: flex; flex-direction: column; gap: .25rem;
+}
+.profile-vip-perks li { font-size: .8rem; color: #aaa; }
+
+.profile-vip-active {
+  padding: .7rem 1rem; border-radius: 10px;
+  background: rgba(255,215,0,.1);
+  border: 1px solid rgba(255,215,0,.25);
+  color: gold; font-weight: 700; font-size: .88rem;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 4px;
+}
+.profile-vip-active span { font-size: .75rem; color: #aaa; font-weight: 400; }
+
+/* ── Conquistas ───────────────────────────────────────────── */
+.profile-achievements {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: .5rem;
+}
+.profile-ach {
+  display: flex; flex-direction: column; align-items: center; gap: .25rem;
+  padding: .6rem .3rem; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  text-align: center; transition: all .2s; cursor: default;
+}
+.profile-ach.unlocked {
+  background: rgba(255,255,255,.05);
+  border-color: rgba(255,215,0,.2);
+}
+.profile-ach.locked {
+  background: rgba(255,255,255,.02);
+  opacity: .35; filter: grayscale(1);
+}
+.profile-ach .ach-icon { font-size: 1.4rem; }
+.profile-ach .ach-name { font-size: .65rem; font-weight: 600; color: #ccc; }

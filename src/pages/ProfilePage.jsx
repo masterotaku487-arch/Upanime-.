@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import './ProfilePage.css'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { FiArrowLeft, FiUser, FiSave, FiGift } from 'react-icons/fi'
+import { FiArrowLeft, FiUser, FiSave, FiGift, FiCopy, FiCheck, FiAward } from 'react-icons/fi'
+import { useAchievements, ACHIEVEMENTS } from '../hooks/useAchievements'
+import { useReferral } from '../hooks/useReferral'
+import { getProfile } from '../services/supabase'
 
 const REWARDS_API = 'https://rewards-proxy.masterotaku487.workers.dev'
 
@@ -18,9 +21,14 @@ export const savePrefs = (prefs) => {
 }
 
 export default function ProfilePage() {
-  const { user, login } = useAuth()
+  const { user, login, isVip, isAdmin } = useAuth()
   const nav = useNavigate()
   const [saved, setSaved] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [refCount, setRefCount] = useState(0)
+  const [dbProfile, setDbProfile] = useState(null)
+  const { getUnlocked, checkStats } = useAchievements()
+  const { getReferralLink, getMyReferralCount, VIP_THRESHOLD } = useReferral()
   const [rewards, setRewards] = useState(null)
   const [prefs, setPrefs] = useState({
     playerMode:  'internal',  // 'internal' | 'mx'
@@ -35,6 +43,12 @@ export default function ProfilePage() {
   }, [])
 
   useEffect(() => {
+    if (!user) return
+    getMyReferralCount().then(setRefCount)
+    getProfile(user.id).then(p => { if (p) setDbProfile(p) })
+  }, [user?.id])
+
+  useEffect(() => {
     if (!user?.id) return
     const uid = user.id
     fetch(`${REWARDS_API}/verificar/${uid}`)
@@ -44,6 +58,14 @@ export default function ProfilePage() {
   }, [user])
 
   const set = (key, val) => setPrefs(p => ({ ...p, [key]: val }))
+
+  const copyRefLink = () => {
+    const link = getReferralLink()
+    if (!link) return
+    navigator.clipboard.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const handleSave = () => {
     savePrefs(prefs)
@@ -102,6 +124,56 @@ export default function ProfilePage() {
               <div className="profile-xp-label">⭐ {rewards.xp} XP</div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* VIP / convites */}
+      {!isVip && !isAdmin && (
+        <div className="profile-vip-card">
+          <div className="profile-vip-header">
+            <span>💎 Torne-se VIP</span>
+            <span className="profile-vip-count">{refCount}/{VIP_THRESHOLD} convidados</span>
+          </div>
+          <div className="profile-vip-bar">
+            <div className="profile-vip-fill" style={{ width: `${Math.min(100,(refCount/VIP_THRESHOLD)*100)}%` }} />
+          </div>
+          <p className="profile-vip-desc">Convide {VIP_THRESHOLD - refCount} amigos para ganhar VIP por 90 dias!</p>
+          <div className="profile-ref-row">
+            <input readOnly className="profile-ref-input" value={getReferralLink() || ''} />
+            <button className="profile-ref-copy" onClick={copyRefLink}>
+              {copied ? <FiCheck /> : <FiCopy />} {copied ? 'Copiado!' : 'Copiar'}
+            </button>
+          </div>
+          <ul className="profile-vip-perks">
+            <li>🎭 GIFs nos comentários</li>
+            <li>💎 Badge VIP no perfil</li>
+            <li>⭐ Destaque no ranking</li>
+          </ul>
+        </div>
+      )}
+
+      {(isVip || isAdmin) && (
+        <div className="profile-vip-active">
+          {isAdmin ? '⚡ Você é ADM' : '💎 Você é VIP'}
+          {dbProfile?.vip_until && !isAdmin && (
+            <span>Válido até {new Date(dbProfile.vip_until).toLocaleDateString('pt-BR')}</span>
+          )}
+        </div>
+      )}
+
+      {/* Conquistas */}
+      <div className="profile-section">
+        <h3 className="profile-section-title"><FiAward /> Conquistas</h3>
+        <div className="profile-achievements">
+          {Object.entries(ACHIEVEMENTS).map(([id, a]) => {
+            const unlocked = getUnlocked().includes(id)
+            return (
+              <div key={id} className={`profile-ach ${unlocked ? 'unlocked' : 'locked'}`} title={a.desc}>
+                <span className="ach-icon">{unlocked ? a.icon : '🔒'}</span>
+                <span className="ach-name">{a.name}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
