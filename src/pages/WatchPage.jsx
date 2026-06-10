@@ -9,6 +9,8 @@ import VideoPlayer from '../components/VideoPlayer'
 import Comments from '../components/Comments'
 import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
+import { incrementAnimeViews, addWatchHistory } from '../services/supabase'
+import { useAuth } from '../context/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FONTE PRINCIPAL: DriveA Worker → animesdrive.online
