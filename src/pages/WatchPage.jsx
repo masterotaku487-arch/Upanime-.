@@ -505,6 +505,21 @@ export default function WatchPage() {
   const [sources,      setSources]      = useState([])
   const [currentSrc,   setCurrentSrc]   = useState('')
   const [afSlug,       setAfSlug]       = useState(null)
+  const { user } = useAuth()
+
+  const trackView = async (animeObj, ep) => {
+    if (!animeObj) return
+    const title = animeObj.title_english || animeObj.title || ''
+    const image = animeObj.images?.jpg?.large_image_url || animeObj.images?.jpg?.image_url || ''
+    const animeId = String(animeObj.mal_id)
+    try {
+      await incrementAnimeViews(animeId, title, image)
+      if (user) {
+        await addWatchHistory(user.id, animeId, title, image, Number(ep))
+      }
+    } catch {}
+  }
+
   const [adSlug,       setAdSlug]       = useState(null)   // slug animesdrive cacheado
   const [aqSlug,       setAqSlug]       = useState(null)   // slug animeq cacheado
   const [loading,      setLoading]      = useState(true)
@@ -646,6 +661,7 @@ export default function WatchPage() {
         setStatus('✅ AnimeQ (embed)')
         setProvider('AnimeQ')
         setLoading(false)
+        trackView(animeObj, ep)
         return
       }
     } catch (aqErr) {
@@ -663,6 +679,7 @@ export default function WatchPage() {
         setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
         setProvider('AniTube')
         setLoading(false)
+        trackView(animeObj, ep)
         return
       }
       setCurrentSrc(atSrc)
@@ -670,6 +687,7 @@ export default function WatchPage() {
       setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
       setProvider('AniTube')
       setLoading(false)
+      trackView(animeObj, ep)
       return
     } catch (atErr) {
       console.warn('[AniTube] falhou:', atErr.message)
@@ -715,6 +733,7 @@ export default function WatchPage() {
         setStatus(`✅ AnimeFire — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
         setProvider('AnimeFire')
         setLoading(false)
+        trackView(animeObj, ep)
         return
       }
     } catch (afErr) {
@@ -735,7 +754,7 @@ export default function WatchPage() {
           setCurrentSrc('__embed__'); setErrorMsg(embedUrl)
           setStatus(`✅ MeusAnimes${dub ? ' 🎙️ Dublado' : ' 📖 Legendado'} — EP${ep}`)
           setProvider('MeusAnimes')
-          setLoading(false); return
+          setLoading(false); trackView(animeObj, ep); return
         }
       }
 
@@ -749,7 +768,7 @@ export default function WatchPage() {
           setCurrentSrc('__embed__'); setErrorMsg(embedUrl)
           setStatus(`✅ Goyabu — EP${ep}`)
           setProvider('Goyabu')
-          setLoading(false); return
+          setLoading(false); trackView(animeObj, ep); return
         }
       }
     } catch (ovErr) {
@@ -776,13 +795,13 @@ export default function WatchPage() {
       if (ccData.iframe) {
         setCurrentSrc('__embed__'); setErrorMsg(ccData.iframe)
         setStatus('✅ animesonlinecc (embed)'); setProvider('animesonlinecc')
-        setLoading(false); return
+        setLoading(false); trackView(animeObj, ep); return
       }
       if (ccData.pageUrl) {
         setCurrentSrc('__embed__')
         setErrorMsg(`${RENDER_PROXY}/res?url=${encodeURIComponent(ccData.pageUrl)}`)
         setStatus('✅ animesonlinecc (página)'); setProvider('animesonlinecc')
-        setLoading(false); return
+        setLoading(false); trackView(animeObj, ep); return
       }
     } catch (ccErr) {
       console.warn('[animesonlinecc]', ccErr.message)
