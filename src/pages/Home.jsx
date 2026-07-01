@@ -135,6 +135,21 @@ export default function Home() {
 
       <div className="container">
 
+        {/* ── Banner Parceria Kwaiianime x UpAnime+ ── */}
+        <a
+          href="https://www.mediafire.com/file/7u6mf4r0p90aekc/kawaiianimes.apk/file"
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="partner-banner"
+          aria-label="Parceria oficial Kwaiianime x UpAnime+ — baixar app"
+        >
+          <img
+            src="/parceria-kwaiianime.png"
+            alt="Parceria Oficial Kwaiianime x UpAnime+"
+            loading="lazy"
+          />
+        </a>
+
         {/* ── Continuar Assistindo ── */}
         {history.length > 0 && (
           <section className="section continue-section">
