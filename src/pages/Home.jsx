@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { getTopAnimeViews } from '../services/supabase'
 import { Link } from 'react-router-dom'
 import Hero from '../components/Hero'
 import AnimeCard from '../components/AnimeCard'
@@ -7,6 +6,8 @@ import FanDubsHomeSection from '../components/FanDubsHomeSection'
 import { getSeasonNow, getTopAnime, getSeasonUpcoming } from '../services/api'
 import { getHistory, getEpProgress, removeHistory } from '../services/history'
 import './Home.css'
+
+const FANDUB_API = 'https://studio-proxy.masterotaku487.workers.dev'
 
 function useJsonLd(id, schema) {
   useEffect(() => {
@@ -65,7 +66,7 @@ function AnimeRow({ title, link, animes, loading }) {
 }
 
 export default function Home() {
-  const [topWatched, setTopWatched] = useState([])
+  const [featuredFanDubs, setFeaturedFanDubs] = useState([])
   const [seasonal, setSeasonal] = useState([])
   const [top,      setTop]      = useState([])
   const [popular,  setPopular]  = useState([])
@@ -113,19 +114,36 @@ export default function Home() {
     ],
   })
 
+  // Fan-dubs marcados como destaque (aceita alguns nomes de campo possíveis,
+  // já que não temos o código-fonte do studio-proxy pra confirmar o exato)
   useEffect(() => {
-    getTopAnimeViews(6).then(data => { if (data?.length) setTopWatched(data) })
+    fetch(`${FANDUB_API}/api/fanDubs`)
+      .then(r => r.json())
+      .then(d => {
+        const list = (d.fanDubs || []).filter(f =>
+          f.destaque === true || f.emDestaque === true || f.featured === true || f.destaque_home === true
+        )
+        setFeaturedFanDubs(list)
+      })
+      .catch(() => {})
   }, [])
 
-  const heroAnimes = topWatched.length >= 3
-    ? topWatched.map(a => ({
-        mal_id: a.anime_id,
-        title: a.anime_title,
-        title_english: a.anime_title,
-        images: { jpg: { large_image_url: a.anime_image, image_url: a.anime_image } },
-        _views: a.views,
-      }))
-    : (top.length > 0 ? top : seasonal)
+  // Fonte primária: API (top em exibição, com fallback pra temporada atual)
+  const apiFeatured = top.length > 0 ? top : seasonal
+
+  const fanDubFeatured = featuredFanDubs.map(d => ({
+    mal_id: d.id,
+    title: d.animeTitulo,
+    title_english: d.animeTitulo,
+    images: { jpg: { large_image_url: d.capa || d.animeCapa, image_url: d.capa || d.animeCapa } },
+    genres: d.genero ? [{ mal_id: 0, name: d.genero }] : [],
+    _isFanDub: true,
+  }))
+
+  // Intercala fandubs em destaque com o topo da API (fandub sempre em segundo, se existir)
+  const heroAnimes = fanDubFeatured.length
+    ? [apiFeatured[0], ...fanDubFeatured, ...apiFeatured.slice(1)].filter(Boolean)
+    : apiFeatured
 
   return (
     <div className="home">

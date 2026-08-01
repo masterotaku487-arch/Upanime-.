@@ -146,7 +146,17 @@
   font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 4px;
   background: rgba(255,255,255,0.08); color: var(--text-dim); border: 1px solid var(--border);
 }
+.wbadge { display: inline-flex; align-items: center; gap: 4px; }
 .wbadge.live { background: rgba(255,50,50,0.12); color: #ff6464; border-color: rgba(255,50,50,0.25); }
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #ff6464; display: inline-block;
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
 .watch-synopsis { font-size: 0.85rem; line-height: 1.7; color: rgba(240,240,240,0.6); }
 
 /* ── SIDEBAR ── */
@@ -264,4 +274,31 @@ code {
   color: var(--text-dim); cursor: pointer; transition: all .15s;
 }
 .report-ep-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* ── BARRA DE ÁUDIO/QUALIDADE (fix: essas classes existiam no JSX
+   mas nunca tiveram CSS — por isso o texto ficava sobreposto) ── */
+.audio-track-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.audio-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
+  white-space: nowrap; flex-shrink: 0;
+}
+.audio-toggle {
+  display: flex; gap: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px; flex-shrink: 0;
+}
+.track-btn {
+  padding: 6px 12px; border-radius: 6px;
+  font-size: 0.76rem; font-weight: 600;
+  color: var(--text-dim); white-space: nowrap;
+  transition: all var(--transition);
+}
+.track-btn:hover { color: var(--text); }
+.track-btn.active { background: var(--red); color: #fff; }
   

@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import {
+  FiChevronLeft, FiChevronRight, FiCast, FiDownload, FiMonitor, FiExternalLink,
+  FiShare2, FiCopy, FiCheck, FiHeadphones, FiTv, FiStar,
+} from 'react-icons/fi'
+import { BsFillCameraVideoFill } from 'react-icons/bs'
+import { FaWhatsapp } from 'react-icons/fa'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
 import { saveHistory } from '../services/history'
@@ -469,9 +474,38 @@ const openMXPlayer = (url, title) => {
   setTimeout(() => { if (!document.hidden) window.location.href = intentPro }, 1000)
 }
 
-const openADM = (url, fn) => {
-  window.location.href = `adm://add?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(fn)}`
-  setTimeout(() => window.open(url, '_blank'), 900)
+const downloadDirect = (url, fn) => {
+  const directUrl = getDirectUrl(url)
+  const a = document.createElement('a')
+  a.href = directUrl
+  a.download = fn || 'episodio.mp4'
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
+// Abre app de cast (Web Video Cast) via intent Android — mesmo padrão que já
+// funciona na página de Fan-Dub, agora usando a URL direta do vídeo
+const openCastTV = (url) => {
+  const directUrl = getDirectUrl(url)
+  window.location.href = `intent:${directUrl}#Intent;package=com.instantbits.cast.webvideo;action=android.intent.action.VIEW;type=video/*;end`
+  setTimeout(() => {
+    if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo', '_blank')
+  }, 2000)
+}
+
+// TapTap (downloader/cast para TV) — não achamos um esquema de intent oficial
+// documentado, então usamos o share sheet nativo do Android (o usuário escolhe
+// o TapTap na lista) com fallback pra Play Store se não tiver instalado
+const openTapTap = async (url, title) => {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url: getDirectUrl(url) })
+      return
+    } catch { /* usuário cancelou o share sheet */ }
+  }
+  window.open('https://play.google.com/store/apps/details?id=com.taptap.client.android.tv', '_blank')
 }
 
 
@@ -1022,18 +1056,18 @@ export default function WatchPage() {
 
           {/* Dub / Leg + Qualidade */}
           <div className="audio-track-bar">
-            <span className="audio-label">🎧 Áudio:</span>
+            <span className="audio-label"><FiHeadphones /> Áudio:</span>
             <div className="audio-toggle">
               <button className={`track-btn ${!isDub ? 'active' : ''}`} onClick={() => isDub && toggleDub()}>
-                🇧🇷 Legendado
+                Legendado
               </button>
               <button className={`track-btn ${isDub ? 'active' : ''}`} onClick={() => !isDub && toggleDub()}>
-                🎙️ Dublado
+                Dublado
               </button>
             </div>
             {sources.length > 1 && (
               <div className="quality-wrap">
-                <span>📺</span>
+                <FiMonitor />
                 {sources.map((s, i) => (
                   <button
                     key={s.url}
@@ -1056,33 +1090,35 @@ export default function WatchPage() {
           <div className="ext-actions">
             {currentSrc && (
               <>
-                <button className="ext-btn"
-                  onClick={() => window.open(`https://www.webvideocast.com/play?url=${encodeURIComponent(currentSrc)}`, '_blank')}>
-                  📡<span>Cast TV</span>
+                <button className="ext-btn" onClick={() => openCastTV(currentSrc)}>
+                  <FiCast /><span>Cast TV</span>
                 </button>
-                <button className="ext-btn" onClick={() => openADM(currentSrc, filename)}>
-                  ⬇️<span>Baixar</span>
+                <button className="ext-btn" onClick={() => openTapTap(currentSrc, `${title} EP${epNum}`)}>
+                  <FiTv /><span>TapTap</span>
+                </button>
+                <button className="ext-btn" onClick={() => downloadDirect(currentSrc, filename)}>
+                  <FiDownload /><span>Baixar</span>
                 </button>
                 <button className="ext-btn"
                   onClick={() => isMobile ? openMXPlayer(currentSrc, `${title} EP${epNum}`) : openVLC(currentSrc, `${title} EP${epNum}`)}>
-                  {isMobile ? <><span>🎬</span><span>MX Player</span></> : <><span>🖥️</span><span>VLC Player</span></>}
+                  {isMobile ? <><BsFillCameraVideoFill /><span>MX Player</span></> : <><FiMonitor /><span>VLC Player</span></>}
                 </button>
               </>
             )}
             <a href={adExternal} target="_blank" rel="noreferrer" className="ext-btn">
-              🚀<span>AnimesDrive</span>
+              <FiExternalLink /><span>AnimesDrive</span>
             </a>
             <div className="share-container">
-              <button className="ext-btn" onClick={() => setShowShare(o => !o)}>🔗<span>Share</span></button>
+              <button className="ext-btn" onClick={() => setShowShare(o => !o)}><FiShare2 /><span>Share</span></button>
               {showShare && (
                 <div className="share-dropdown">
                   <button onClick={() => {
                     navigator.clipboard.writeText(window.location.href)
                     setCopied(true); setTimeout(() => setCopied(false), 2000)
-                  }}>{copied ? '✅ Copiado!' : '📋 Copiar link'}</button>
-                  <a href={`https://wa.me/?text=${encodeURIComponent(`🔥 ${title} EP${epNum}\n${window.location.href}`)}`}
-                    target="_blank" rel="noreferrer">💬 WhatsApp</a>
-                  <a href={adExternal} target="_blank" rel="noreferrer">🚀 AnimesDrive</a>
+                  }}>{copied ? <FiCheck /> : <FiCopy />} {copied ? 'Copiado!' : 'Copiar link'}</button>
+                  <a href={`https://wa.me/?text=${encodeURIComponent(`${title} EP${epNum}\n${window.location.href}`)}`}
+                    target="_blank" rel="noreferrer"><FaWhatsapp /> WhatsApp</a>
+                  <a href={adExternal} target="_blank" rel="noreferrer"><FiExternalLink /> AnimesDrive</a>
                 </div>
               )}
             </div>
@@ -1108,9 +1144,9 @@ export default function WatchPage() {
               <Link to={`/anime/${id}`} className="back-link">← {title}</Link>
               <h1 className="watch-anime-title">{title}</h1>
               <div className="watch-badges">
-                {isDub ? <span className="wbadge dub">🎙️ Dublado</span> : <span className="wbadge sub">🇧🇷 Legendado</span>}
-                {anime.score && <span className="wbadge">⭐ {anime.score.toFixed(1)}</span>}
-                {anime.status === 'Currently Airing' && <span className="wbadge live">🔴 Em Exibição</span>}
+                {isDub ? <span className="wbadge dub"><FiHeadphones /> Dublado</span> : <span className="wbadge sub">🇧🇷 Legendado</span>}
+                {anime.score && <span className="wbadge"><FiStar /> {anime.score.toFixed(1)}</span>}
+                {anime.status === 'Currently Airing' && <span className="wbadge live"><span className="live-dot" /> Em Exibição</span>}
                 {anime.type && <span className="wbadge">{anime.type}</span>}
               </div>
               {synopsis && (
