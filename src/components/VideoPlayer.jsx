@@ -1,4 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
+import {
+  FiPlay, FiPause, FiVolume2, FiVolume1, FiVolumeX,
+  FiMaximize, FiMinimize, FiSkipForward,
+} from 'react-icons/fi'
+import { MdReplay10, MdForward10 } from 'react-icons/md'
 import './VideoPlayer.css'
 
 const fmt = (s) => {
@@ -189,7 +194,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
 
   const progress    = duration ? (currentTime / duration) * 100 : 0
   const bufferedPct = duration ? (buffered  / duration) * 100 : 0
-  const VolumeEmoji = muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'
+  const VolumeIcon  = muted || volume === 0 ? FiVolumeX : volume < 0.5 ? FiVolume1 : FiVolume2
 
   return (
     <div
@@ -216,7 +221,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
 
       {/* Ícone central */}
       {!playing && (
-        <div className="vp-center-icon" onClick={(e) => { e.stopPropagation(); togglePlay() }}>▶</div>
+        <div className="vp-center-icon" onClick={(e) => { e.stopPropagation(); togglePlay() }}><FiPlay /></div>
       )}
 
       {/* Skip intro */}
@@ -236,7 +241,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
 
       {showSkip && (
         <button className="vp-skip" onClick={skipIntro}>
-          ⏭ Pular Abertura
+          <FiSkipForward /> Pular Abertura
         </button>
       )}
 
@@ -268,18 +273,18 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         {/* ── BOTÕES ── */}
         <div className="vp-bar">
           <div className="vp-left">
-            <button className="vp-btn" onClick={togglePlay}>
-              {playing ? '⏸' : '▶'}
+            <button className="vp-btn" onClick={togglePlay} aria-label={playing ? 'Pausar' : 'Reproduzir'}>
+              {playing ? <FiPause /> : <FiPlay />}
             </button>
-            <button className="vp-btn" onClick={() => skip(-10)}>⏪</button>
-            <button className="vp-btn" onClick={() => skip(10)}>⏩</button>
+            <button className="vp-btn" onClick={() => skip(-10)} aria-label="Voltar 10 segundos"><MdReplay10 /></button>
+            <button className="vp-btn" onClick={() => skip(10)} aria-label="Avançar 10 segundos"><MdForward10 /></button>
 
             <div
               className="vp-vol-wrap"
               onMouseEnter={() => setShowVolume(true)}
               onMouseLeave={() => setShowVolume(false)}
             >
-              <button className="vp-btn" onClick={toggleMute}>{VolumeEmoji}</button>
+              <button className="vp-btn" onClick={toggleMute} aria-label="Volume"><VolumeIcon /></button>
               {showVolume && (
                 <input
                   type="range" min={0} max={1} step={0.05}
@@ -303,8 +308,8 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
                 ))}
               </select>
             )}
-            <button className="vp-btn" onClick={toggleFullscreen}>
-              {fullscreen ? '🗗' : '⛶'}
+            <button className="vp-btn" onClick={toggleFullscreen} aria-label="Tela cheia">
+              {fullscreen ? <FiMinimize /> : <FiMaximize />}
             </button>
           </div>
         </div>

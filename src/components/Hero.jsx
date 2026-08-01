@@ -35,6 +35,7 @@ export default function Hero({ animes }) {
 
   const anime = items[current]
   const image = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url
+  const linkBase = anime._isFanDub ? `/fandub/${anime.mal_id}` : `/anime/${anime.mal_id}`
 
   return (
     <section className="hero">
@@ -52,6 +53,7 @@ export default function Hero({ animes }) {
       <div className={`hero-content container ${animating ? 'animating' : ''}`}>
         <div className="hero-meta">
           <span className="hero-badge">🔥 EM DESTAQUE</span>
+          {anime._isFanDub && <span className="hero-badge hero-badge-dub">🎙️ FAN-DUB</span>}
           {anime.score && (
             <span className="hero-score"><FiStar /> {anime.score.toFixed(1)}</span>
           )}
@@ -71,10 +73,10 @@ export default function Hero({ animes }) {
         </div>
         {anime.synopsis && <HeroSynopsis synopsis={anime.synopsis} />}
         <div className="hero-actions">
-          <Link to={`/anime/${anime.mal_id}`} className="btn btn-primary">
+          <Link to={linkBase} className="btn btn-primary">
             <FiPlay /> Assistir Agora
           </Link>
-          <Link to={`/anime/${anime.mal_id}`} className="btn btn-ghost">
+          <Link to={linkBase} className="btn btn-ghost">
             <FiInfo /> Detalhes
           </Link>
         </div>

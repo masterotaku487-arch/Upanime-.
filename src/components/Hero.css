@@ -65,6 +65,11 @@
   padding: 4px 10px;
   border-radius: 4px;
 }
+.hero-badge-dub {
+  color: #5ddb80;
+  background: rgba(0, 200, 100, 0.1);
+  border-color: rgba(0, 200, 100, 0.3);
+}
 .hero-score {
   display: flex;
   align-items: center;
