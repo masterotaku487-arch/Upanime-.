@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { FiPlay, FiInfo, FiChevronLeft, FiChevronRight, FiStar } from 'react-icons/fi'
 import { useTranslatedSynopsis } from '../services/translate'
+import { translateGenre, translateStatus } from '../utils/genreLabels'
 import './Hero.css'
 
 // Sub-componente para sinopse traduzida de cada slide
@@ -66,10 +67,10 @@ export default function Hero({ animes }) {
         )}
         <div className="hero-tags">
           {anime.genres?.slice(0, 4).map(g => (
-            <span key={g.mal_id} className="hero-tag">{g.name}</span>
+            <span key={g.mal_id} className="hero-tag">{translateGenre(g.name)}</span>
           ))}
           {anime.episodes && <span className="hero-tag">{anime.episodes} eps</span>}
-          {anime.status && <span className="hero-tag">{anime.status}</span>}
+          {anime.status && <span className="hero-tag">{translateStatus(anime.status)}</span>}
         </div>
         {anime.synopsis && <HeroSynopsis synopsis={anime.synopsis} />}
         <div className="hero-actions">
