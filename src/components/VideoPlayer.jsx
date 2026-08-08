@@ -48,6 +48,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const containerRef = useRef(null)
   const seekRef      = useRef(null)
   const hideTimer    = useRef(null)
+  const wasVisibleRef = useRef(true)
 
   const [playing, setPlaying]           = useState(false)
   const [currentTime, setCurrentTime]   = useState(0)
@@ -201,7 +202,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       ref={containerRef}
       className={`vp-wrap ${showControls ? 'show-ctrl' : ''} ${fullscreen ? 'vp-fs' : ''}`}
       onMouseMove={resetHideTimer}
-      onTouchStart={resetHideTimer}
+      onTouchStart={() => { wasVisibleRef.current = showControls; resetHideTimer() }}
     >
       <video
         ref={videoRef}
@@ -216,8 +217,16 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         onError={onError}
       />
 
-      {/* Clique central */}
-      <div className="vp-click" onClick={togglePlay} />
+      {/* Toque na área do vídeo: primeiro toque só revela os controles,
+          só alterna play/pause quando os controles já estão visíveis
+          (evita pausar sem querer ao tocar pra ver a barra) */}
+      <div
+        className="vp-click"
+        onClick={() => {
+          if (!wasVisibleRef.current) { wasVisibleRef.current = true; return }
+          togglePlay()
+        }}
+      />
 
       {/* Ícone central */}
       {!playing && (
@@ -316,7 +325,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-      }
-
-
-         
+                                                   }
