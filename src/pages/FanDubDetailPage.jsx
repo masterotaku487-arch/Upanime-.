@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  FiShare2, FiCast, FiSmartphone, FiHeart, FiPlay, FiList, FiMic, FiInfo,
+  FiTv, FiMessageCircle, FiFileText, FiTag, FiShield, FiBarChart2,
+} from 'react-icons/fi'
 import Comments from '../components/Comments'
+import VideoPlayer from '../components/VideoPlayer'
+import { useFavorites } from '../context/FavoritesContext'
+import { useAuth } from '../context/AuthContext'
+import { saveHistory } from '../services/history'
 import './FanDubDetailPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
@@ -32,7 +40,8 @@ export default function FanDubDetailPage() {
   const [studioData, setStudioData] = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [tab,       setTab]       = useState('assistir')
-  const [fullscreen, setFullscreen] = useState(false)
+  const { toggle, isFav } = useFavorites()
+  const { user, openLogin } = useAuth()
 
   // Carrega o fan-dub
   useEffect(() => {
@@ -53,6 +62,26 @@ export default function FanDubDetailPage() {
       .catch(() => {})
   }, [fanDub?.studioId])
 
+  // Salva no histórico (Continuar Assistindo)
+  useEffect(() => {
+    if (!fanDub) return
+    const eps = Array.isArray(fanDub.listaEpisodios) && fanDub.listaEpisodios.length > 0
+      ? fanDub.listaEpisodios
+      : [{ ep: 1 }]
+    saveHistory({
+      mal_id: `fandub-${id}`,
+      title: fanDub.titulo,
+      title_english: fanDub.titulo,
+      images: {
+        jpg: {
+          large_image_url: fanDub.capa || fanDub.animeCapa,
+          image_url: fanDub.capa || fanDub.animeCapa,
+        },
+      },
+      episodes: eps.length,
+    }, epAtual)
+  }, [fanDub, epAtual, id])
+
   if (loading) return (
     <div className="fddetail-loading">
       <div className="skeleton" style={{ width: '100%', height: 280, borderRadius: 0 }} />
@@ -71,6 +100,27 @@ export default function FanDubDetailPage() {
   const epData   = episodios.find(e => e.ep === epAtual) || episodios[0]
   const videoSrc = driveToSrc(epData?.url || fanDub.embedUrl)
   const totalEps = episodios.length
+
+  const fanDubAsAnime = {
+    mal_id: `fandub-${id}`,
+    title: fanDub.titulo,
+    title_english: fanDub.titulo,
+    images: {
+      jpg: {
+        large_image_url: fanDub.capa || fanDub.animeCapa,
+        image_url: fanDub.capa || fanDub.animeCapa,
+      },
+    },
+    score: null,
+    type: 'Fan-Dub',
+    episodes: totalEps,
+    status: null,
+  }
+  const favorited = isFav(`fandub-${id}`)
+  const handleFav = () => {
+    if (!user) { openLogin(); return }
+    toggle(fanDubAsAnime)
+  }
 
   const goEp = (n) => setSp({ ep: n })
 
@@ -108,17 +158,6 @@ export default function FanDubDetailPage() {
     }, 2000)
   }
 
-  const toggleFS = () => {
-    const el = document.getElementById('fandub-iframe')
-    if (!document.fullscreenElement) {
-      el?.requestFullscreen?.()
-      setFullscreen(true)
-    } else {
-      document.exitFullscreen?.()
-      setFullscreen(false)
-    }
-  }
-
   const discord = discordUrl(studioData?.discord)
 
   return (
@@ -131,12 +170,19 @@ export default function FanDubDetailPage() {
         <div className="fddetail-grad" />
         <button className="fddetail-back" onClick={() => nav(-1)}>‹</button>
         <div className="fddetail-hero-info">
-          <div className="fddetail-anime-tag">🎌 {fanDub.animeTitulo}</div>
+          <div className="fddetail-anime-tag">{fanDub.animeTitulo}</div>
           <h1 className="fddetail-titulo">{fanDub.titulo}</h1>
           <div className="fddetail-meta">
             <span className="fddetail-badge">🇧🇷 {fanDub.idioma}</span>
             <span className="fddetail-badge">{fanDub.qualidade}</span>
-            <span className="fddetail-badge">📺 {totalEps} EP{totalEps > 1 ? 'S' : ''}</span>
+            <span className="fddetail-badge"><FiTv /> {totalEps} EP{totalEps > 1 ? 'S' : ''}</span>
+            <button
+              className={`fddetail-badge fddetail-fav-btn ${favorited ? 'active' : ''}`}
+              onClick={handleFav}
+              title={favorited ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+            >
+              <FiHeart fill={favorited ? 'currentColor' : 'none'} /> {favorited ? 'Favoritado' : 'Favoritar'}
+            </button>
           </div>
         </div>
       </div>
@@ -145,7 +191,7 @@ export default function FanDubDetailPage() {
       <div className="fddetail-studio-bar" onClick={() => nav(`/fandubs?studio=${fanDub.studioId}`)}>
         {fanDub.studioLogo
           ? <img src={fanDub.studioLogo} alt={fanDub.studioNome} className="fddetail-studio-logo" />
-          : <div className="fddetail-studio-avatar">🎙️</div>
+          : <div className="fddetail-studio-avatar"><FiMic /></div>
         }
         <div>
           <div className="fddetail-studio-label">Estúdio de dublagem</div>
@@ -159,10 +205,10 @@ export default function FanDubDetailPage() {
         {['assistir', 'episodios', 'elenco', 'info'].map(t => (
           <div key={t} className={`fddetail-tab ${tab === t ? 'active' : ''}`}
             onClick={() => setTab(t)}>
-            {t === 'assistir'  ? '▶ Assistir'
-           : t === 'episodios' ? '📋 EPs'
-           : t === 'elenco'    ? '🎙️ Elenco'
-           : 'ℹ️ Info'}
+            {t === 'assistir'  ? <><FiPlay /> Assistir</>
+           : t === 'episodios' ? <><FiList /> EPs</>
+           : t === 'elenco'    ? <><FiMic /> Elenco</>
+           : <><FiInfo /> Info</>}
           </div>
         ))}
       </div>
@@ -180,14 +226,12 @@ export default function FanDubDetailPage() {
 
           {/* Player nativo via studio-proxy */}
           <div className="fddetail-iframe-wrap">
-            <video
+            <VideoPlayer
               key={videoSrc}
-              className="fddetail-iframe"
               src={videoSrc}
-              controls
-              autoPlay
-              playsInline
-              preload="metadata"
+              title={fanDub.titulo}
+              animeId={`fandub-${id}`}
+              epNum={epAtual}
             />
           </div>
 
@@ -211,16 +255,13 @@ export default function FanDubDetailPage() {
           {/* Ações */}
           <div className="fddetail-acoes">
             <button className="fddetail-acao-btn" onClick={compartilhar}>
-              🔗 <span>Compartilhar</span>
+              <FiShare2 /> <span>Compartilhar</span>
             </button>
             <button className="fddetail-acao-btn" onClick={openCastTV}>
-              📡 <span>Cast TV</span>
-            </button>
-            <button className="fddetail-acao-btn" onClick={toggleFS}>
-              ⛶ <span>Tela cheia</span>
+              <FiCast /> <span>Cast TV</span>
             </button>
             <button className="fddetail-acao-btn" onClick={openNativePlayer}>
-              📱 <span>Player</span>
+              <FiSmartphone /> <span>Player</span>
             </button>
           </div>
 
@@ -231,7 +272,7 @@ export default function FanDubDetailPage() {
           {discord && (
             <a href={discord} target="_blank" rel="noopener noreferrer"
               className="fddetail-discord">
-              <span className="fddetail-discord-icon">💬</span>
+              <span className="fddetail-discord-icon"><FiMessageCircle /></span>
               <div className="fddetail-discord-text">
                 <span className="fddetail-discord-label">Comunidade oficial</span>
                 <span className="fddetail-discord-nome">Servidor do {fanDub.studioNome}</span>
@@ -251,7 +292,7 @@ export default function FanDubDetailPage() {
               onClick={() => { setTab('assistir'); goEp(e.ep) }}>
               <span className="fddetail-ep-num">EP {e.ep}</span>
               <span className="fddetail-ep-name">{e.titulo || `Episódio ${e.ep}`}</span>
-              {epAtual === e.ep && <span className="fddetail-ep-playing">▶</span>}
+              {epAtual === e.ep && <span className="fddetail-ep-playing"><FiPlay /></span>}
             </div>
           ))}
         </div>
@@ -265,7 +306,7 @@ export default function FanDubDetailPage() {
               <div key={i} className="fddetail-elenco-item">
                 <div className="elenco-personagem">{e.personagem}</div>
                 <div className="elenco-sep">→</div>
-                <div className="elenco-dublador">🎙️ {e.dublador}</div>
+                <div className="elenco-dublador"><FiMic /> {e.dublador}</div>
               </div>
             ))
           ) : (
@@ -279,20 +320,20 @@ export default function FanDubDetailPage() {
         <div className="fddetail-info-section">
           {fanDub.descricao && (
             <div className="fddetail-section">
-              <div className="fddetail-section-title">📝 Descrição</div>
+              <div className="fddetail-section-title"><FiFileText /> Descrição</div>
               <p className="fddetail-descricao">{fanDub.descricao}</p>
             </div>
           )}
           {fanDub.tags?.length > 0 && (
             <div className="fddetail-section">
-              <div className="fddetail-section-title">🏷️ Tags</div>
+              <div className="fddetail-section-title"><FiTag /> Tags</div>
               <div className="fddetail-tags">
                 {fanDub.tags.map((t, i) => <span key={i} className="fddetail-tag">{t}</span>)}
               </div>
             </div>
           )}
           <div className="fddetail-section">
-            <div className="fddetail-section-title">⚖️ Direitos Autorais</div>
+            <div className="fddetail-section-title"><FiShield /> Direitos Autorais</div>
             <div className="fddetail-direitos">
               <p>{fanDub.direitos}</p>
               <p style={{ marginTop: 8, fontSize: '.78rem', opacity: .6 }}>
@@ -301,7 +342,7 @@ export default function FanDubDetailPage() {
             </div>
           </div>
           <div className="fddetail-section">
-            <div className="fddetail-section-title">📊 Informações</div>
+            <div className="fddetail-section-title"><FiBarChart2 /> Informações</div>
             <div className="fddetail-meta-grid">
               <div className="fddetail-meta-item"><span>Anime</span><strong>{fanDub.animeTitulo}</strong></div>
               <div className="fddetail-meta-item"><span>Episódios</span><strong>{totalEps}</strong></div>
@@ -316,7 +357,7 @@ export default function FanDubDetailPage() {
           {discord && (
             <a href={discord} target="_blank" rel="noopener noreferrer"
               className="fddetail-discord">
-              <span className="fddetail-discord-icon">💬</span>
+              <span className="fddetail-discord-icon"><FiMessageCircle /></span>
               <div className="fddetail-discord-text">
                 <span className="fddetail-discord-label">Comunidade oficial</span>
                 <span className="fddetail-discord-nome">Servidor do {fanDub.studioNome}</span>

@@ -43,9 +43,12 @@ export default function FavoritesPage() {
       </div>
 
       <div className="favs-grid">
-        {sorted.map(anime => (
+        {sorted.map(anime => {
+          const isFanDub = String(anime.mal_id).startsWith('fandub-')
+          const link = isFanDub ? `/fandub/${String(anime.mal_id).replace('fandub-', '')}` : `/anime/${anime.mal_id}`
+          return (
           <div key={anime.mal_id} className="fav-card">
-            <Link to={`/anime/${anime.mal_id}`} className="fav-poster">
+            <Link to={link} className="fav-poster">
               {anime.image
                 ? <img src={anime.image} alt={anime.title} loading="lazy" />
                 : <div className="fav-no-img">?</div>
@@ -56,7 +59,7 @@ export default function FavoritesPage() {
               </div>
             </Link>
             <div className="fav-info">
-              <Link to={`/anime/${anime.mal_id}`} className="fav-title">{anime.title}</Link>
+              <Link to={link} className="fav-title">{anime.title}</Link>
               <div className="fav-meta">
                 {anime.episodes && <span>{anime.episodes} eps</span>}
                 {anime.status   && <span>{anime.status === 'Currently Airing' ? '🔴 Em exibição' : anime.status === 'Finished Airing' ? 'Completo' : anime.status}</span>}
@@ -70,7 +73,8 @@ export default function FavoritesPage() {
               </button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

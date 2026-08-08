@@ -2,23 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getGenres, getTopAnime } from '../services/api'
 import AnimeCard from '../components/AnimeCard'
+import { GENRE_LABELS } from '../utils/genreLabels'
 import './GenresPage.css'
 
-const GENRE_LABELS = {
-  'Action':'Ação','Adventure':'Aventura','Comedy':'Comédia','Drama':'Drama',
-  'Fantasy':'Fantasia','Horror':'Terror','Mystery':'Mistério','Romance':'Romance',
-  'Sci-Fi':'Sci-Fi','Slice of Life':'Slice of Life','Sports':'Esportes',
-  'Supernatural':'Sobrenatural','Thriller':'Suspense','Mecha':'Mecha',
-  'Music':'Musical','Psychological':'Psicológico','Ecchi':'Ecchi','Isekai':'Isekai',
-  'Shounen':'Shounen','Shoujo':'Shoujo','Seinen':'Seinen','Josei':'Josei',
-  'Historical':'Histórico','Military':'Militar','Harem':'Harem',
-  'School':'Vida Escolar','Magic':'Magia','Demons':'Demônios','Vampire':'Vampiro',
-  'Samurai':'Samurai','Space':'Espaço','Game':'Jogos','Cars':'Carros',
-  'Parody':'Paródia','Martial Arts':'Artes Marciais','Super Power':'Super Poderes',
-  'Kids':'Infantil','Girls Love':'Girls Love','Boys Love':'Boys Love',
-  'Avant Garde':'Avant Garde','Award Winning':'Premiado','Gourmet':'Gastronomia',
-  'Suspense':'Suspense','Gore':'Gore','Erotica':'Adulto',
-}
 
 const SORTS = [
   { label: 'Mais populares', value: 'bypopularity' },

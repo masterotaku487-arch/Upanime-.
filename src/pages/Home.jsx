@@ -25,9 +25,13 @@ function useJsonLd(id, schema) {
 
 function ContinueCard({ entry, onRemove }) {
   const pct = getEpProgress(entry.mal_id, entry.lastEp) ?? 0
+  const isFanDub = String(entry.mal_id).startsWith('fandub-')
+  const realId = isFanDub ? String(entry.mal_id).replace('fandub-', '') : entry.mal_id
+  const watchLink = isFanDub ? `/fandub/${realId}?ep=${entry.lastEp}` : `/watch/${entry.mal_id}?ep=${entry.lastEp}`
+  const infoLink  = isFanDub ? `/fandub/${realId}` : `/anime/${entry.mal_id}`
   return (
     <div className="continue-card">
-      <Link to={`/watch/${entry.mal_id}?ep=${entry.lastEp}`} className="continue-thumb">
+      <Link to={watchLink} className="continue-thumb">
         <img src={entry.image} alt={entry.title} loading="lazy" />
         <div className="continue-overlay">▶</div>
         <div className="continue-bar">
@@ -35,7 +39,7 @@ function ContinueCard({ entry, onRemove }) {
         </div>
       </Link>
       <div className="continue-info">
-        <Link to={`/anime/${entry.mal_id}`} className="continue-title">{entry.title}</Link>
+        <Link to={infoLink} className="continue-title">{entry.title}</Link>
         <span className="continue-ep">EP {entry.lastEp}</span>
       </div>
       <button className="continue-remove" onClick={() => onRemove(entry.mal_id)} title="Remover">✕</button>

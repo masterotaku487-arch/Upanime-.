@@ -474,15 +474,30 @@ const openMXPlayer = (url, title) => {
   setTimeout(() => { if (!document.hidden) window.location.href = intentPro }, 1000)
 }
 
-const downloadDirect = (url, fn) => {
-  const directUrl = getDirectUrl(url)
-  const a = document.createElement('a')
-  a.href = directUrl
-  a.download = fn || 'episodio.mp4'
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+// Baixa via blob: com <a download> puro, se o CDN não manda o header
+// Content-Disposition (nenhum dos nossos manda), o navegador ignora o
+// atributo "download" em link cross-origin e só abre/reproduz o vídeo.
+// Buscando como blob primeiro, o "Salvar como" é forçado de verdade.
+// Importante: usa a URL PROXIED (currentSrc, não getDirectUrl) porque
+// os workers de proxy já liberam CORS e mandam o Referer certo — a URL
+// crua do CDN muitas vezes bloqueia o fetch().
+const downloadDirect = async (url, fn) => {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = fn || 'episodio.mp4'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+  } catch (err) {
+    console.warn('[download] blob falhou, abrindo em nova aba pra salvar manualmente:', err.message)
+    window.open(getDirectUrl(url), '_blank')
+  }
 }
 
 // Abre app de cast (Web Video Cast) via intent Android — mesmo padrão que já
@@ -564,6 +579,7 @@ export default function WatchPage() {
   const [errorMsg,     setErrorMsg]     = useState('')
   const [showShare,    setShowShare]    = useState(false)
   const [copied,       setCopied]       = useState(false)
+  const [downloading,  setDownloading]  = useState(false)
   const [newAchievements, setNewAchievements] = useState([])
   const [showBugReport,   setShowBugReport]   = useState(false)
   const [fallbackUrl,     setFallbackUrl]     = useState(null)
@@ -1096,8 +1112,12 @@ export default function WatchPage() {
                 <button className="ext-btn" onClick={() => openTapTap(currentSrc, `${title} EP${epNum}`)}>
                   <FiTv /><span>TapTap</span>
                 </button>
-                <button className="ext-btn" onClick={() => downloadDirect(currentSrc, filename)}>
-                  <FiDownload /><span>Baixar</span>
+                <button className="ext-btn" disabled={downloading} onClick={async () => {
+                  setDownloading(true)
+                  await downloadDirect(currentSrc, filename)
+                  setDownloading(false)
+                }}>
+                  <FiDownload /><span>{downloading ? 'Baixando...' : 'Baixar'}</span>
                 </button>
                 <button className="ext-btn"
                   onClick={() => isMobile ? openMXPlayer(currentSrc, `${title} EP${epNum}`) : openVLC(currentSrc, `${title} EP${epNum}`)}>

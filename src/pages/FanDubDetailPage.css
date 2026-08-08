@@ -9,6 +9,9 @@
 .fddetail-titulo { font-family: var(--font-cond,'Barlow Condensed',sans-serif); font-size: 1.6rem; font-weight: 900; line-height: 1.1; margin-bottom: 10px; }
 .fddetail-meta { display: flex; gap: 6px; flex-wrap: wrap; }
 .fddetail-badge { font-size: .68rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); }
+.fddetail-fav-btn { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: all .2s; }
+.fddetail-fav-btn:hover { background: rgba(255,255,255,.18); }
+.fddetail-fav-btn.active { color: #e8001c; background: rgba(232,0,28,.14); border-color: rgba(232,0,28,.35); }
 
 .fddetail-studio-bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--card,#111); border-bottom: 1px solid var(--border,#222); cursor: pointer; }
 .fddetail-studio-logo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border,#222); }
