@@ -3,3 +3,7 @@ dist
 .env
 .env.local
 .DS_Store
+android/local.properties
+node_modules/
+dist/
+pnpm-workspace.yaml

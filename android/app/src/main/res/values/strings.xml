@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UpAnime+</string>
+    <string name="title_activity_main">UpAnime+</string>
+    <string name="package_name">io.upanime.app</string>
+    <string name="custom_url_scheme">io.upanime.app</string>
+</resources>

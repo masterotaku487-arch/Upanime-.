@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import {
   FiChevronLeft, FiChevronRight, FiCast, FiDownload, FiMonitor, FiExternalLink,
   FiShare2, FiCopy, FiCheck, FiHeadphones, FiTv, FiStar,
 } from 'react-icons/fi'
 import { BsFillCameraVideoFill } from 'react-icons/bs'
 import { FaWhatsapp } from 'react-icons/fa'
-import { getAnimeById, getAnimeEpisodes } from '../services/api'
+import { getAnimeById, getAnimeEpisodes, searchAnime, getShinokaiPlayUrl } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
 import { saveHistory } from '../services/history'
 import { recordWatched, ACHIEVEMENTS } from '../services/achievements'
@@ -31,8 +32,7 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
 // SK = proxy seguro da Shinokai (chave AES e URL base ficam no worker, não aqui)
-const SK      = 'https://upanime-api.masterotaku487.workers.dev'
-const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
+const isNativeApp = Capacitor.isNativePlatform()
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
 const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
@@ -70,10 +70,8 @@ async function findShinokaiId(anime, epNum, dub) {
   const queries = [...new Set([anime.title_english, anime.title, anime.title_japanese].filter(Boolean))]
   let items = []
   for (const query of queries) {
-    const res = await fetch(`${SK}/search?q=${encodeURIComponent(query)}`)
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(`Shinokai search HTTP ${res.status}`)
-    items = shinokaiList(data)
+    const data = await searchAnime(query)
+    items = Array.isArray(data?.data) ? data.data : []
     if (items.length) break
   }
   if (!items.length) throw new Error('Anime não encontrado na Shinokai')
@@ -98,10 +96,8 @@ async function findShinokaiId(anime, epNum, dub) {
     const mediaId = item.shinokai_id || item.id
     if (!mediaId) continue
     try {
-      const res = await fetch(`${SK}/episodes?id=${encodeURIComponent(mediaId)}`)
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) continue
-      const list = shinokaiList(data)
+      const data = await getAnimeEpisodes(mediaId)
+      const list = Array.isArray(data?.data) ? data.data : []
       const episode = list.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
       const variants = Array.isArray(episode?.variants) ? episode.variants : []
       const hasWantedAudio = variants.some(v => dub
@@ -119,10 +115,8 @@ async function findShinokaiId(anime, epNum, dub) {
 
 // Busca os episódios e pega o epId + melhor variantId pro ep desejado
 async function getShinokaiEp(mediaId, epNum, dub) {
-  const res = await fetch(`${SK}/episodes?id=${encodeURIComponent(mediaId)}`)
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `Shinokai episodes HTTP ${res.status}`)
-  const episodes = shinokaiList(data)
+  const data = await getAnimeEpisodes(mediaId)
+  const episodes = Array.isArray(data?.data) ? data.data : []
 
   const ep = episodes.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
   if (!ep) throw new Error(`EP ${epNum} não encontrado na Shinokai`)
@@ -144,13 +138,7 @@ async function getShinokaiEp(mediaId, epNum, dub) {
 async function resolveShinokai(anime, ep, dub) {
   const mediaId = await findShinokaiId(anime, ep, dub)
   const { epId, varId, label } = await getShinokaiEp(mediaId, ep, dub)
-  const params = new URLSearchParams({ id: mediaId, ep: epId, var: varId })
-  const res = await fetch(`${SK}/play?${params.toString()}`)
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `Shinokai play HTTP ${res.status}`)
-  const url = data.url || data.videoUrl || data.playUrl || data.source?.url
-  if (!url) throw new Error('URL de vídeo vazia na Shinokai')
-
+  const url = await getShinokaiPlayUrl(mediaId, epId, varId)
   return { url, label }
 }
 
@@ -707,7 +695,7 @@ export default function WatchPage() {
   const [serverStatus,    setServerStatus]    = useState({ driveA: null, animeQ: null, aniTube: null })
 
   useEffect(() => {
-    checkServers().then(setServerStatus)
+    if (!isNativeApp) checkServers().then(setServerStatus)
   }, [])
 
   useEffect(() => {
@@ -736,7 +724,7 @@ export default function WatchPage() {
       const overrides = await loadOverrides()
       const ov = overrides[String(animeObj.mal_id)]
       const fbUrl = ov?.fallback?.[String(ep)]
-      if (fbUrl) {
+      if (fbUrl && !isNativeApp) {
         console.log('[fallback imediato]', fbUrl)
         setFallbackUrl(fbUrl); setError(true); setLoading(false); return
       }
@@ -744,7 +732,7 @@ export default function WatchPage() {
 
     // ── FONTE 0: Shinokai (Nova Fonte Principal) ─────────────────────────────
     try {
-      setStatus('📡 Conectando ao Shinokai (Túnel)...')
+      setStatus('📡 Conectando diretamente ao Shinokai...')
       const skResult = await resolveShinokai(animeObj, ep, dub)
       
       setSources([{ label: skResult.label, url: skResult.url }])
@@ -755,7 +743,14 @@ export default function WatchPage() {
       trackView(animeObj, ep)
       return
     } catch (skErr) {
-      console.warn('[Shinokai] falhou:', skErr.message)
+      console.warn('[Shinokai direto] falhou:', skErr.message)
+      if (isNativeApp) {
+        setErrorMsg(skErr.message || 'Falha na conexão direta com a Shinokai')
+        setStatus('❌ Shinokai indisponível')
+        setLoading(false)
+        setError(true)
+        return
+      }
     }
 
     // ── FONTE 1: DriveA → animesdrive.online ─────────────────────────────────
