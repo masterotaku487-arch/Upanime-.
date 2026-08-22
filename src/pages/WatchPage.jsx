@@ -30,7 +30,7 @@ import { useAuth } from '../context/AuthContext'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
-const SK      = 'https://curly.masterotaku487.workers.dev'   // Fonte Principal - Shinokai (Túnel)
+const SK      = 'https://upanime-tunnel.masterotaku487.workers.dev'   // Fonte Principal - Shinokai (Túnel)
 const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
