@@ -39,50 +39,92 @@ const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitub
 
 // ── Shinokai (Fonte Principal — chave e URL ficam no worker, não aqui) ───────
 
+// Normaliza os formatos que o Worker pode devolver: array, { data }, { results } ou { episodes }
+const shinokaiList = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.episodes)) return payload.episodes
+  return []
+}
+
+const shinokaiTitle = (media) => {
+  if (typeof media?.title === 'string') return media.title
+  if (media?.title && typeof media.title === 'object') {
+    return media.title.romaji || media.title.english || media.title.native || ''
+  }
+  return media?.name || ''
+}
+
+const normalizeTitle = (value) => String(value || '')
+  .toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9\s]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+
 // Busca o mediaId da Shinokai pelo título do anime
 async function findShinokaiId(anime) {
-  const q = encodeURIComponent(anime.title_english || anime.title)
-  const res = await fetch(`${SK}/search?q=${q}`)
-  if (!res.ok) throw new Error(`Shinokai search HTTP ${res.status}`)
-  const data = await res.json()
-  if (!data.data?.length) throw new Error('Anime não encontrado na Shinokai')
+  const queries = [...new Set([anime.title_english, anime.title, anime.title_japanese].filter(Boolean))]
+  let items = []
+  for (const query of queries) {
+    const res = await fetch(`${SK}/search?q=${encodeURIComponent(query)}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(`Shinokai search HTTP ${res.status}`)
+    items = shinokaiList(data)
+    if (items.length) break
+  }
+  if (!items.length) throw new Error('Anime não encontrado na Shinokai')
 
-  // Tenta casar pelo mal_id primeiro, senão pega o primeiro resultado
-  const byMal = data.data.find(m => String(m.mal_id) === String(anime.mal_id))
-  return byMal ? byMal.shinokai_id : data.data[0].shinokai_id
+  const wanted = normalizeTitle(anime.title_english || anime.title)
+  const ranked = [...items].sort((a, b) => {
+    const score = (item) => {
+      const title = normalizeTitle(shinokaiTitle(item))
+      const exact = title === wanted ? 100 : 0
+      const overlap = wanted.split(' ').filter(t => t.length > 2 && title.includes(t)).length
+      return exact + overlap
+    }
+    return score(b) - score(a)
+  })
+  const selected = ranked[0]
+  return selected.shinokai_id || selected.id
 }
 
 // Busca os episódios e pega o epId + melhor variantId pro ep desejado
 async function getShinokaiEp(mediaId, epNum, dub) {
-  const res = await fetch(`${SK}/episodes?id=${mediaId}`)
-  if (!res.ok) throw new Error(`Shinokai episodes HTTP ${res.status}`)
-  const data = await res.json()
-  const episodes = data.data || []
+  const res = await fetch(`${SK}/episodes?id=${encodeURIComponent(mediaId)}`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `Shinokai episodes HTTP ${res.status}`)
+  const episodes = shinokaiList(data)
 
-  const ep = episodes.find(e => String(e.number) === String(epNum))
+  const ep = episodes.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
   if (!ep) throw new Error(`EP ${epNum} não encontrado na Shinokai`)
 
-  // Escolhe variante: dub se existir e pedido, senão leg
-  const variants = ep.variants || []
-  const dubVar = variants.find(v => v.lang?.toLowerCase().includes('dub') || v.label?.toLowerCase().includes('dub'))
-  const legVar = variants.find(v => !v.lang?.toLowerCase().includes('dub'))
-  const chosen = (dub && dubVar) ? dubVar : (legVar || variants[0])
+  const variants = Array.isArray(ep.variants) ? ep.variants : []
+  const hasDub = (variant) => /dub|dublado|pt[- ]?br|portuguese/i.test(JSON.stringify(variant))
+  const hasLeg = (variant) => /sub|leg|legendado|japanese/i.test(JSON.stringify(variant))
+  const chosen = (dub ? variants.find(hasDub) : variants.find(hasLeg)) || variants[0]
 
   if (!chosen) throw new Error('Nenhuma variante disponível')
-  return { epId: ep.id, varId: chosen.id, label: chosen.label || (dub ? 'Dublado' : 'Legendado') }
+  return {
+    epId: ep.id,
+    varId: chosen.id || chosen.variantId || ep.id,
+    label: chosen.label || chosen.audioType || (dub ? 'Dublado' : 'Legendado'),
+  }
 }
 
 // Resolve tudo e devolve { url, label }
 async function resolveShinokai(anime, ep, dub) {
   const mediaId = await findShinokaiId(anime)
   const { epId, varId, label } = await getShinokaiEp(mediaId, ep, dub)
+  const params = new URLSearchParams({ id: mediaId, ep: epId, var: varId })
+  const res = await fetch(`${SK}/play?${params.toString()}`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `Shinokai play HTTP ${res.status}`)
+  const url = data.url || data.videoUrl || data.playUrl || data.source?.url
+  if (!url) throw new Error('URL de vídeo vazia na Shinokai')
 
-  const res = await fetch(`${SK}/play?id=${mediaId}&ep=${epId}&var=${varId}`)
-  if (!res.ok) throw new Error(`Shinokai play HTTP ${res.status}`)
-  const data = await res.json()
-  if (!data.url) throw new Error('URL de vídeo vazia na Shinokai')
-
-  return { url: data.url, label }
+  return { url, label }
 }
 
 // Sites
