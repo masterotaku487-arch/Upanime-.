@@ -29,14 +29,23 @@ const ENDPOINTS = [
 
   // ── Servidores de vídeo ───────────────────────────────────────────────────
   {
+    id: 'srv0',
+    label: 'Servidor 0',
+    sublabel: 'Shinokai · Principal',
+    icon: '🔥',
+    group: 'Vídeo',
+    url: 'https://curly.masterotaku487.workers.dev/home',
+    method: 'GET',
+    badge: 'PRINCIPAL',
+  },
+  {
     id: 'srv1',
     label: 'Servidor 1',
-    sublabel: 'AnimesDrive · Principal',
+    sublabel: 'AnimesDrive · Alternativo',
     icon: '🚀',
     group: 'Vídeo',
     url: 'https://drivea.masterotaku487.workers.dev/?url=https://animesdrive.online/episodio/naruto-episodio-01',
     method: 'GET',
-    badge: 'PRINCIPAL',
   },
   {
     id: 'srv2',
