@@ -132,37 +132,40 @@ const resolveShinokai = async (animeObj, ep, dub) => {
   
   const headers = { "X-Tunnel-Secret": TUNNEL_SECRET };
   // 1. Busca o anime
-  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`, { headers })
+  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`, { headers, signal: AbortSignal.timeout(10000) })
+  if (!searchRes.ok) throw new Error(`HTTP ${searchRes.status} ao buscar anime`)
   const searchData = await searchRes.json()
-  const results = searchData.results || searchData
+  const results = Array.isArray(searchData) ? searchData : (searchData.results || [])
   
+  if (!results.length) throw new Error('Nenhum resultado no Shinokai')
+
   const match = results.find(item => 
     item.title.toLowerCase().includes(title.toLowerCase()) || 
     title.toLowerCase().includes(item.title.toLowerCase())
   ) || results[0]
-
-  if (!match) throw new Error('Anime não encontrado no Shinokai')
   
   // 2. Busca episódios
-  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`, { headers })
+  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`, { headers, signal: AbortSignal.timeout(10000) })
+  if (!epsRes.ok) throw new Error(`HTTP ${epsRes.status} ao buscar episódios`)
   const epsData = await epsRes.json()
-  const episodes = epsData.results || epsData
+  const episodes = Array.isArray(epsData) ? epsData : (epsData.results || [])
   
   // 3. Encontra o episódio e a variante (dub/leg)
-  const episode = episodes.find(e => e.number === ep || e.number === String(ep))
+  const episode = episodes.find(e => e.number === ep || e.number === String(ep) || e.number === Number(ep))
   if (!episode) throw new Error(`Episódio ${ep} não encontrado no Shinokai`)
   
-  const variant = episode.variants.find(v => 
+  const variant = episode.variants?.find(v => 
     (v.audioType || v.type || '').toUpperCase() === (dub ? 'DUBBED' : 'SUBTITLED')
   )
   if (!variant) throw new Error(`Versão ${dub ? 'Dublada' : 'Legendada'} não disponível`)
 
-  // 4. Retorna a URL de play (que já sai tunelada pelo worker)
+  // 4. Retorna a URL de play
   const playUrl = `${SK}/medias/${match.id}/episodes/${episode.id}/play?variantId=${variant.id}`
-  const playRes = await fetch(playUrl, { headers })
+  const playRes = await fetch(playUrl, { headers, signal: AbortSignal.timeout(10000) })
+  if (!playRes.ok) throw new Error(`HTTP ${playRes.status} ao obter link de vídeo`)
   const playData = await playRes.json()
   
-  if (!playData.url) throw new Error('Falha ao obter link de vídeo do Shinokai')
+  if (!playData.url) throw new Error('URL de vídeo vazia no Shinokai')
   
   return {
     url: playData.url,
