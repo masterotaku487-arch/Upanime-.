@@ -30,9 +30,60 @@ import { useAuth } from '../context/AuthContext'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
+// SK = proxy seguro da Shinokai (chave AES e URL base ficam no worker, não aqui)
+const SK      = 'https://shinokai-proxy.masterotaku487.workers.dev'
+const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
 const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
+
+// ── Shinokai (Fonte Principal — chave e URL ficam no worker, não aqui) ───────
+
+// Busca o mediaId da Shinokai pelo título do anime
+async function findShinokaiId(anime) {
+  const q = encodeURIComponent(anime.title_english || anime.title)
+  const res = await fetch(`${SK}/search?q=${q}`)
+  if (!res.ok) throw new Error(`Shinokai search HTTP ${res.status}`)
+  const data = await res.json()
+  if (!data.data?.length) throw new Error('Anime não encontrado na Shinokai')
+
+  // Tenta casar pelo mal_id primeiro, senão pega o primeiro resultado
+  const byMal = data.data.find(m => String(m.mal_id) === String(anime.mal_id))
+  return byMal ? byMal.shinokai_id : data.data[0].shinokai_id
+}
+
+// Busca os episódios e pega o epId + melhor variantId pro ep desejado
+async function getShinokaiEp(mediaId, epNum, dub) {
+  const res = await fetch(`${SK}/episodes?id=${mediaId}`)
+  if (!res.ok) throw new Error(`Shinokai episodes HTTP ${res.status}`)
+  const data = await res.json()
+  const episodes = data.data || []
+
+  const ep = episodes.find(e => String(e.number) === String(epNum))
+  if (!ep) throw new Error(`EP ${epNum} não encontrado na Shinokai`)
+
+  // Escolhe variante: dub se existir e pedido, senão leg
+  const variants = ep.variants || []
+  const dubVar = variants.find(v => v.lang?.toLowerCase().includes('dub') || v.label?.toLowerCase().includes('dub'))
+  const legVar = variants.find(v => !v.lang?.toLowerCase().includes('dub'))
+  const chosen = (dub && dubVar) ? dubVar : (legVar || variants[0])
+
+  if (!chosen) throw new Error('Nenhuma variante disponível')
+  return { epId: ep.id, varId: chosen.id, label: chosen.label || (dub ? 'Dublado' : 'Legendado') }
+}
+
+// Resolve tudo e devolve { url, label }
+async function resolveShinokai(anime, ep, dub) {
+  const mediaId = await findShinokaiId(anime)
+  const { epId, varId, label } = await getShinokaiEp(mediaId, ep, dub)
+
+  const res = await fetch(`${SK}/play?id=${mediaId}&ep=${epId}&var=${varId}`)
+  if (!res.ok) throw new Error(`Shinokai play HTTP ${res.status}`)
+  const data = await res.json()
+  if (!data.url) throw new Error('URL de vídeo vazia na Shinokai')
+
+  return { url: data.url, label }
+}
 
 // Sites
 const AD_BASE = 'https://animesdrive.online'
@@ -622,6 +673,22 @@ export default function WatchPage() {
       }
     } catch {}
 
+    // ── FONTE 0: Shinokai (Nova Fonte Principal) ─────────────────────────────
+    try {
+      setStatus('📡 Conectando ao Shinokai (Túnel)...')
+      const skResult = await resolveShinokai(animeObj, ep, dub)
+      
+      setSources([{ label: skResult.label, url: skResult.url }])
+      setCurrentSrc(skResult.url)
+      setStatus(`✅ Shinokai — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+      setProvider('Shinokai')
+      setLoading(false)
+      trackView(animeObj, ep)
+      return
+    } catch (skErr) {
+      console.warn('[Shinokai] falhou:', skErr.message)
+    }
+
     // ── FONTE 1: DriveA → animesdrive.online ─────────────────────────────────
     try {
       setStatus('📡 Conectando ao DriveA...')
@@ -953,6 +1020,7 @@ export default function WatchPage() {
 
   // Badge de provider para mostrar na UI
   const providerLabel = {
+    'Shinokai':          '🔥 S0 Shinokai',
     'DriveA':            '🚀 S1 AnimesDrive',
     'AnimeQ':            '⚡ S2 AnimeQ',
     'AniTube':           '📺 S3 AniTube',
