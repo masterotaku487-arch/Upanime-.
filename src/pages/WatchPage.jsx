@@ -132,27 +132,32 @@ const resolveShinokai = async (animeObj, ep, dub) => {
   // 1. Busca o anime
   const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`)
   const searchData = await searchRes.json()
+  const results = searchData.results || searchData
   
-  const match = searchData.find(item => 
+  const match = results.find(item => 
     item.title.toLowerCase().includes(title.toLowerCase()) || 
     title.toLowerCase().includes(item.title.toLowerCase())
-  ) || searchData[0]
+  ) || results[0]
 
   if (!match) throw new Error('Anime não encontrado no Shinokai')
   
   // 2. Busca episódios
   const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`)
   const epsData = await epsRes.json()
+  const episodes = epsData.results || epsData
   
   // 3. Encontra o episódio e a variante (dub/leg)
-  const episode = epsData.find(e => e.number === ep)
+  const episode = episodes.find(e => e.number === ep || e.number === String(ep))
   if (!episode) throw new Error(`Episódio ${ep} não encontrado no Shinokai`)
   
-  const variant = episode.variants.find(v => v.type === (dub ? 'dubbed' : 'subtitled'))
+  const variant = episode.variants.find(v => 
+    (v.audioType || v.type || '').toUpperCase() === (dub ? 'DUBBED' : 'SUBTITLED')
+  )
   if (!variant) throw new Error(`Versão ${dub ? 'Dublada' : 'Legendada'} não disponível`)
 
   // 4. Retorna a URL de play (que já sai tunelada pelo worker)
-  const playRes = await fetch(`${SK}/medias/${match.id}/episodes/${variant.id}/play`)
+  const playUrl = `${SK}/medias/${match.id}/episodes/${episode.id}/play?variantId=${variant.id}`
+  const playRes = await fetch(playUrl)
   const playData = await playRes.json()
   
   if (!playData.url) throw new Error('Falha ao obter link de vídeo do Shinokai')
