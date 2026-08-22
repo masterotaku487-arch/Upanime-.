@@ -685,7 +685,7 @@ export default function WatchPage() {
       setStatus(`✅ Shinokai — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
       setProvider('Shinokai')
       setLoading(false)
-      // trackView(animeObj, ep) // Removido se não definido
+      trackView(animeObj, ep)
       return
     } catch (skErr) {
       console.warn('[Shinokai] falhou:', skErr.message)
