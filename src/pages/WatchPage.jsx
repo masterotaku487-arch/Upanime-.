@@ -31,7 +31,7 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
 // SK = proxy seguro da Shinokai (chave AES e URL base ficam no worker, não aqui)
-const SK      = 'https://shinokai-proxy.masterotaku487.workers.dev'
+const SK      = 'https://upanime-api.masterotaku487.workers.dev'
 const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
