@@ -30,8 +30,7 @@ import { useAuth } from '../context/AuthContext'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
-const SK      = 'https://cdn-api.masterotaku487.workers.dev'   // Fonte Principal - Shinokai (Proxy Direto)
-const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
+const SK      = 'https://curly.masterotaku487.workers.dev'   // Fonte Principal - Shinokai (Túnel)
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
 const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
@@ -130,42 +129,33 @@ const resolveShinokai = async (animeObj, ep, dub) => {
   const title = animeObj.title_english || animeObj.title
   console.log(`[Shinokai] Buscando: ${title}`)
   
-  const headers = { "X-Tunnel-Secret": TUNNEL_SECRET };
   // 1. Busca o anime
-  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`, { headers, signal: AbortSignal.timeout(10000) })
-  if (!searchRes.ok) throw new Error(`HTTP ${searchRes.status} ao buscar anime`)
+  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`)
   const searchData = await searchRes.json()
-  const results = Array.isArray(searchData) ? searchData : (searchData.results || [])
   
-  if (!results.length) throw new Error('Nenhum resultado no Shinokai')
-
-  const match = results.find(item => 
+  const match = searchData.find(item => 
     item.title.toLowerCase().includes(title.toLowerCase()) || 
     title.toLowerCase().includes(item.title.toLowerCase())
-  ) || results[0]
+  ) || searchData[0]
+
+  if (!match) throw new Error('Anime não encontrado no Shinokai')
   
   // 2. Busca episódios
-  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`, { headers, signal: AbortSignal.timeout(10000) })
-  if (!epsRes.ok) throw new Error(`HTTP ${epsRes.status} ao buscar episódios`)
+  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`)
   const epsData = await epsRes.json()
-  const episodes = Array.isArray(epsData) ? epsData : (epsData.results || [])
   
   // 3. Encontra o episódio e a variante (dub/leg)
-  const episode = episodes.find(e => e.number === ep || e.number === String(ep) || e.number === Number(ep))
+  const episode = epsData.find(e => e.number === ep)
   if (!episode) throw new Error(`Episódio ${ep} não encontrado no Shinokai`)
   
-  const variant = episode.variants?.find(v => 
-    (v.audioType || v.type || '').toUpperCase() === (dub ? 'DUBBED' : 'SUBTITLED')
-  )
+  const variant = episode.variants.find(v => v.type === (dub ? 'dubbed' : 'subtitled'))
   if (!variant) throw new Error(`Versão ${dub ? 'Dublada' : 'Legendada'} não disponível`)
 
-  // 4. Retorna a URL de play
-  const playUrl = `${SK}/medias/${match.id}/episodes/${episode.id}/play?variantId=${variant.id}`
-  const playRes = await fetch(playUrl, { headers, signal: AbortSignal.timeout(10000) })
-  if (!playRes.ok) throw new Error(`HTTP ${playRes.status} ao obter link de vídeo`)
+  // 4. Retorna a URL de play (que já sai tunelada pelo worker)
+  const playRes = await fetch(`${SK}/medias/${match.id}/episodes/${variant.id}/play`)
   const playData = await playRes.json()
   
-  if (!playData.url) throw new Error('URL de vídeo vazia no Shinokai')
+  if (!playData.url) throw new Error('Falha ao obter link de vídeo do Shinokai')
   
   return {
     url: playData.url,
