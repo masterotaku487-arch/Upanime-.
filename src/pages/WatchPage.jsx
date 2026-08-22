@@ -17,12 +17,29 @@ import './WatchPage.css'
 import { incrementAnimeViews, addWatchHistory } from '../services/supabase'
 import { useAuth } from '../context/AuthContext'
 
-// ── Fonte única: Shinokai — integração direta autorizada ─────────────────────
-const SHINOKAI_BASE = 'https://api-prod.shinokai.online'
-const SHINOKAI_AES_KEY_B64 = 'LClZ5k9139ypHE4c863iIrMALnupsPH+4TUF6zhA6nk='
-let shinokaiToken = null
-let shinokaiLoginPromise = null
+// ─────────────────────────────────────────────────────────────────────────────
+// FONTE PRINCIPAL: DriveA Worker → animesdrive.online
+//
+// Padrão de URL que o worker espera:
+//   https://animesdrive.online/episodio/{slug}-episodio-{ep-2digits}
+//
+// Worker endpoints:
+//   ?url=<page>      → extrai player links do episódio
+//   ?blogger=<embed> → resolve Blogger Player → MP4 real
+//   ?proxy=<mp4>     → proxy chunked com Range support
+// ─────────────────────────────────────────────────────────────────────────────
 
+// ── Workers / Servidores ─────────────────────────────────────────────────────
+// SK = proxy seguro da Shinokai (chave AES e URL base ficam no worker, não aqui)
+const SK      = 'https://shinokai-proxy.masterotaku487.workers.dev'
+const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
+const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
+const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
+const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
+
+// ── Shinokai (Fonte Principal — chave e URL ficam no worker, não aqui) ───────
+
+// Normaliza os formatos que o Worker pode devolver: array, { data }, { results } ou { episodes }
 const shinokaiList = (payload) => {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
@@ -46,72 +63,21 @@ const normalizeTitle = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .trim()
 
-const decodeBase64 = (value) => {
-  const normalized = String(value).replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
-  const binary = atob(padded)
-  return Uint8Array.from(binary, char => char.charCodeAt(0))
-}
-
-const decryptShinokai = async (envelope) => {
-  if (!envelope?.iv || !envelope?.tag || !envelope?.payload) return envelope
-  const key = await crypto.subtle.importKey(
-    'raw', decodeBase64(SHINOKAI_AES_KEY_B64), { name: 'AES-GCM' }, false, ['decrypt']
-  )
-  const payload = decodeBase64(envelope.payload)
-  const tag = decodeBase64(envelope.tag)
-  const ciphertext = new Uint8Array(payload.length + tag.length)
-  ciphertext.set(payload)
-  ciphertext.set(tag, payload.length)
-  const clear = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: decodeBase64(envelope.iv), tagLength: 128 }, key, ciphertext
-  )
-  return JSON.parse(new TextDecoder().decode(clear))
-}
-
-const readShinokai = async (response) => {
-  const text = await response.text()
-  let parsed
-  try { parsed = JSON.parse(text) } catch { throw new Error(`Shinokai HTTP ${response.status}`) }
-  if (!response.ok) throw new Error(parsed?.message || parsed?.error || `Shinokai HTTP ${response.status}`)
-  const clear = parsed?.iv && parsed?.tag && parsed?.payload ? await decryptShinokai(parsed) : parsed
-  return clear?.data && typeof clear.data === 'object' ? clear.data : clear
-}
-
-const loginShinokai = async () => {
-  const response = await fetch(`${SHINOKAI_BASE}/auth/anonymous`, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: '{}',
-  })
-  const data = await readShinokai(response)
-  shinokaiToken = data?.accessToken || data?.access_token || data?.token
-  if (!shinokaiToken) throw new Error('Token anônimo ausente na resposta Shinokai')
-}
-
-const shinokaiFetch = async (path, retry = true) => {
-  if (!shinokaiToken) {
-    if (!shinokaiLoginPromise) shinokaiLoginPromise = loginShinokai().finally(() => { shinokaiLoginPromise = null })
-    await shinokaiLoginPromise
-  }
-  const response = await fetch(`${SHINOKAI_BASE}${path}`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${shinokaiToken}` },
-  })
-  if (response.status === 401 && retry) {
-    shinokaiToken = null
-    return shinokaiFetch(path, false)
-  }
-  return readShinokai(response)
-}
-
+// Busca o mediaId da Shinokai pelo título do anime.
+// A busca pode devolver itens sem título/MAL ID; nesse caso, não podemos
+// simplesmente usar o primeiro resultado, pois ele pode ser outra temporada.
 async function findShinokaiId(anime, epNum, dub) {
   const queries = [...new Set([anime.title_english, anime.title, anime.title_japanese].filter(Boolean))]
   let items = []
   for (const query of queries) {
-    items = shinokaiList(await shinokaiFetch(`/medias?q=${encodeURIComponent(query)}`))
+    const res = await fetch(`${SK}/search?q=${encodeURIComponent(query)}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(`Shinokai search HTTP ${res.status}`)
+    items = shinokaiList(data)
     if (items.length) break
   }
   if (!items.length) throw new Error('Anime não encontrado na Shinokai')
+
   const wanted = normalizeTitle(anime.title_english || anime.title)
   const score = (item) => {
     const title = normalizeTitle(shinokaiTitle(item))
@@ -121,12 +87,21 @@ async function findShinokaiId(anime, epNum, dub) {
     return malMatch + exact + overlap
   }
   const ranked = [...items].sort((a, b) => score(b) - score(a))
+
+  // Quando a resposta traz metadados, a correspondência de título/MAL é suficiente.
   if (score(ranked[0]) > 0) return ranked[0].shinokai_id || ranked[0].id
+
+  // Quando os metadados vêm vazios, confirma a temporada pelo total de episódios
+  // e pela existência do episódio/áudio solicitado. As consultas são sequenciais
+  // para evitar o ThrottlerException do upstream.
   for (const item of ranked) {
     const mediaId = item.shinokai_id || item.id
     if (!mediaId) continue
     try {
-      const list = shinokaiList(await shinokaiFetch(`/medias/${encodeURIComponent(mediaId)}/episodes`))
+      const res = await fetch(`${SK}/episodes?id=${encodeURIComponent(mediaId)}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) continue
+      const list = shinokaiList(data)
       const episode = list.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
       const variants = Array.isArray(episode?.variants) ? episode.variants : []
       const hasWantedAudio = variants.some(v => dub
@@ -134,30 +109,445 @@ async function findShinokaiId(anime, epNum, dub) {
         : /sub|leg|legendado|japanese/i.test(JSON.stringify(v)))
       const countMatches = !anime.episodes || list.length === Number(anime.episodes)
       if (episode && hasWantedAudio && countMatches) return mediaId
-    } catch {}
+    } catch { /* tenta o próximo candidato */ }
   }
+
+  // Último fallback: preserva o primeiro candidato somente quando não foi
+  // possível confirmar a temporada devido a falha temporária do upstream.
   return ranked[0].shinokai_id || ranked[0].id
 }
 
+// Busca os episódios e pega o epId + melhor variantId pro ep desejado
 async function getShinokaiEp(mediaId, epNum, dub) {
-  const episodes = shinokaiList(await shinokaiFetch(`/medias/${encodeURIComponent(mediaId)}/episodes`))
+  const res = await fetch(`${SK}/episodes?id=${encodeURIComponent(mediaId)}`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `Shinokai episodes HTTP ${res.status}`)
+  const episodes = shinokaiList(data)
+
   const ep = episodes.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
   if (!ep) throw new Error(`EP ${epNum} não encontrado na Shinokai`)
+
   const variants = Array.isArray(ep.variants) ? ep.variants : []
   const hasDub = (variant) => /dub|dublado|pt[- ]?br|portuguese/i.test(JSON.stringify(variant))
   const hasLeg = (variant) => /sub|leg|legendado|japanese/i.test(JSON.stringify(variant))
   const chosen = (dub ? variants.find(hasDub) : variants.find(hasLeg)) || variants[0]
+
   if (!chosen) throw new Error('Nenhuma variante disponível')
-  return { epId: ep.id, varId: chosen.id || chosen.variantId || ep.id, label: chosen.label || chosen.audioType || (dub ? 'Dublado' : 'Legendado') }
+  return {
+    epId: ep.id,
+    varId: chosen.id || chosen.variantId || ep.id,
+    label: chosen.label || chosen.audioType || (dub ? 'Dublado' : 'Legendado'),
+  }
 }
 
+// Resolve tudo e devolve { url, label }
 async function resolveShinokai(anime, ep, dub) {
   const mediaId = await findShinokaiId(anime, ep, dub)
   const { epId, varId, label } = await getShinokaiEp(mediaId, ep, dub)
-  const data = await shinokaiFetch(`/medias/${encodeURIComponent(mediaId)}/episodes/${encodeURIComponent(epId)}/play?variantId=${encodeURIComponent(varId)}`)
-  const url = data?.url || data?.videoUrl || data?.playUrl || data?.source?.url
+  const params = new URLSearchParams({ id: mediaId, ep: epId, var: varId })
+  const res = await fetch(`${SK}/play?${params.toString()}`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `Shinokai play HTTP ${res.status}`)
+  const url = data.url || data.videoUrl || data.playUrl || data.source?.url
   if (!url) throw new Error('URL de vídeo vazia na Shinokai')
+
   return { url, label }
+}
+
+// Sites
+const AD_BASE = 'https://animesdrive.online'
+const AQ_BASE = 'https://animeq.net'
+const AT_BASE = 'https://www.anitube.zip'
+
+// ── Dub URL transform ────────────────────────────────────────────────────────
+// Insere /Dub/ antes do último segmento da URL (nome do arquivo)
+// LEG: …/Re-Zero-4/09.mp4  →  DUB: …/Re-Zero-4/Dub/09.mp4
+const toDubUrl = (url) => {
+  if (url.includes('/Dub/')) return url  // já está dublado
+  const i = url.lastIndexOf('/')
+  return url.slice(0, i) + '/Dub' + url.slice(i)
+}
+
+// Fallbacks legados
+const AF            = 'https://animefire-proxy.masterotaku487.workers.dev'
+const RENDER_PROXY  = 'https://animesfontes-proxy.onrender.com'
+
+// ── Slug helpers ──────────────────────────────────────────────────────────────
+
+/** Converte string em slug no padrão animesdrive.online (romaji com hifens) */
+/**
+ * Converte string em slug no padrão animesdrive.online.
+ *
+ * Regras observadas nos exemplos reais do site:
+ *   "Re:Zero kara..."   → "rezero-kara-..."    (dois-pontos removido SEM espaço)
+ *   "Naruto"            → "naruto"
+ *   "Kimetsu no Yaiba"  → "kimetsu-no-yaiba"
+ *   "4th Season"        → "4th-season"         (mantém número de season)
+ */
+const slugifyAD = (s) =>
+  s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
+    .replace(/[:.!?★☆♪•'"]/g, '')                      // remove pontuação sem espaço
+    .replace(/[^a-z0-9\s-]/g, ' ')                     // resto vira espaço
+    .trim().replace(/\s+/g, '-').replace(/-+/g, '-')
+
+/**
+ * Remove sufixos de season SOMENTE se for string genérica como "Season 2",
+ * mas mantém casos como "4th Season" que fazem parte do título oficial.
+ * O animesdrive.online mantém "4th-season" no slug.
+ */
+const stripSeasonAD = (s) =>
+  s.replace(/\s+(the\s+)?(final|last|new)\s+season/gi, '')
+   .replace(/\s*[-–]\s*(season|parte?|part|cour)\s*\d+/gi, '')
+   .trim()
+
+/**
+ * Gera candidatos de slug para animesdrive.online.
+ *
+ * Exemplos reais confirmados:
+ *   "naruto"                                           (simples)
+ *   "rezero-kara-hajimeru-isekai-seikatsu-4th-season"  (mantém 4th-season)
+ *   "kimetsu-no-yaiba-movie-mugen-jou-hen"             (movie sem episodio)
+ */
+const buildDriveACandidates = (anime, dub = false) => {
+  // Romaji (title) é o padrão do site; en como fallback
+  const titles = [
+    anime.title,           // romaji japonês — prioritário
+    anime.title_english,
+    anime.title_portuguese,
+    ...(anime.titles || []).map(t => t.title),
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
+
+  const bases = new Set()
+  for (const t of titles) {
+    const stripped = stripSeasonAD(t)
+    for (const v of [t, stripped]) {
+      const s = slugifyAD(v)
+      if (s && s.length > 1) bases.add(s)
+    }
+  }
+
+  // Dublado → tenta slug com -dublado primeiro, depois sem (fallback)
+  // LEG: rezero-kara-hajimeru-isekai-seikatsu-4th-season
+  // DUB: rezero-kara-hajimeru-isekai-seikatsu-4th-season-dublado
+  if (dub) {
+    const withDub    = [...bases].map(b => b + '-dublado')
+    const withoutDub = [...bases]
+    return [...new Set([...withDub, ...withoutDub])]
+  }
+  return [...new Set([...bases])]
+}
+
+/** Número do episódio zero-padded em 2 dígitos (padrão do site) */
+const epStr = (ep) => String(ep).padStart(2, '0')
+
+/**
+ * Monta a URL de episódio do animesdrive.online.
+ * Filmes/OVAs não têm -episodio-NN (ex: kimetsu-no-yaiba-movie-mugen-jou-hen)
+ * Séries: {slug}-episodio-{ep2d}
+ */
+const buildEpisodeUrl = (slug, ep, isMovie = false) =>
+  isMovie
+    ? `${AD_BASE}/episodio/${slug}`
+    : `${AD_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
+
+// ── DriveA fetch ──────────────────────────────────────────────────────────────
+
+/** Testa se um slug+ep existe no animesdrive.online via DriveA worker. */
+const probeDriveA = async (slug, ep, isMovie = false) => {
+  const epUrl     = buildEpisodeUrl(slug, ep, isMovie)
+  const workerUrl = `${DA}/?url=${encodeURIComponent(epUrl)}`
+  try {
+    const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(20000) })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data.success && data.results?.length > 0) return { slug, results: data.results }
+  } catch { /* slug não existe */ }
+  return null
+}
+
+/** Resolve slug correto testando candidatos em ordem. */
+const resolveDriveA = async (anime, ep, dub = false) => {
+  const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+
+  // 1. Checa slug-overrides.json primeiro (editável no GitHub sem redeploy)
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  if (ov?.drivea) {
+    // Suporte a directUrl: MP4 direto via ?proxy= (filmes do aniplay.online etc)
+    const directUrls = dub ? ov.drivea.directUrl?.dub : ov.drivea.directUrl?.leg
+    if (directUrls) {
+      const mp4 = directUrls[String(ep)] ?? directUrls['1']
+      if (mp4) {
+        console.log('[DriveA] ✅ (directUrl override)', mp4)
+        return {
+          slug: 'direct',
+          results: [{
+            type:      'mp4',
+            url:       mp4,
+            proxyUrl:  `${DA}/?proxy=${encodeURIComponent(mp4)}`,
+            isBlogger: false,
+            label:     dub ? 'Dublado' : 'Legendado',
+          }]
+        }
+      }
+    }
+    const slug = (dub && ov.drivea.dub) ? ov.drivea.dub : ov.drivea.leg
+    if (slug) {
+      console.log('[DriveA] ✅ (override)', slug)
+      const found = await probeDriveA(slug, ep, isMovie)
+      if (found) return found
+      console.warn('[DriveA] override slug falhou, tentando candidatos...')
+    }
+  }
+
+  // 2. Testa candidatos gerados automaticamente
+  const candidates = buildDriveACandidates(anime, dub)
+  console.log('[DriveA] testando slugs:', candidates.join(', '))
+
+  for (const slug of candidates) {
+    const found = await probeDriveA(slug, ep, isMovie)
+    if (found) {
+      console.log('[DriveA] ✅ slug encontrado:', slug)
+      return found
+    }
+  }
+  throw new Error(`"${anime.title}" não encontrado no animesdrive.online`)
+}
+
+/**
+ * Classifica e retorna fontes do DriveA worker.
+ *
+ * Tipos de result confirmados no response real:
+ *   type:"mp4"    isBlogger:false  proxyUrl:✅  → usar proxyUrl direto (MP4 via chunked proxy)
+ *   type:"iframe" isBlogger:true   resolveUrl:✅ → resolver via ?blogger= → obter MP4
+ *   type:"iframe" isBlogger:false  proxyUrl:✅  → embed JS (animeshd.cloud, strp2p) → iframe
+ *
+ * Prioridade: MP4 direto > Blogger resolvido > iframe embed
+ */
+const pickBestDriveASource = async (results) => {
+  // ── 1. MP4 direto → proxyUrl já pronto ──────────────────────────────────
+  const mp4s = results.filter(r => r.type === 'mp4' && !r.isBlogger && r.proxyUrl)
+  if (mp4s.length > 0) {
+    return {
+      type: 'mp4',
+      sources: mp4s.map(r => ({
+        label:     r.label,
+        url:       r.proxyUrl,    // ?proxy=<mp4> — chunked range support
+        directUrl: r.url,
+      }))
+    }
+  }
+
+  // ── 2. Blogger → resolve ?blogger= → extrai MP4 ─────────────────────────
+  const bloggers = results.filter(r => r.isBlogger && r.resolveUrl)
+  for (const r of bloggers) {
+    try {
+      const res  = await fetch(r.resolveUrl, { signal: AbortSignal.timeout(15000) })
+      const data = await res.json()
+      if (data.success && data.sources?.length > 0) {
+        return {
+          type: 'mp4',
+          sources: data.sources.map((s, i) => ({
+            label:     `Blogger ${i + 1}`,
+            url:       `${DA}/?proxy=${encodeURIComponent(s.url)}`,
+            directUrl: s.url,
+          }))
+        }
+      }
+    } catch { /* tenta próximo */ }
+  }
+
+  // ── 3. iframe embed (animeshd.cloud, strp2p…) → carrega no <iframe> ─────
+  const iframes = results.filter(r => r.type === 'iframe' && !r.isBlogger && r.url)
+  if (iframes.length > 0) {
+    return {
+      type:   'iframe',
+      embedUrl: iframes[0].url,  // carrega o primeiro como embed
+      sources:  iframes.map((r, i) => ({ label: r.label || `Opção ${i + 1}`, url: r.url }))
+    }
+  }
+
+  throw new Error('Nenhuma fonte de vídeo válida retornada pelo DriveA')
+}
+
+// ── AnimeQ (Servidor 2) ───────────────────────────────────────────────────────
+// animeq.net é outro site Dooplay — mesmo padrão de slug do animesdrive
+
+const buildAnimeQCandidates = (anime, dub = false) => {
+  // AnimeQ usa slugs em português/romanizado — mesmo helper do DriveA
+  return buildDriveACandidates(anime, dub).map(s => s)
+}
+
+const resolveAnimeQ = async (anime, ep, dub = false) => {
+  const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+
+  // Override dedicado para AnimeQ
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  if (ov?.animeq) {
+    const slug = (dub && ov.animeq.dub) ? ov.animeq.dub : ov.animeq.leg
+    if (slug) {
+      const epUrl = isMovie
+        ? `${AQ_BASE}/episodio/${slug}`
+        : `${AQ_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
+      const workerUrl = `${AQ}/?url=${encodeURIComponent(epUrl)}`
+      try {
+        const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(20000) })
+        const data = await res.json()
+        if (data.success && data.results?.length) {
+          console.log('[AnimeQ] ✅ (override)', slug)
+          return { slug, results: data.results, worker: AQ }
+        }
+      } catch {}
+    }
+  }
+
+  const candidates = buildAnimeQCandidates(anime, dub)
+  console.log('[AnimeQ] testando slugs:', candidates.join(', '))
+  for (const slug of candidates) {
+    const epUrl = isMovie
+      ? `${AQ_BASE}/episodio/${slug}`
+      : `${AQ_BASE}/episodio/${slug}-episodio-${epStr(ep)}`
+    const workerUrl = `${AQ}/?url=${encodeURIComponent(epUrl)}`
+    try {
+      const res  = await fetch(workerUrl, { signal: AbortSignal.timeout(20000) })
+      if (!res.ok) continue
+      const data = await res.json()
+      if (data.success && data.results?.length) {
+        console.log('[AnimeQ] ✅', slug)
+        return { slug, results: data.results, worker: AQ }
+      }
+    } catch {}
+  }
+  throw new Error(`"${anime.title}" não encontrado no AnimeQ`)
+}
+
+// ── Anitube (Servidor 3) ──────────────────────────────────────────────────────
+// anitube.zip usa URLs de página por episódio — resolução via override ou slug
+// O worker extrai o vídeo (HLS m3u8 ou MP4) e faz proxy automático
+
+
+
+// ── AniTube (at.masterotaku487.workers.dev) ───────────────────────────────────
+// Worker proxy: extrai HLS/MP4 de qualquer página anitube.zip e proxeia
+// URLs do anitube são hash-based (ex: anitube.zip/939915b/) → requer override
+// O src retornado é o próprio worker (stream direto, não JSON)
+
+const resolveAniTube = async (anime, ep, dub) => {
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  const atOv = ov?.anitube
+  if (!atOv) throw new Error('AniTube: sem override para este anime')
+  const epUrl = dub
+    ? (atOv.dub?.[String(ep)] || atOv.leg?.[String(ep)])
+    : (atOv.leg?.[String(ep)] || atOv.dub?.[String(ep)])
+  if (!epUrl) throw new Error(`AniTube: sem URL para EP ${ep}`)
+  // Se for embed direto (vidmoly, etc) — não passa pelo worker
+  if (epUrl.includes('vidmoly') || epUrl.includes('.html')) {
+    return { type: 'directEmbed', embedUrl: epUrl }
+  }
+  return `${AT}/?url=${encodeURIComponent(epUrl)}`
+}
+
+
+// ── AnimeFire legado ──────────────────────────────────────────────────────────
+
+const proxyUrl = (url) => `https://at.masterotaku487.workers.dev/?url=${encodeURIComponent(url)}`
+
+const afFetch = async (params) => {
+  const qs = new URLSearchParams(params).toString()
+  const r  = await fetch(`${AF}?${qs}`, { signal: AbortSignal.timeout(30000) })
+  if (!r.ok) throw new Error(`AF Proxy ${r.status}`)
+  return r.json()
+}
+
+const slugify = (s) =>
+  s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/['":`]/g, '')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .trim().replace(/\s+/g, '-').replace(/-+/g, '-')
+
+const stripSeason = (s) =>
+  s.replace(/\s*[-–:]\s*(season|parte?|part|cour)\s*\d*/gi, '')
+   .replace(/\s+\d+(st|nd|rd|th)\s*(season|cour)/gi, '')
+   .replace(/\s+(the\s+)?(final|last|new)\s+season/gi, '')
+   .replace(/\s+(season|parte?|part)\s*\d*/gi, '')
+   .replace(/\s+\d+$/g, '').trim()
+
+const buildSlugCandidates = (anime, dub = false) => {
+  const titles = [
+    anime.title, anime.title_english, anime.title_portuguese,
+    ...(anime.titles || []).map(t => t.title),
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
+
+  const bases = new Set()
+  for (const t of titles) {
+    const noSeason   = stripSeason(t)
+    const noSubtitle = stripSubtitle(noSeason)
+    for (const v of [noSeason, noSubtitle, t]) {
+      const s = slugify(v)
+      if (s && s.length > 1) bases.add(s)
+    }
+  }
+  const withSeason = []; const withoutSeason = []
+  for (const base of bases) {
+    const isFull = [...bases].some(b => b !== base && base.startsWith(b))
+    const target = isFull ? withSeason : withoutSeason
+    if (dub) { target.push(base + '-dublado-todos-os-episodios'); target.push(base + '-dublado') }
+    else       target.push(base + '-todos-os-episodios')
+    target.push(base)
+  }
+  return [...new Set([...withSeason, ...withoutSeason])]
+}
+
+let _overridesCache = null
+const loadOverrides = async () => {
+  if (_overridesCache) return _overridesCache
+  try {
+    const SLUG_CID = window.__SLUG_CID__ || localStorage.getItem('slug_cid') || ''
+    const SLUG_URL = SLUG_CID
+      ? `https://${SLUG_CID}.ipfs.dweb.link/slug-overrides.json`
+      : '/slug-overrides.json'
+    const res  = await fetch(SLUG_URL + '?_t=' + Date.now())
+    const json = await res.json()
+    _overridesCache = json.animes || {}
+  } catch { _overridesCache = {} }
+  return _overridesCache
+}
+
+const probeSlug = async (slug, isMovie = false) => {
+  try {
+    const data = await afFetch({ action: 'info', slug })
+    if (data.episodes?.length > 0) return slug
+    if (isMovie && data.slug) return slug
+  } catch { /* não existe */ }
+  return null
+}
+
+const resolveSlug = async (anime, dub = false) => {
+  const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(anime.type)
+  const overrides = await loadOverrides()
+  const ov = overrides[String(anime.mal_id)]
+  if (ov) {
+    const slug = (dub && ov.dub) ? ov.dub : ov.leg
+    if (slug) { console.log('[AnimeFire] ✅ (override)', slug); return slug }
+  }
+  const candidates = buildSlugCandidates(anime, dub)
+  if (isMovie) {
+    for (const slug of candidates) {
+      try {
+        const data = await afFetch({ action: 'video', slug, ep: 1 })
+        if (data.sources?.length > 0) { console.log('[AnimeFire] ✅ (movie)', slug); return slug }
+      } catch { /* tenta próximo */ }
+    }
+  }
+  for (const slug of candidates) {
+    const found = await probeSlug(slug, isMovie)
+    if (found) { console.log('[AnimeFire] ✅', slug); return found }
+  }
+  throw new Error(`"${anime.title}" não encontrado no AnimeFire`)
 }
 
 const bestQuality = (sources = []) => {
@@ -196,7 +586,7 @@ const openVLC = (url, title) => {
 const openMXPlayer = (url, title) => {
   const directUrl = getDirectUrl(url)
   const titleEnc  = encodeURIComponent(title)
-  const referer   = encodeURIComponent('https://shinokai.online/')
+  const referer   = encodeURIComponent('https://animesdrive.online/')
   const ua        = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
   const intentFree = `intent:${directUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_Referer=${referer};S.headers_User-Agent=${ua};end`
   const intentPro  = `intent:${directUrl}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.pro;S.title=${titleEnc};S.headers_Referer=${referer};S.headers_User-Agent=${ua};end`
@@ -254,6 +644,23 @@ const openTapTap = async (url, title) => {
 }
 
 
+// ── Server status ping ────────────────────────────────────────────────────────
+const checkServers = async () => {
+  // Worker online = qualquer resposta HTTP (mesmo 400 = URL inválida = worker rodando)
+  const ping = async (url) => {
+    try {
+      await fetch(url, { signal: AbortSignal.timeout(8000) })
+      return true  // respondeu = online
+    } catch { return false }
+  }
+  const [s1, s2, s3] = await Promise.all([
+    ping(DA).catch(() => false),
+    ping(AQ).catch(() => false),
+    ping(AT).catch(() => false),
+  ])
+  return { driveA: s1, animeQ: s2, aniTube: s3 }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WatchPage() {
   const { id } = useParams()
@@ -268,6 +675,7 @@ export default function WatchPage() {
 
   const [sources,      setSources]      = useState([])
   const [currentSrc,   setCurrentSrc]   = useState('')
+  const [afSlug,       setAfSlug]       = useState(null)
   const { user } = useAuth()
 
   const trackView = async (animeObj, ep) => {
@@ -283,8 +691,10 @@ export default function WatchPage() {
     } catch {}
   }
 
+  const [adSlug,       setAdSlug]       = useState(null)   // slug animesdrive cacheado
+  const [aqSlug,       setAqSlug]       = useState(null)   // slug animeq cacheado
   const [loading,      setLoading]      = useState(true)
-  const [status,       setStatus]       = useState('📡 Conectando ao Shinokai...')
+  const [status,       setStatus]       = useState('📡 Conectando ao DriveA...')
   const [error,        setError]        = useState(false)
   const [errorMsg,     setErrorMsg]     = useState('')
   const [showShare,    setShowShare]    = useState(false)
@@ -292,10 +702,16 @@ export default function WatchPage() {
   const [downloading,  setDownloading]  = useState(false)
   const [newAchievements, setNewAchievements] = useState([])
   const [showBugReport,   setShowBugReport]   = useState(false)
-  const [provider,        setProvider]        = useState('Shinokai')
+  const [fallbackUrl,     setFallbackUrl]     = useState(null)
+  const [provider,        setProvider]        = useState('DriveA')
+  const [serverStatus,    setServerStatus]    = useState({ driveA: null, animeQ: null, aniTube: null })
 
   useEffect(() => {
-    setAnime(null); setEpisodes([])
+    checkServers().then(setServerStatus)
+  }, [])
+
+  useEffect(() => {
+    setAnime(null); setEpisodes([]); setAfSlug(null); setAdSlug(null); setAqSlug(null)
     Promise.allSettled([getAnimeById(id), getAnimeEpisodes(id, 1)]).then(([d, e]) => {
       if (d.status === 'fulfilled') {
         const a = d.value.data
@@ -312,32 +728,335 @@ export default function WatchPage() {
     return () => { document.title = 'Up Anime+ | Assistir Animes Online Grátis em HD' }
   }, [id])
 
-  const doLoad = async (animeObj, ep, dub) => {
-    setLoading(true)
-    setError(false)
-    setSources([])
-    setCurrentSrc('')
-    setProvider('Shinokai')
-    setStatus('📡 Conectando ao Shinokai...')
+  const doLoad = async (animeObj, ep, dub, cachedAdSlug, cachedAqSlug, cachedAfSlug) => {
+    setLoading(true); setError(false); setSources([]); setCurrentSrc(''); setFallbackUrl(null)
 
+    // Fallback imediato do slug-overrides
     try {
+      const overrides = await loadOverrides()
+      const ov = overrides[String(animeObj.mal_id)]
+      const fbUrl = ov?.fallback?.[String(ep)]
+      if (fbUrl) {
+        console.log('[fallback imediato]', fbUrl)
+        setFallbackUrl(fbUrl); setError(true); setLoading(false); return
+      }
+    } catch {}
+
+    // ── FONTE 0: Shinokai (Nova Fonte Principal) ─────────────────────────────
+    try {
+      setStatus('📡 Conectando ao Shinokai (Túnel)...')
       const skResult = await resolveShinokai(animeObj, ep, dub)
+      
       setSources([{ label: skResult.label, url: skResult.url }])
       setCurrentSrc(skResult.url)
       setStatus(`✅ Shinokai — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+      setProvider('Shinokai')
       setLoading(false)
       trackView(animeObj, ep)
-    } catch (err) {
-      console.warn('[Shinokai] falhou:', err)
-      setErrorMsg(err?.message || 'Não foi possível carregar este episódio pela Shinokai.')
-      setError(true)
-      setLoading(false)
+      return
+    } catch (skErr) {
+      console.warn('[Shinokai] falhou:', skErr.message)
     }
+
+    // ── FONTE 1: DriveA → animesdrive.online ─────────────────────────────────
+    try {
+      setStatus('📡 Conectando ao DriveA...')
+
+      const isMovie = ['Movie', 'OVA', 'Special', 'TV Special', 'Music'].includes(animeObj.type)
+
+      let adResult
+      if (cachedAdSlug) {
+        adResult = await probeDriveA(cachedAdSlug, ep, isMovie)
+        if (!adResult) cachedAdSlug = null
+      }
+      if (!adResult) {
+        setStatus('🔍 Localizando no animesdrive.online...')
+        adResult = await resolveDriveA(animeObj, ep, dub)
+        setAdSlug(adResult.slug)
+      }
+
+      setStatus('📡 Carregando vídeo...')
+      const picked = await pickBestDriveASource(adResult.results)
+
+      if (picked.type === 'mp4' && picked.sources.length > 0) {
+        // MP4 direto via proxy chunked ✅
+        // Se dublado: insere /Dub/ antes do nome do arquivo
+        const finalSources = dub
+          ? picked.sources.map(s => {
+              const dubDirect = toDubUrl(s.directUrl)
+              return { ...s, directUrl: dubDirect, url: `${DA}/?proxy=${encodeURIComponent(dubDirect)}` }
+            })
+          : picked.sources
+        setSources(finalSources)
+        const best = bestQuality(finalSources)
+        setCurrentSrc(best?.url || finalSources[0].url)
+        setStatus(`✅ animesdrive.online — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+        setProvider('DriveA')
+        setLoading(false)
+        return
+      }
+
+      if (picked.type === 'iframe' && picked.embedUrl) {
+        // Embed JS (animeshd.cloud, strp2p…) — carrega em iframe
+        setCurrentSrc('__embed__')
+        setErrorMsg(picked.embedUrl)
+        setStatus('✅ animesdrive.online (embed)')
+        setProvider('DriveA')
+        setLoading(false)
+        return
+      }
+    } catch (daErr) {
+      console.warn('[DriveA] falhou:', daErr.message)
+    }
+
+    // ── FONTE 2: AnimeQ (aq.masterotaku487.workers.dev) ─────────────────────────
+    try {
+      setStatus('📡 Tentando AnimeQ...')
+
+      let aqResult
+      if (cachedAqSlug) {
+        aqResult = await probeAnimeQ(cachedAqSlug, ep, dub)
+        if (!aqResult) cachedAqSlug = null
+      }
+      if (!aqResult) {
+        setStatus('🔍 Localizando no AnimeQ...')
+        aqResult = await resolveAnimeQ(animeObj, ep, dub)
+        setAqSlug(aqResult.slug)
+      }
+
+      setStatus('📡 Carregando AnimeQ...')
+      const aqPicked = await pickBestDriveASource(aqResult.results)
+
+      if (aqPicked.type === 'mp4' && aqPicked.sources.length > 0) {
+        const finalSrcs = dub
+          ? aqPicked.sources.map(s => {
+              const dubDirect = toDubUrl(s.directUrl)
+              return { ...s, directUrl: dubDirect, url: `${AQ}/?proxy=${encodeURIComponent(dubDirect)}` }
+            })
+          : aqPicked.sources
+        setSources(finalSrcs)
+        const best = bestQuality(finalSrcs)
+        setCurrentSrc(best?.url || finalSrcs[0].url)
+        setStatus(`✅ AnimeQ — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+        setProvider('AnimeQ')
+        setLoading(false)
+        return
+      }
+
+      if (aqPicked.type === 'iframe' && aqPicked.embedUrl) {
+        setCurrentSrc('__embed__')
+        setErrorMsg(aqPicked.embedUrl)
+        setStatus('✅ AnimeQ (embed)')
+        setProvider('AnimeQ')
+        setLoading(false)
+        trackView(animeObj, ep)
+        return
+      }
+    } catch (aqErr) {
+      console.warn('[AnimeQ] falhou:', aqErr.message)
+    }
+
+    // ── FONTE 3: AniTube (at.masterotaku487.workers.dev) ─────────────────────
+    try {
+      setStatus('📡 Tentando AniTube...')
+      const atSrc = await resolveAniTube(animeObj, ep, dub)
+      // Embed direto (Vidmoly etc)
+      if (atSrc?.type === 'directEmbed') {
+        setCurrentSrc('__embed__')
+        setErrorMsg(atSrc.embedUrl)
+        setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+        setProvider('AniTube')
+        setLoading(false)
+        trackView(animeObj, ep)
+        return
+      }
+      setCurrentSrc(atSrc)
+      setSources([{ label: 'AniTube', url: atSrc }])
+      setStatus(`✅ AniTube — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
+      setProvider('AniTube')
+      setLoading(false)
+      trackView(animeObj, ep)
+      return
+    } catch (atErr) {
+      console.warn('[AniTube] falhou:', atErr.message)
+    }
+
+    // ── FONTE 4: AnimeFire (Render proxy + CF Worker) ─────────────────────────
+    try {
+      let slug = cachedAfSlug
+      if (!slug) {
+        setStatus('🔍 Tentando AnimeFire...')
+        slug = await resolveSlug(animeObj, dub)
+        setAfSlug(slug)
+      }
+      setStatus('📡 Buscando fontes AnimeFire...')
+
+      let srcs = []
+      try {
+        const renderRes = await fetch(
+          `${RENDER_PROXY}/af-sources?slug=${encodeURIComponent(slug)}&ep=${ep}`,
+          { signal: AbortSignal.timeout(35000) }
+        )
+        const renderData = await renderRes.json()
+        srcs = renderData.sources || []
+      } catch (renderErr) {
+        console.warn('[Render] falhou:', renderErr.message)
+      }
+
+      if (!srcs.length) {
+        try {
+          setStatus('🔄 Tentando CF Worker AnimeFire...')
+          const data = await afFetch({ action: 'video', slug, ep })
+          srcs = data.sources || []
+        } catch (cfErr) {
+          console.warn('[CF Worker AF] falhou:', cfErr.message)
+        }
+      }
+
+      if (srcs.length) {
+        const proxied = srcs.map(s => ({ ...s, url: proxyUrl(s.url), directUrl: s.url }))
+        setSources(proxied)
+        const best = bestQuality(proxied)
+        setCurrentSrc(best?.url || '')
+        setStatus(`✅ AnimeFire — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'} — ${best?.label || 'Auto'}`)
+        setProvider('AnimeFire')
+        setLoading(false)
+        trackView(animeObj, ep)
+        return
+      }
+    } catch (afErr) {
+      console.warn('[AnimeFire] falhou:', afErr.message)
+    }
+
+    // ── FONTE 5: meusanimes / goyabu (override) ───────────────────────────────
+    try {
+      const overrides  = await loadOverrides()
+      const ov         = overrides[String(animeObj.mal_id)]
+
+      const maOv = ov?.sources?.meusanimes
+      if (maOv) {
+        const maBase = (dub ? maOv.dub : maOv.leg) || maOv.any
+        if (maBase) {
+          const maSlug   = `${maBase}-episodio-${ep}`
+          const embedUrl = `${RENDER_PROXY}/ma/${maSlug}`
+          setCurrentSrc('__embed__'); setErrorMsg(embedUrl)
+          setStatus(`✅ MeusAnimes${dub ? ' 🎙️ Dublado' : ' 📖 Legendado'} — EP${ep}`)
+          setProvider('MeusAnimes')
+          setLoading(false); trackView(animeObj, ep); return
+        }
+      }
+
+      const gyOv = ov?.sources?.goyabu
+      if (gyOv) {
+        const gyId = gyOv.ids
+          ? (gyOv.ids[ep - 1] || gyOv.ids[0])
+          : (gyOv.id || (dub ? gyOv.dub : gyOv.leg) || gyOv.any)
+        if (gyId) {
+          const embedUrl = `${RENDER_PROXY}/gy/${gyId}`
+          setCurrentSrc('__embed__'); setErrorMsg(embedUrl)
+          setStatus(`✅ Goyabu — EP${ep}`)
+          setProvider('Goyabu')
+          setLoading(false); trackView(animeObj, ep); return
+        }
+      }
+    } catch (ovErr) {
+      console.warn('[fallback meusanimes/goyabu]', ovErr.message)
+    }
+
+    // ── FONTE 6: animesonlinecc.to ────────────────────────────────────────────
+    try {
+      const titleQuery = animeObj.title_english || animeObj.title
+      setStatus('🔄 Tentando animesonlinecc.to...')
+      const ccRes  = await fetch(
+        `https://animeonline-proxy.masterotaku487.workers.dev/?action=episode` +
+        `&title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`
+      )
+      const ccData = await ccRes.json()
+      if (ccData.sources?.length) {
+        const mp4s = ccData.sources.filter(s => !s.isM3U8)
+        const best = bestQuality(mp4s.length ? mp4s : ccData.sources)
+        setSources(ccData.sources); setCurrentSrc(best?.url || ccData.sources[0].url)
+        setStatus(`✅ animesonlinecc — ${best?.label || 'Auto'}`)
+        setProvider('animesonlinecc')
+        setLoading(false); return
+      }
+      if (ccData.iframe) {
+        setCurrentSrc('__embed__'); setErrorMsg(ccData.iframe)
+        setStatus('✅ animesonlinecc (embed)'); setProvider('animesonlinecc')
+        setLoading(false); trackView(animeObj, ep); return
+      }
+      if (ccData.pageUrl) {
+        setCurrentSrc('__embed__')
+        setErrorMsg(`${RENDER_PROXY}/res?url=${encodeURIComponent(ccData.pageUrl)}`)
+        setStatus('✅ animesonlinecc (página)'); setProvider('animesonlinecc')
+        setLoading(false); trackView(animeObj, ep); return
+      }
+    } catch (ccErr) {
+      console.warn('[animesonlinecc]', ccErr.message)
+    }
+
+    // ── FONTE 7: animesonline.cloud ───────────────────────────────────────────
+    try {
+      const titleQuery = animeObj.title_english || animeObj.title
+      setStatus('🔄 Tentando animesonline.cloud...')
+      const hdRes  = await fetch(
+        `https://animesonlinecloud-proxy.masterotaku487.workers.dev/?action=episode` +
+        `&title=${encodeURIComponent(titleQuery)}&ep=${ep}`
+      )
+      const hdData = await hdRes.json()
+      if (hdData.sources?.length) {
+        const mp4s = hdData.sources.filter(s => !s.isM3U8)
+        const best = bestQuality(mp4s.length ? mp4s : hdData.sources)
+        setSources(hdData.sources); setCurrentSrc(best?.url || hdData.sources[0].url)
+        setStatus(`✅ animesonline.cloud — ${best?.label || 'Auto'}`)
+        setProvider('animesonline.cloud')
+        setLoading(false); return
+      }
+      if (hdData.iframe) {
+        setCurrentSrc('__embed__')
+        setErrorMsg(`${RENDER_PROXY}/res?url=${encodeURIComponent(hdData.iframe)}`)
+        setStatus('✅ animesonline.cloud (embed)'); setProvider('animesonline.cloud')
+        setLoading(false); return
+      }
+    } catch (hdErr) {
+      console.warn('[animesonlinecloud]', hdErr.message)
+    }
+
+    // ── FONTE 8: animesfontes-proxy ───────────────────────────────────────────
+    try {
+      const titleQuery = animeObj.title_english || animeObj.title
+      setStatus('🔄 Tentando AnimeFontes...')
+      const afontesRes  = await fetch(
+        `${RENDER_PROXY}/episode?title=${encodeURIComponent(titleQuery)}&ep=${ep}&dub=${dub ? '1' : '0'}`,
+        { signal: AbortSignal.timeout(30000) }
+      )
+      const afontesData = await afontesRes.json()
+      if (afontesData.sources?.length) {
+        const mp4s = afontesData.sources.filter(s => !s.isM3U8)
+        const best = bestQuality(mp4s.length ? mp4s : afontesData.sources)
+        setSources(afontesData.sources); setCurrentSrc(best?.url || afontesData.sources[0].url)
+        setStatus(`✅ AnimeFontes — ${best?.label || 'Auto'}`)
+        setProvider('AnimeFontes')
+        setLoading(false); return
+      }
+      if (afontesData.iframe) {
+        setCurrentSrc('__embed__'); setErrorMsg(afontesData.iframe)
+        setStatus('✅ AnimeFontes (embed)'); setProvider('AnimeFontes')
+        setLoading(false); return
+      }
+    } catch (afErr) {
+      console.warn('[animesfontes]', afErr.message)
+    }
+
+    // Nenhuma fonte funcionou
+    setError(true)
+    setErrorMsg('Todas as fontes falharam para este episódio.')
+    setLoading(false)
   }
 
   useEffect(() => {
     if (anime) {
-      doLoad(anime, epNum, isDub)
+      doLoad(anime, epNum, isDub, adSlug, aqSlug, afSlug)
       const t = anime.title_english || anime.title || 'Anime'
       document.title = `${t} EP ${epNum} - Assistir | Up Anime+`
       saveHistory(anime, epNum)
@@ -345,7 +1064,7 @@ export default function WatchPage() {
   }, [anime, epNum, isDub])
 
   const goEp = (n) => setSearchParams({ ep: n, ...(isDub ? { dub: '1' } : {}) })
-  const toggleDub = () => setSearchParams({ ep: epNum, ...(!isDub ? { dub: '1' } : {}) })
+  const toggleDub = () => { setAfSlug(null); setAdSlug(null); setAqSlug(null); setSearchParams({ ep: epNum, ...(!isDub ? { dub: '1' } : {}) }) }
 
   const loadMoreEps = async () => {
     const next = epPage + 1
@@ -357,13 +1076,30 @@ export default function WatchPage() {
 
   const title      = anime?.title_english || anime?.title || ''
   const synopsis   = useTranslatedSynopsis(anime?.synopsis)
+  const adExternal = adSlug
+    ? `${AD_BASE}/anime/${adSlug}`
+    : AD_BASE
+  const afExternal = afSlug
+    ? `https://animefire.io/animes/${afSlug}`
+    : `https://animefire.io`
   const prevEp   = epNum > 1 ? epNum - 1 : null
   const nextEp   = anime?.episodes && epNum < anime.episodes ? epNum + 1 : null
   const epTitle  = episodes.find(e => e.mal_id === epNum)?.title || `Episódio ${epNum}`
   const filename = `${title} - EP${String(epNum).padStart(2, '0')}.mp4`
 
   // Badge de provider para mostrar na UI
-  const providerLabel = provider === 'Shinokai' ? '🔥 Shinokai' : provider
+  const providerLabel = {
+    'Shinokai':          '🔥 S0 Shinokai',
+    'DriveA':            '🚀 S1 AnimesDrive',
+    'AnimeQ':            '⚡ S2 AnimeQ',
+    'AniTube':           '📺 S3 AniTube',
+    'AnimeFire':         '🇧🇷 AnimeFire',
+    'MeusAnimes':        '📺 MeusAnimes',
+    'Goyabu':            '🎌 Goyabu',
+    'animesonlinecc':    '🌐 animesonlinecc',
+    'animesonline.cloud':'☁️ animesonline.cloud',
+    'AnimeFontes':       '🔁 AnimeFontes',
+  }[provider] || provider
 
   const srvDot = (ok) =>
     ok === null ? '⚪' : ok ? '🟢' : '🔴'
@@ -395,15 +1131,30 @@ export default function WatchPage() {
                 <div className="loading-ring" />
                 <img src="/logo.png" className="loading-logo" alt="" />
                 <p className="loading-text">{status}</p>
-                <p className="loading-sub">Fonte única: Shinokai</p>
+                <p className="loading-sub">
+                  {status.includes('DriveA') || status.includes('animesdrive')
+                    ? 'Fonte: 🚀 animesdrive.online via DriveA'
+                    : status.includes('AnimeFire')
+                    ? 'Fonte: 🇧🇷 AnimeFire via Cloudflare'
+                    : '🔄 Buscando fontes...'}
+                </p>
               </div>
+            ) : error && fallbackUrl ? (
+              <iframe
+                key={fallbackUrl}
+                src={fallbackUrl}
+                style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                title={`${title} EP${epNum}`}
+              />
             ) : error ? (
               <div className="player-error">
                 <span className="error-emoji">😕</span>
                 <h3>Erro ao carregar o player</h3>
                 <p className="error-hint">Tente novamente ou abra em outro player.</p>
                 <div className="error-btns">
-                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub)}>
+                  <button className="btn btn-primary" onClick={() => doLoad(anime, epNum, isDub, null, null)}>
                     🔄 Tentar novamente
                   </button>
                   {currentSrc && (
@@ -411,6 +1162,9 @@ export default function WatchPage() {
                       🎬 Abrir no MX Player
                     </button>
                   )}
+                  <a href={adExternal} target="_blank" rel="noreferrer" className="btn btn-ghost">
+                    🚀 Ver no AnimesDrive
+                  </a>
                 </div>
               </div>
             ) : currentSrc === '__embed__' ? (
@@ -508,6 +1262,9 @@ export default function WatchPage() {
                 </button>
               </>
             )}
+            <a href={adExternal} target="_blank" rel="noreferrer" className="ext-btn">
+              <FiExternalLink /><span>AnimesDrive</span>
+            </a>
             <div className="share-container">
               <button className="ext-btn" onClick={() => setShowShare(o => !o)}><FiShare2 /><span>Share</span></button>
               {showShare && (
@@ -518,6 +1275,7 @@ export default function WatchPage() {
                   }}>{copied ? <FiCheck /> : <FiCopy />} {copied ? 'Copiado!' : 'Copiar link'}</button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(`${title} EP${epNum}\n${window.location.href}`)}`}
                     target="_blank" rel="noreferrer"><FaWhatsapp /> WhatsApp</a>
+                  <a href={adExternal} target="_blank" rel="noreferrer"><FiExternalLink /> AnimesDrive</a>
                 </div>
               )}
             </div>
