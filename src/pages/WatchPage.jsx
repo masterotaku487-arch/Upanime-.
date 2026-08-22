@@ -30,7 +30,6 @@ import { useAuth } from '../context/AuthContext'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
-const SK      = 'https://curly.masterotaku487.workers.dev'   // Fonte Principal - Shinokai (Túnel)
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
 const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
@@ -121,48 +120,6 @@ const buildDriveACandidates = (anime, dub = false) => {
 
 /** Número do episódio zero-padded em 2 dígitos (padrão do site) */
 const epStr = (ep) => String(ep).padStart(2, '0')
-
-// ── Shinokai Resolver (Nova Fonte Principal) ──────────────────────────────────
-
-/** Busca o anime no Shinokai pelo título e retorna o ID */
-const resolveShinokai = async (animeObj, ep, dub) => {
-  const title = animeObj.title_english || animeObj.title
-  console.log(`[Shinokai] Buscando: ${title}`)
-  
-  // 1. Busca o anime
-  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`)
-  const searchData = await searchRes.json()
-  
-  const match = searchData.find(item => 
-    item.title.toLowerCase().includes(title.toLowerCase()) || 
-    title.toLowerCase().includes(item.title.toLowerCase())
-  ) || searchData[0]
-
-  if (!match) throw new Error('Anime não encontrado no Shinokai')
-  
-  // 2. Busca episódios
-  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`)
-  const epsData = await epsRes.json()
-  
-  // 3. Encontra o episódio e a variante (dub/leg)
-  const episode = epsData.find(e => e.number === ep)
-  if (!episode) throw new Error(`Episódio ${ep} não encontrado no Shinokai`)
-  
-  const variant = episode.variants.find(v => v.type === (dub ? 'dubbed' : 'subtitled'))
-  if (!variant) throw new Error(`Versão ${dub ? 'Dublada' : 'Legendada'} não disponível`)
-
-  // 4. Retorna a URL de play (que já sai tunelada pelo worker)
-  const playRes = await fetch(`${SK}/medias/${match.id}/episodes/${variant.id}/play`)
-  const playData = await playRes.json()
-  
-  if (!playData.url) throw new Error('Falha ao obter link de vídeo do Shinokai')
-  
-  return {
-    url: playData.url,
-    provider: 'Shinokai',
-    label: dub ? 'Dublado' : 'Legendado'
-  }
-}
 
 /**
  * Monta a URL de episódio do animesdrive.online.
@@ -665,22 +622,6 @@ export default function WatchPage() {
       }
     } catch {}
 
-    // ── FONTE 0: Shinokai (Nova Fonte Principal) ─────────────────────────────
-    try {
-      setStatus('📡 Conectando ao Shinokai (Túnel)...')
-      const skResult = await resolveShinokai(animeObj, ep, dub)
-      
-      setSources([{ label: skResult.label, url: skResult.url }])
-      setCurrentSrc(skResult.url)
-      setStatus(`✅ Shinokai — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
-      setProvider('Shinokai')
-      setLoading(false)
-      trackView(animeObj, ep)
-      return
-    } catch (skErr) {
-      console.warn('[Shinokai] falhou:', skErr.message)
-    }
-
     // ── FONTE 1: DriveA → animesdrive.online ─────────────────────────────────
     try {
       setStatus('📡 Conectando ao DriveA...')
@@ -1012,7 +953,6 @@ export default function WatchPage() {
 
   // Badge de provider para mostrar na UI
   const providerLabel = {
-    'Shinokai':          '🔥 S0 Shinokai',
     'DriveA':            '🚀 S1 AnimesDrive',
     'AnimeQ':            '⚡ S2 AnimeQ',
     'AniTube':           '📺 S3 AniTube',
