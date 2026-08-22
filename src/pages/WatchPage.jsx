@@ -31,6 +31,7 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
 const SK      = 'https://curly.masterotaku487.workers.dev'   // Fonte Principal - Shinokai (Túnel)
+const TUNNEL_SECRET = "Q4hsu7Fbusnksi26up";
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
 const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
@@ -129,8 +130,9 @@ const resolveShinokai = async (animeObj, ep, dub) => {
   const title = animeObj.title_english || animeObj.title
   console.log(`[Shinokai] Buscando: ${title}`)
   
+  const headers = { "X-Tunnel-Secret": TUNNEL_SECRET };
   // 1. Busca o anime
-  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`)
+  const searchRes = await fetch(`${SK}/medias?q=${encodeURIComponent(title)}`, { headers })
   const searchData = await searchRes.json()
   const results = searchData.results || searchData
   
@@ -142,7 +144,7 @@ const resolveShinokai = async (animeObj, ep, dub) => {
   if (!match) throw new Error('Anime não encontrado no Shinokai')
   
   // 2. Busca episódios
-  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`)
+  const epsRes = await fetch(`${SK}/medias/${match.id}/episodes`, { headers })
   const epsData = await epsRes.json()
   const episodes = epsData.results || epsData
   
@@ -157,7 +159,7 @@ const resolveShinokai = async (animeObj, ep, dub) => {
 
   // 4. Retorna a URL de play (que já sai tunelada pelo worker)
   const playUrl = `${SK}/medias/${match.id}/episodes/${episode.id}/play?variantId=${variant.id}`
-  const playRes = await fetch(playUrl)
+  const playRes = await fetch(playUrl, { headers })
   const playData = await playRes.json()
   
   if (!playData.url) throw new Error('Falha ao obter link de vídeo do Shinokai')
