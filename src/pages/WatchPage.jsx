@@ -63,8 +63,10 @@ const normalizeTitle = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .trim()
 
-// Busca o mediaId da Shinokai pelo título do anime
-async function findShinokaiId(anime) {
+// Busca o mediaId da Shinokai pelo título do anime.
+// A busca pode devolver itens sem título/MAL ID; nesse caso, não podemos
+// simplesmente usar o primeiro resultado, pois ele pode ser outra temporada.
+async function findShinokaiId(anime, epNum, dub) {
   const queries = [...new Set([anime.title_english, anime.title, anime.title_japanese].filter(Boolean))]
   let items = []
   for (const query of queries) {
@@ -77,17 +79,42 @@ async function findShinokaiId(anime) {
   if (!items.length) throw new Error('Anime não encontrado na Shinokai')
 
   const wanted = normalizeTitle(anime.title_english || anime.title)
-  const ranked = [...items].sort((a, b) => {
-    const score = (item) => {
-      const title = normalizeTitle(shinokaiTitle(item))
-      const exact = title === wanted ? 100 : 0
-      const overlap = wanted.split(' ').filter(t => t.length > 2 && title.includes(t)).length
-      return exact + overlap
-    }
-    return score(b) - score(a)
-  })
-  const selected = ranked[0]
-  return selected.shinokai_id || selected.id
+  const score = (item) => {
+    const title = normalizeTitle(shinokaiTitle(item))
+    const exact = title && title === wanted ? 100 : 0
+    const overlap = wanted.split(' ').filter(t => t.length > 2 && title.includes(t)).length
+    const malMatch = anime.mal_id && item.mal_id && String(anime.mal_id) === String(item.mal_id) ? 1000 : 0
+    return malMatch + exact + overlap
+  }
+  const ranked = [...items].sort((a, b) => score(b) - score(a))
+
+  // Quando a resposta traz metadados, a correspondência de título/MAL é suficiente.
+  if (score(ranked[0]) > 0) return ranked[0].shinokai_id || ranked[0].id
+
+  // Quando os metadados vêm vazios, confirma a temporada pelo total de episódios
+  // e pela existência do episódio/áudio solicitado. As consultas são sequenciais
+  // para evitar o ThrottlerException do upstream.
+  for (const item of ranked) {
+    const mediaId = item.shinokai_id || item.id
+    if (!mediaId) continue
+    try {
+      const res = await fetch(`${SK}/episodes?id=${encodeURIComponent(mediaId)}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) continue
+      const list = shinokaiList(data)
+      const episode = list.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
+      const variants = Array.isArray(episode?.variants) ? episode.variants : []
+      const hasWantedAudio = variants.some(v => dub
+        ? /dub|dublado|pt[- ]?br|portuguese/i.test(JSON.stringify(v))
+        : /sub|leg|legendado|japanese/i.test(JSON.stringify(v)))
+      const countMatches = !anime.episodes || list.length === Number(anime.episodes)
+      if (episode && hasWantedAudio && countMatches) return mediaId
+    } catch { /* tenta o próximo candidato */ }
+  }
+
+  // Último fallback: preserva o primeiro candidato somente quando não foi
+  // possível confirmar a temporada devido a falha temporária do upstream.
+  return ranked[0].shinokai_id || ranked[0].id
 }
 
 // Busca os episódios e pega o epId + melhor variantId pro ep desejado
@@ -115,7 +142,7 @@ async function getShinokaiEp(mediaId, epNum, dub) {
 
 // Resolve tudo e devolve { url, label }
 async function resolveShinokai(anime, ep, dub) {
-  const mediaId = await findShinokaiId(anime)
+  const mediaId = await findShinokaiId(anime, ep, dub)
   const { epId, varId, label } = await getShinokaiEp(mediaId, ep, dub)
   const params = new URLSearchParams({ id: mediaId, ep: epId, var: varId })
   const res = await fetch(`${SK}/play?${params.toString()}`)
