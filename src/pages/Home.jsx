@@ -47,7 +47,7 @@ function ContinueCard({ entry, onRemove }) {
   )
 }
 
-function AnimeRow({ title, link, animes, loading }) {
+function AnimeRow({ title, link, animes, loading, ranked }) {
   return (
     <section className="section">
       <div className="section-header">
@@ -62,10 +62,31 @@ function AnimeRow({ title, link, animes, loading }) {
         </div>
       ) : (
         <div className="anime-grid">
-          {animes?.map((a, i) => <AnimeCard key={a.mal_id} anime={a} index={i} />)}
+          {animes?.map((a, i) => <AnimeCard key={a.mal_id} anime={a} index={i} rank={ranked ? i + 1 : null} />)}
         </div>
       )}
     </section>
+  )
+}
+
+const CHIPS = [
+  { label: 'Em Alta',     link: '/category/airing' },
+  { label: 'Lançamentos', link: '/category/upcoming' },
+  { label: 'Ação',        link: '/explorar?genres=1' },
+  { label: 'Shounen',     link: '/explorar?genres=27' },
+  { label: 'Terror',      link: '/explorar?genres=14' },
+  { label: 'Dublado',     link: '/fandubs' },
+]
+
+function CategoryChips() {
+  return (
+    <div className="chips-row">
+      {CHIPS.map((c, i) => (
+        <Link key={c.label} to={c.link} className={`chip${i === 0 ? ' chip-active' : ''}`}>
+          {c.label}
+        </Link>
+      ))}
+    </div>
   )
 }
 
@@ -153,6 +174,8 @@ export default function Home() {
     <div className="home">
       <h1 style={{ display: 'none' }}>Up Anime+ - Assistir Animes Online Grátis em HD</h1>
 
+      <CategoryChips />
+
       <Hero animes={heroAnimes} />
 
       <div className="container">
@@ -172,7 +195,7 @@ export default function Home() {
         )}
 
         <AnimeRow title={<>Temporada <span>Atual</span></>}    link="/category/airing"       animes={seasonal.slice(0, 12)} loading={loading} />
-        <AnimeRow title={<>Top <span>Airing</span></>}         link="/category/airing"       animes={top.slice(0, 12)}      loading={loading} />
+        <AnimeRow title={<>Top 10 <span>Hoje</span></>}        link="/category/airing"       animes={top.slice(0, 10)}      loading={loading} ranked />
 
         {/* ── Fan-Dubs Brasileiros ── */}
         <FanDubsHomeSection />
@@ -182,4 +205,4 @@ export default function Home() {
       </div>
     </div>
   )
-       }
+          }
