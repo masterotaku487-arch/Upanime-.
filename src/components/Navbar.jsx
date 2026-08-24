@@ -49,7 +49,7 @@ export default function Navbar() {
             <button className="icon-btn" onClick={() => setSearchOpen(true)}>
               <FiSearch />
             </button>
-            <Link to="/meu-perfil" className="icon-btn profile-btn">
+            <Link to="/config" className="icon-btn profile-btn">
               {user?.avatar ? (
                 <img src={user.avatar} alt={user.name || 'Perfil'} className="profile-avatar" />
               ) : (

@@ -8,7 +8,7 @@ const items = [
   { label: 'Explorar',  path: '/genres',    icon: FiCompass },
   { label: 'Favoritos', path: '/favoritos', icon: FiHeart },
   { label: 'Novidades', path: '/novidades', icon: FiCalendar },
-  { label: 'Perfil',    path: '/meu-perfil', icon: FiUser },
+  { label: 'Perfil',    path: '/config', icon: FiUser },
 ]
 
 export default function BottomNav() {
