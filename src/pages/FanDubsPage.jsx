@@ -4,6 +4,9 @@ import './FanDubsPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
+const normalize = (s) =>
+  (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+
 export default function FanDubsPage() {
   const nav = useNavigate()
   const [sp, setSp] = useSearchParams()
@@ -11,6 +14,7 @@ export default function FanDubsPage() {
   const [studios, setStudios]   = useState([])
   const [loading, setLoading]   = useState(true)
   const [studioFiltro, setStudioFiltro] = useState(sp.get('studio') || '')
+  const generoFiltro = sp.get('genero') || ''
   const [busca, setBusca]       = useState('')
 
   useEffect(() => {
@@ -24,9 +28,16 @@ export default function FanDubsPage() {
     })
   }, [studioFiltro])
 
+  const limparGenero = () => {
+    const next = new URLSearchParams(sp)
+    next.delete('genero')
+    setSp(next)
+  }
+
   const filtrados = fanDubs.filter(d =>
-    !busca || d.animeTitulo.toLowerCase().includes(busca.toLowerCase()) ||
-    d.titulo.toLowerCase().includes(busca.toLowerCase())
+    (!busca || d.animeTitulo.toLowerCase().includes(busca.toLowerCase()) ||
+      d.titulo.toLowerCase().includes(busca.toLowerCase())) &&
+    (!generoFiltro || normalize(d.genero) === normalize(generoFiltro))
   )
 
   return (
@@ -36,6 +47,13 @@ export default function FanDubsPage() {
         <p className="fandubs-sub">Dublagens feitas com amor pela comunidade brasileira</p>
       </div>
 
+      {generoFiltro && (
+        <div className="genero-filter-tag">
+          Gênero: <strong>{generoFiltro}</strong>
+          <button onClick={limparGenero}>✕</button>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="fandubs-filters">
         <input className="fandubs-search" value={busca}
@@ -43,12 +61,12 @@ export default function FanDubsPage() {
           placeholder="🔍 Buscar anime ou fan-dub..." />
         <div className="studio-tabs">
           <div className={`studio-tab ${!studioFiltro ? 'active' : ''}`}
-            onClick={() => { setStudioFiltro(''); setSp({}) }}>
+            onClick={() => { setStudioFiltro(''); setSp(generoFiltro ? { genero: generoFiltro } : {}) }}>
             Todos
           </div>
           {studios.map(s => (
             <div key={s.id} className={`studio-tab ${studioFiltro === s.id ? 'active' : ''}`}
-              onClick={() => { setStudioFiltro(s.id); setSp({ studio: s.id }) }}>
+              onClick={() => { setStudioFiltro(s.id); setSp(generoFiltro ? { studio: s.id, genero: generoFiltro } : { studio: s.id }) }}>
               {s.logo && <img src={s.logo} alt={s.nome} className="studio-tab-logo" />}
               {s.nome}
             </div>
@@ -64,7 +82,7 @@ export default function FanDubsPage() {
       ) : filtrados.length === 0 ? (
         <div className="fandubs-empty">
           <div style={{fontSize:'3rem'}}>🎙️</div>
-          <p>Nenhum fan-dub encontrado.</p>
+          <p>{generoFiltro ? `Nenhum fan-dub de ${generoFiltro} encontrado ainda.` : 'Nenhum fan-dub encontrado.'}</p>
         </div>
       ) : (
         <div className="fandubs-grid">

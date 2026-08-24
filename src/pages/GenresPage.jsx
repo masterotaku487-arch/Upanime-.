@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FiSearch } from 'react-icons/fi'
 import { getAnimeByGenre, getGenres } from '../services/api'
-import { getDubbedTitleSet, isDubbed } from '../services/fandubs'
+import { getFanDubsByGenre } from '../services/fandubs'
 import { GENRE_LABELS } from '../utils/genreLabels'
 import AnimeCard from '../components/AnimeCard'
 import './GenresPage.css'
@@ -42,6 +42,34 @@ const SORTS = [
 const YEARS = [new Date().getFullYear(), new Date().getFullYear()-1, new Date().getFullYear()-2,
   2022, 2021, 2020, 2019, 2018, 2015, 2010, 2005, 2000]
 
+// Card de fan-dub reaproveitando o visual "rank" do AnimeCard (mesmas
+// classes CSS), já que os dados vêm da nossa API de estúdios e não do
+// catálogo AniList (mal_id, images...).
+function FandubRankCard({ dub, rank }) {
+  const image = dub.capa || dub.animeCapa
+  return (
+    <Link to={`/fandub/${dub.id}`} className="anime-card rank-card">
+      <span className="rank-number">{rank}</span>
+      <div className="card-body">
+        <div className="card-poster">
+          {image
+            ? <img src={image} alt={dub.animeTitulo} loading="lazy"
+                onError={e => e.target.src = 'https://via.placeholder.com/200x280/111/fff?text=FD'} />
+            : <div className="card-no-img">?</div>}
+          <div className="card-badges">
+            <span className="badge badge-score">🇧🇷 DUB</span>
+          </div>
+          {dub.episodios && <span className="card-ep">{dub.episodios} eps</span>}
+        </div>
+        <div className="card-info">
+          <h3 className="card-title">{dub.animeTitulo}</h3>
+          <p className="card-sub">{dub.studioNome || dub.idioma}</p>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 export default function GenresPage() {
   const navigate = useNavigate()
 
@@ -68,32 +96,42 @@ export default function GenresPage() {
 
   useEffect(() => {
     setLoadingPopular(true)
-    getAnimeByGenre(FEATURED.id, 1)
-      .then(async d => {
-        let list = d.data || []
-        if (dublado) {
-          const dubbedSet = await getDubbedTitleSet()
-          list = list.filter(a => isDubbed(a, dubbedSet))
-        }
-        setPopular(list.slice(0, 10))
-      })
-      .finally(() => setLoadingPopular(false))
+    if (dublado) {
+      getFanDubsByGenre(FEATURED.label)
+        .then(list => setPopular(list.slice(0, 10)))
+        .finally(() => setLoadingPopular(false))
+    } else {
+      getAnimeByGenre(FEATURED.id, 1)
+        .then(d => setPopular((d.data || []).slice(0, 10)))
+        .finally(() => setLoadingPopular(false))
+    }
   }, [dublado])
 
-  // "Dublado" leva pro catálogo real cruzado com a lista de fan-dubs em PT-BR
-  const tileLink = (id) =>
-    dublado ? `/explorar?genres=${id}&dublado=1` : `/explorar?genres=${id}`
+  // "Dublado" leva direto pro catálogo real de fan-dubs, filtrado pelo
+  // campo `genero` que já vem da nossa própria API de estúdios.
+  const tileLink = (id, label) =>
+    dublado ? `/fandubs?genero=${encodeURIComponent(label)}` : `/explorar?genres=${id}`
 
   const toggleGenre = (id) =>
     setSelGenres(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
   const applyAdvanced = () => {
+    if (dublado) {
+      // Fan-dubs não têm filtro por tipo/ano/ordenação — só por gênero.
+      if (selGenres.length === 1) {
+        const g = allGenres.find(x => x.mal_id === selGenres[0])
+        const label = g ? (GENRE_LABELS[g.name] || g.name) : ''
+        navigate(label ? `/fandubs?genero=${encodeURIComponent(label)}` : '/fandubs')
+      } else {
+        navigate('/fandubs')
+      }
+      return
+    }
     const params = new URLSearchParams()
     if (selGenres.length) params.set('genres', selGenres.join(','))
     if (selType)  params.set('type', selType)
     if (selYear)  params.set('year', selYear)
     params.set('sort', selSort)
-    if (dublado) params.set('dublado', '1')
     navigate(`/explorar?${params.toString()}`)
   }
 
@@ -123,7 +161,7 @@ export default function GenresPage() {
 
       <div className="genre-grid">
         {TILES.map(t => (
-          <Link key={t.id} to={tileLink(t.id)} className={`genre-tile ${t.bg}`}>
+          <Link key={t.id} to={tileLink(t.id, t.label)} className={`genre-tile ${t.bg}`}>
             <span className="name">{t.label}</span>
           </Link>
         ))}
@@ -141,7 +179,9 @@ export default function GenresPage() {
           <div className="rail">
             {loadingPopular
               ? Array(5).fill(0).map((_, i) => <div key={i} className="skeleton rail-skeleton" />)
-              : popular.map((a, i) => <AnimeCard key={a.mal_id} anime={a} index={i} rank={i + 1} />)
+              : dublado
+                ? popular.map((d, i) => <FandubRankCard key={d.id} dub={d} rank={i + 1} />)
+                : popular.map((a, i) => <AnimeCard key={a.mal_id} anime={a} index={i} rank={i + 1} />)
             }
           </div>
         )}
@@ -217,7 +257,7 @@ export default function GenresPage() {
         </div>
 
         <button className="apply-btn" onClick={applyAdvanced}>
-          Aplicar filtro{dublado ? ' (só dublados)' : ''}
+          {dublado ? 'Ver fan-dubs' : 'Aplicar filtro'}
         </button>
       </section>
     </div>

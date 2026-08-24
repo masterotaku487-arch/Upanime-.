@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AnimeCard from '../components/AnimeCard'
-import { getTopAnime, getAnimeByGenre, searchAnimeFilter } from '../services/api'
-import { getDubbedTitleSet, isDubbed } from '../services/fandubs'
+import { searchAnimeFilter } from '../services/api'
 import './ExplorarPage.css'
 
 export default function ExplorarPage() {
@@ -12,23 +11,16 @@ export default function ExplorarPage() {
   const [page, setPage]       = useState(1)
   const [hasMore, setHasMore] = useState(false)
 
-  const genres  = searchParams.get('genres')?.split(',').filter(Boolean) || []
-  const type    = searchParams.get('type') || ''
-  const year    = searchParams.get('year') || ''
-  const sort    = searchParams.get('sort') || 'bypopularity'
-  const dublado = searchParams.get('dublado') === '1'
-
-  const filterDubbed = async (list) => {
-    if (!dublado) return list
-    const dubbedSet = await getDubbedTitleSet()
-    return list.filter(a => isDubbed(a, dubbedSet))
-  }
+  const genres = searchParams.get('genres')?.split(',').filter(Boolean) || []
+  const type   = searchParams.get('type') || ''
+  const year   = searchParams.get('year') || ''
+  const sort   = searchParams.get('sort') || 'bypopularity'
 
   useEffect(() => {
     setLoading(true); setAnimes([]); setPage(1)
     searchAnimeFilter({ genres, type, year, sort, page: 1 })
-      .then(async d => {
-        setAnimes(await filterDubbed(d.data || []))
+      .then(d => {
+        setAnimes(d.data || [])
         setHasMore(d.pagination?.has_next_page || false)
       })
       .finally(() => setLoading(false))
@@ -37,8 +29,7 @@ export default function ExplorarPage() {
   const loadMore = async () => {
     const next = page + 1
     const d = await searchAnimeFilter({ genres, type, year, sort, page: next })
-    const filtered = await filterDubbed(d.data || [])
-    setAnimes(p => [...p, ...filtered])
+    setAnimes(p => [...p, ...(d.data || [])])
     setHasMore(d.pagination?.has_next_page || false)
     setPage(next)
   }
@@ -46,7 +37,7 @@ export default function ExplorarPage() {
   return (
     <div className="container explorar-page">
       <h1 className="explorar-title">
-        {dublado ? '🇧🇷 Dublados' : 'Resultados'}
+        Resultados
         {animes.length > 0 && <span>{animes.length} animes</span>}
       </h1>
 
@@ -59,11 +50,7 @@ export default function ExplorarPage() {
       ) : animes.length === 0 ? (
         <div className="explorar-empty">
           <span>😶</span>
-          <p>
-            {dublado
-              ? 'Nenhum anime dublado encontrado com esses filtros.'
-              : 'Nenhum anime encontrado com esses filtros.'}
-          </p>
+          <p>Nenhum anime encontrado com esses filtros.</p>
         </div>
       ) : (
         <>
@@ -80,3 +67,4 @@ export default function ExplorarPage() {
     </div>
   )
 }
+

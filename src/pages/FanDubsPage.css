@@ -34,3 +34,27 @@
 .studio-cta-title { font-size: .88rem; font-weight: 700; }
 .studio-cta-sub { font-size: .75rem; color: var(--muted); margin-top: 2px; }
 .studio-cta-arrow { margin-left: auto; color: var(--yellow); font-size: 1.2rem; flex-shrink: 0; }
+
+/* ── Tag de filtro por gênero (vindo da tela de Categorias) ── */
+.genero-filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 14px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.genero-filter-tag strong { color: var(--text); }
+.genero-filter-tag button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.genero-filter-tag button:hover { color: var(--red); }
