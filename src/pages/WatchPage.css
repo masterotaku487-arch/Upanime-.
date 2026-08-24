@@ -1,9 +1,9 @@
-.watch-page { padding-top: 68px; min-height: 100vh; background: var(--bg); }
+.watch-page { padding-top: 0; min-height: 100vh; background: var(--bg); }
 
 .watch-layout {
   display: grid;
   grid-template-columns: 1fr 300px;
-  min-height: calc(100vh - 68px);
+  min-height: 100vh;
 }
 
 .watch-main { display: flex; flex-direction: column; }
@@ -163,7 +163,7 @@
 .ep-sidebar {
   background: var(--bg2); border-left: 1px solid var(--border);
   display: flex; flex-direction: column;
-  height: calc(100vh - 68px); position: sticky; top: 68px;
+  height: 100vh; position: sticky; top: 0;
 }
 .sidebar-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -301,4 +301,3 @@ code {
 }
 .track-btn:hover { color: var(--text); }
 .track-btn.active { background: var(--red); color: #fff; }
-  
