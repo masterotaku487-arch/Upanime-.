@@ -1,3 +1,4 @@
+
 .anime-card {
   display: block;
   border-radius: var(--radius);
@@ -65,6 +66,21 @@
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+}
+.card-rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  font-family: var(--font-hero);
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid var(--red-glow);
+  padding: 3px 8px;
+  border-radius: 5px;
+  letter-spacing: 0.5px;
 }
 .badge-score {
   display: inline-flex;
