@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FiSearch, FiX, FiBell } from 'react-icons/fi'
+import { FiSearch, FiX, FiUser } from 'react-icons/fi'
 import './Navbar.css'
 
 export default function Navbar() {
@@ -47,8 +47,8 @@ export default function Navbar() {
             <button className="icon-btn" onClick={() => setSearchOpen(true)}>
               <FiSearch />
             </button>
-            <Link to="/novidades" className="icon-btn">
-              <FiBell />
+            <Link to="/meu-perfil" className="icon-btn">
+              <FiUser />
             </Link>
           </div>
         )}
