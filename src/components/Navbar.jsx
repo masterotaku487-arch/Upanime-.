@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FiSearch, FiX, FiUser } from 'react-icons/fi'
+import { useAuth } from '../context/AuthContext'
 import './Navbar.css'
 
 export default function Navbar() {
@@ -8,6 +9,7 @@ export default function Navbar() {
   const [query, setQuery] = useState('')
   const inputRef = useRef(null)
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   useEffect(() => {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 100)
@@ -47,8 +49,12 @@ export default function Navbar() {
             <button className="icon-btn" onClick={() => setSearchOpen(true)}>
               <FiSearch />
             </button>
-            <Link to="/meu-perfil" className="icon-btn">
-              <FiUser />
+            <Link to="/meu-perfil" className="icon-btn profile-btn">
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.name || 'Perfil'} className="profile-avatar" />
+              ) : (
+                <FiUser />
+              )}
             </Link>
           </div>
         )}
