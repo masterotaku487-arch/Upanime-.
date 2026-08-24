@@ -1,174 +1,97 @@
-// src/services/shi.mjs
+// services/shi.mjs
 
-const BASE_URL = 'https://api-prod.shinokai.online'
-const AES_KEY_B64 = 'LClZ5k9139ypHE4c863iIrMALnupsPH+4TUF6zhA6nk='
-const CORS_PROXY = 'https://corsproxy.io/?'
+/**
+ * Faz requisições à API Shinokai usando o proxy serverless interno (/api/shinokai).
+ */
+export async function api(endpoint) {
+  const cleanPath = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
+  const res = await fetch(`/api/shinokai?path=${encodeURIComponent(cleanPath)}`)
 
-let accessToken = null
-
-function bytesFromBase64(value) {
-  if (typeof value !== 'string' || !value) return new Uint8Array(0)
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
-  const binary = atob(padded)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
+  if (!res.ok) {
+    let errorMsg = `Erro HTTP ${res.status}`
+    try {
+      const errData = await res.json()
+      if (errData.msg || errData.error) {
+        errorMsg = errData.msg || errData.error
+      }
+    } catch (_) {}
+    throw new Error(errorMsg)
   }
-  return bytes
+
+  return await res.json()
 }
 
-async function decryptEnvelope(envelope) {
-  if (!envelope?.iv || !envelope?.tag || !envelope?.payload) return envelope
-
-  const keyBytes = bytesFromBase64(AES_KEY_B64)
-  const iv = bytesFromBase64(envelope.iv)
-  const tag = bytesFromBase64(envelope.tag)
-  const payload = bytesFromBase64(envelope.payload)
-
-  const ciphertext = new Uint8Array(payload.length + tag.length)
-  ciphertext.set(payload, 0)
-  ciphertext.set(tag, payload.length)
-
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyBytes,
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt']
-  )
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv, tagLength: tag.length * 8 },
-    cryptoKey,
-    ciphertext
-  )
-
-  const text = new TextDecoder().decode(decrypted)
-  return JSON.parse(text)
-}
-
-async function unwrapJson(parsed) {
-  if (parsed?.iv && parsed?.tag && parsed?.payload) {
-    return await decryptEnvelope(parsed)
-  }
-  if (parsed && typeof parsed.data === 'object' && !Array.isArray(parsed.data)) {
-    return parsed.data
-  }
-  return parsed
-}
-
-async function readResponse(response) {
-  const text = await response.text()
-  let parsed
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    throw new Error(`Shinokai HTTP ${response.status}: resposta não é JSON`)
-  }
-  if (!response.ok) {
-    const detail = parsed?.message || parsed?.error || `HTTP ${response.status}`
-    throw new Error(detail)
-  }
-  return await unwrapJson(parsed)
-}
-
-async function login() {
-  const targetUrl = `${BASE_URL}/auth/anonymous`
-  const response = await fetch(`${CORS_PROXY}${encodeURIComponent(targetUrl)}`, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-  })
-  const data = await readResponse(response)
-  const token = data?.accessToken || data?.access_token || data?.token
-  if (!token) throw new Error('Token anônimo ausente')
-  accessToken = token
-}
-
-export async function api(path, allowRelogin = true) {
-  if (!accessToken) await login()
-  const targetUrl = `${BASE_URL}${path}`
-  const response = await fetch(`${CORS_PROXY}${encodeURIComponent(targetUrl)}`, {
-    headers: {
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  })
-  if (response.status === 401 && allowRelogin) {
-    accessToken = null
-    return api(path, false)
-  }
-  return readResponse(response)
-}
-
-export function arrayOf(value) {
-  if (Array.isArray(value)) return value
-  if (Array.isArray(value?.results)) return value.results
-  if (Array.isArray(value?.episodes)) return value.episodes
-  if (Array.isArray(value?.data)) return value.data
+/**
+ * Normaliza o retorno em um Array para prevenir falhas de iteradores no React.
+ */
+export function arrayOf(data) {
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data.data)) return data.data
+  if (Array.isArray(data.items)) return data.items
+  if (typeof data === 'object') return Object.values(data)
   return []
 }
 
-export function titleOf(media) {
-  if (typeof media?.title === 'string') return media.title
-  if (media?.title && typeof media.title === 'object') {
-    return media.title.romaji || media.title.english || media.title.native || ''
-  }
-  return media?.name || media?.originalTitle || ''
-}
-
+/**
+ * Normaliza os dados da mídia/anime retornados da API.
+ */
 export function mediaInfo(media) {
+  if (!media) return {}
   return {
-    id: media?.id || media?.shinokai_id || null,
-    mal_id: media?.malId || media?.mal_id || null,
-    title: titleOf(media),
-    english: media?.title?.english || null,
-    type: media?.type || media?.format || null,
-    year: media?.releaseYear || media?.seasonYear || null,
-    episodes: media?.episodes || media?.episodeCount || null,
-    cover: media?.posterUrl || media?.coverImage?.large || media?.thumbnail || null,
+    id: media.id || media._id || media.mal_id || '',
+    mal_id: media.mal_id || media.malId || null,
+    title: media.title || media.name || 'Título Desconhecido',
+    title_english: media.title_english || media.english_title || media.title || '',
+    image: media.image || media.cover || media.poster || '',
   }
 }
 
-export function episodeInfo(episode) {
-  const variants = Array.isArray(episode?.variants)
-    ? episode.variants
-    : (Array.isArray(episode?.sources) ? episode.sources : [])
+/**
+ * Normaliza a estrutura de episódios e suas variantes.
+ */
+export function episodeInfo(ep) {
+  if (!ep) return {}
   return {
-    id: episode?.id || null,
-    number: episode?.number ?? episode?.episodeNumber ?? null,
-    title: episode?.title || episode?.name || null,
-    variants: variants.map((variant) => ({
-      id: variant?.id || variant?.variantId || null,
-      label: variant?.label || variant?.quality || variant?.audioType || 'Auto',
-      lang: variant?.lang || variant?.language || variant?.audioType || '',
-      audioType: variant?.audioType || null,
-    })),
+    id: ep.id || ep._id || String(ep.number || ep.episode || '1'),
+    number: Number(ep.number || ep.episode || 1),
+    title: ep.title || `Episódio ${ep.number || ep.episode || 1}`,
+    variants: arrayOf(ep.variants || ep.players || ep.sources || []),
   }
 }
 
-export function videoUrl(data) {
-  if (typeof data === 'string') return data
-  if (data?.url || data?.videoUrl || data?.playUrl) return data.url || data.videoUrl || data.playUrl
-  const source = Array.isArray(data?.sources) ? data.sources.find((item) => item?.url) : null
-  return source?.url || null
+/**
+ * Extrai a URL final de reprodução obtida do endpoint /play.
+ */
+export function videoUrl(playData) {
+  if (!playData) return ''
+  if (typeof playData === 'string') return playData
+  return playData.url || playData.streamUrl || playData.file || playData.data?.url || ''
 }
 
-export function qualityNumber(variant) {
-  const text = `${variant?.label || ''} ${variant?.quality || ''}`.toLowerCase()
-  if (/2160|4k/.test(text)) return 2160
-  if (/1440/.test(text)) return 1440
-  if (/1080|full\s*hd/.test(text)) return 1080
-  if (/720|hd/.test(text)) return 720
-  if (/480/.test(text)) return 480
-  if (/360/.test(text)) return 360
-  return 0
-}
-
+/**
+ * Verifica se a opção/variante de vídeo é dublada em Português.
+ */
 export function isDub(variant) {
-  const text = `${variant?.label || ''} ${variant?.lang || ''} ${variant?.audioType || ''}`.toLowerCase()
-  return /dub|dubl|pt[- ]?br|portugu/.test(text)
+  if (!variant) return false
+  const label = String(variant.label || variant.name || variant.lang || '').toLowerCase()
+  const audio = String(variant.audio || '').toLowerCase()
+  return (
+    label.includes('dub') ||
+    label.includes('pt-br') ||
+    label.includes('português') ||
+    label.includes('portugues') ||
+    audio.includes('dub') ||
+    variant.isDub === true
+  )
 }
+
+/**
+ * Converte o rótulo de resolução/qualidade em número para permitir ordenação (ex: "1080p" -> 1080).
+ */
+export function qualityNumber(variant) {
+  if (!variant) return 0
+  const label = String(variant.label || variant.quality || '')
+  const match = label.match(/(\d+)/)
+  return match ? parseInt(match[1], 10) : 0
+                      }
