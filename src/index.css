@@ -10,6 +10,7 @@
   --text: #f0f0f0;
   --text-dim: #888;
   --font-display: 'Bebas Neue', sans-serif;
+  --font-hero: 'Anton', sans-serif;
   --font-body: 'Outfit', sans-serif;
   --radius: 10px;
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -200,4 +201,3 @@ ul, ol { list-style: none; }
 .sobre-links { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 20px; border-top: 1px solid var(--border); }
 .sobre-links a { font-size: .82rem; color: var(--red); font-weight: 600; }
 .sobre-links a:hover { text-decoration: underline; }
-  
