@@ -17,7 +17,7 @@ const getProgress = (animeId, totalEps) => {
   return null
 }
 
-export default function AnimeCard({ anime, index = 0 }) {
+export default function AnimeCard({ anime, index = 0, rank = null }) {
   if (!anime) return null
 
   const [progress, setProgress] = useState(null)
@@ -39,6 +39,7 @@ export default function AnimeCard({ anime, index = 0 }) {
       style={{ animationDelay: `${index * 0.05}s` }}
     >
       <div className="card-poster">
+        {rank && <span className="card-rank">{String(rank).padStart(2, '0')}</span>}
         {image ? (
           <img src={image} alt={anime.title} loading="lazy" />
         ) : (
