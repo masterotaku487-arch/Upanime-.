@@ -1,11 +1,11 @@
-.home { padding-top: 0; }
+.home { padding-top: 60px; }
 
 /* ── Chips de categoria (topo, estilo app) ───────────────── */
 .chips-row {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 18px 24px 16px;
+  padding: 14px 18px 4px;
   scrollbar-width: none;
 }
 .chips-row::-webkit-scrollbar { display: none; }
@@ -34,12 +34,9 @@
 }
 
 /* ── Tipografia impactante na Home (estilo do mockup) ───── */
-.home .hero-title,
 .home .section-title {
   font-family: var(--font-hero);
   letter-spacing: 0.5px;
-}
-.home .section-title {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -52,27 +49,39 @@
   border-radius: 2px;
   display: inline-block;
 }
+.home .section { padding: 0 0 32px; }
+.home .section-header { padding: 0 18px; margin-bottom: 14px; }
 
-/* Slash diagonal crimson sutil sobre o hero, como no mockup */
-.home .hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    linear-gradient(115deg, transparent 42%, rgba(226,27,44,0.16) 43%, rgba(226,27,44,0.02) 46%, transparent 47%),
-    linear-gradient(115deg, transparent 55%, rgba(255,255,255,0.04) 56%, transparent 58%);
+/* ── Fileiras horizontais (estilo app, não desce em grid) ── */
+.home .anime-grid,
+.home .continue-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 2px 18px 6px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.home .anime-grid::-webkit-scrollbar,
+.home .continue-grid::-webkit-scrollbar { display: none; }
+
+.home .anime-grid .anime-card,
+.home .continue-grid .continue-card {
+  flex: 0 0 auto;
+  width: 130px;
+  scroll-snap-align: start;
+}
+.home .anime-grid .anime-card.rank-card {
+  width: 168px;
+}
+.home .anime-grid .skeleton {
+  flex: 0 0 auto;
+  width: 130px;
 }
 
 /* ── Continuar Assistindo ───────────────────────────────── */
 .continue-section { padding-bottom: 0; }
-
-.continue-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
 
 .continue-card {
   position: relative; display: flex; flex-direction: column; gap: 6px;
