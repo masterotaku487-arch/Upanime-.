@@ -1,46 +1,183 @@
-.genres-page { padding: 80px 0 140px; }
-.genres-title {
-  font-size: 1.6rem; font-weight: 800;
-  margin-bottom: 28px; color: var(--text);
+.genres-page { padding-bottom: 40px; }
+
+/* ── Cabeçalho ────────────────────────────────────────── */
+.cat-header { padding: 18px 18px 4px; }
+.cat-h-title {
+  font-family: var(--font-hero, var(--font-display));
+  font-size: 1.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.cat-h-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 4px;
 }
 
-.filter-section { margin-bottom: 28px; }
-.filter-section h2 {
-  font-size: 1rem; font-weight: 700;
-  color: var(--text); margin-bottom: 14px;
+/* ── Barra de busca (leva pra /search) ───────────────────── */
+.searchbar {
+  margin: 14px 18px 6px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 14px;
+  color: var(--text-dim);
 }
+.searchbar svg { width: 15px; height: 15px; flex-shrink: 0; }
+.searchbar span { font-size: 0.78rem; }
 
-.filter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-
+/* ── Chips de filtro (Todos / Dublado / Legendado) ───────── */
+.filter-row {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px 6px;
+}
 .chip {
-  padding: 8px 16px; border-radius: 99px;
-  border: 1.5px solid rgba(255,255,255,0.18);
-  background: transparent; color: var(--text);
-  font-size: 0.82rem; font-weight: 500;
-  cursor: pointer; transition: all .18s;
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition);
   white-space: nowrap;
 }
-.chip:hover { border-color: rgba(255,255,255,0.5); }
+.chip:hover { color: var(--text); border-color: rgba(255,255,255,0.3); }
 .chip.active {
-  background: var(--red); border-color: var(--red);
-  color: #fff; font-weight: 700;
+  background: linear-gradient(135deg, var(--red), var(--red-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 14px -4px var(--red-glow);
 }
-.chip-more { color: var(--red); border-color: var(--red); }
-.chip-more:hover { background: rgba(229,57,53,.1); }
 
-/* Botão fixo no fundo — sempre visível acima do BottomNav */
+/* ── Grade de gêneros ─────────────────────────────────────── */
+.genre-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 18px 18px;
+}
+.genre-tile {
+  height: 78px;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+  border: 1px solid var(--border);
+  transition: transform var(--transition);
+}
+.genre-tile:active { transform: scale(0.97); }
+.genre-tile.bg1 { background: linear-gradient(140deg, #3a0810, #120a0b); }
+.genre-tile.bg2 { background: linear-gradient(140deg, #1c0d10, #120a0b); }
+.genre-tile::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.75) 100%);
+  z-index: 1;
+}
+.genre-tile::after {
+  content: '';
+  position: absolute; top: -30%; right: -20%;
+  width: 80px; height: 80px;
+  background: var(--red-glow);
+  opacity: 0.35;
+  border-radius: 50%;
+  filter: blur(14px);
+}
+.genre-tile .name {
+  position: relative; z-index: 2;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #fff;
+}
+
+/* ── Fileira "Populares em..." ───────────────────────────── */
+.genres-page .section { margin-top: 8px; }
+.genres-page .section-head { padding: 0 18px 12px; }
+.genres-page .section-title {
+  font-family: var(--font-hero, var(--font-display));
+  font-size: 1rem;
+  display: flex; align-items: center; gap: 10px;
+}
+.genres-page .section-title::before {
+  content: '';
+  width: 4px; height: 16px;
+  background: var(--red);
+  border-radius: 2px;
+  display: inline-block;
+}
+.genres-page .rail {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 2px 18px 6px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.genres-page .rail::-webkit-scrollbar { display: none; }
+.genres-page .rail .anime-card {
+  flex: 0 0 auto;
+  width: 168px;
+  scroll-snap-align: start;
+}
+.genres-page .rail-skeleton {
+  flex: 0 0 auto;
+  width: 130px;
+  aspect-ratio: 2/3;
+  border-radius: var(--radius);
+}
+.rail-empty {
+  padding: 0 18px 8px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* ── Filtro avançado (formulário completo) ───────────────── */
+.adv-filter {
+  margin-top: 20px;
+  padding: 20px 18px 100px;
+  border-top: 1px solid var(--border);
+}
+.adv-filter-title {
+  font-family: var(--font-hero, var(--font-display));
+  font-size: 1.1rem;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.adv-filter .filter-section { margin-bottom: 22px; }
+.adv-filter .filter-section h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.adv-filter .filter-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.adv-filter .chip-more { color: var(--red); }
+
 .apply-btn {
-  width: 100%; padding: 16px;
-  background: var(--red); border: none;
-  border-radius: 10px; color: #fff;
-  font-size: 1rem; font-weight: 700;
-  cursor: pointer; margin-top: 8px;
-  transition: opacity .2s; position: sticky;
-  bottom: 74px; z-index: 10;
-  box-shadow: 0 -8px 20px rgba(0,0,0,0.4);
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, var(--red), var(--red-dark));
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: opacity var(--transition);
+  box-shadow: 0 8px 20px -6px var(--red-glow);
 }
-.apply-btn:hover { opacity: .88; }
-
-@media (min-width: 768px) {
-  .apply-btn { position: static; box-shadow: none; }
-}
+.apply-btn:hover { opacity: 0.9; }
