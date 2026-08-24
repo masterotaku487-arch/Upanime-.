@@ -20,7 +20,8 @@
 .logo-img {
   width: 30px;
   height: 30px;
-  object-fit: contain;
+  object-fit: cover;
+  border-radius: 50%;
   filter: drop-shadow(0 0 8px var(--red-glow));
 }
 .logo-text {
@@ -52,6 +53,17 @@
 .icon-btn:hover {
   background: rgba(255,255,255,0.1);
   color: var(--text);
+}
+
+.profile-btn {
+  padding: 0;
+  overflow: hidden;
+}
+.profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .search-bar {
