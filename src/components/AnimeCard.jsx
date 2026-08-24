@@ -17,6 +17,45 @@ const getProgress = (animeId, totalEps) => {
   return null
 }
 
+function Poster({ anime, score, type, episodes, image, progress }) {
+  return (
+    <div className="card-poster">
+      {image ? (
+        <img src={image} alt={anime.title} loading="lazy" />
+      ) : (
+        <div className="card-no-img">?</div>
+      )}
+
+      <div className="card-overlay">
+        <button className="play-btn"><FiPlay /></button>
+      </div>
+
+      <div className="card-badges">
+        {score && (
+          <span className="badge badge-score">
+            <FiStar size={10} /> {score}
+          </span>
+        )}
+        {type && <span className="badge badge-type">{type}</span>}
+      </div>
+
+      {episodes && (
+        <span className="card-ep">{episodes} eps</span>
+      )}
+
+      {/* ── Barra de progresso "Continue Assistindo" ── */}
+      {progress && (
+        <div className="card-progress-wrap">
+          <div
+            className="card-progress-bar"
+            style={{ width: `${progress.pct * 100}%` }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AnimeCard({ anime, index = 0, rank = null }) {
   if (!anime) return null
 
@@ -32,59 +71,46 @@ export default function AnimeCard({ anime, index = 0, rank = null }) {
   const episodes = anime.episodes
   const image    = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url
 
+  const info = (
+    <div className="card-info">
+      <h3 className="card-title">{anime.title_english || anime.title}</h3>
+      <p className="card-sub">
+        {progress
+          ? `EP ${progress.ep} • ${Math.round(progress.pct * 100)}%`
+          : anime.title !== anime.title_english
+            ? anime.title
+            : anime.aired?.prop?.from?.year || ''
+        }
+      </p>
+    </div>
+  )
+
+  const poster = <Poster anime={anime} score={score} type={type} episodes={episodes} image={image} progress={progress} />
+
+  if (rank) {
+    return (
+      <Link
+        to={`/anime/${anime.mal_id}`}
+        className="anime-card rank-card"
+        style={{ animationDelay: `${index * 0.05}s` }}
+      >
+        <span className="rank-number">{rank}</span>
+        <div className="card-body">
+          {poster}
+          {info}
+        </div>
+      </Link>
+    )
+  }
+
   return (
     <Link
       to={`/anime/${anime.mal_id}`}
       className="anime-card"
       style={{ animationDelay: `${index * 0.05}s` }}
     >
-      <div className="card-poster">
-        {rank && <span className="card-rank">{String(rank).padStart(2, '0')}</span>}
-        {image ? (
-          <img src={image} alt={anime.title} loading="lazy" />
-        ) : (
-          <div className="card-no-img">?</div>
-        )}
-
-        <div className="card-overlay">
-          <button className="play-btn"><FiPlay /></button>
-        </div>
-
-        <div className="card-badges">
-          {score && (
-            <span className="badge badge-score">
-              <FiStar size={10} /> {score}
-            </span>
-          )}
-          {type && <span className="badge badge-type">{type}</span>}
-        </div>
-
-        {episodes && (
-          <span className="card-ep">{episodes} eps</span>
-        )}
-
-        {/* ── Barra de progresso "Continue Assistindo" ── */}
-        {progress && (
-          <div className="card-progress-wrap">
-            <div
-              className="card-progress-bar"
-              style={{ width: `${progress.pct * 100}%` }}
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="card-info">
-        <h3 className="card-title">{anime.title_english || anime.title}</h3>
-        <p className="card-sub">
-          {progress
-            ? `EP ${progress.ep} • ${Math.round(progress.pct * 100)}%`
-            : anime.title !== anime.title_english
-              ? anime.title
-              : anime.aired?.prop?.from?.year || ''
-          }
-        </p>
-      </div>
+      {poster}
+      {info}
     </Link>
   )
 }
