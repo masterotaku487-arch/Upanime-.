@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Capacitor } from '@capacitor/core'
 import {
   FiChevronLeft, FiChevronRight, FiCast, FiDownload, FiMonitor, FiExternalLink,
   FiShare2, FiCopy, FiCheck, FiHeadphones, FiTv, FiStar,
 } from 'react-icons/fi'
 import { BsFillCameraVideoFill } from 'react-icons/bs'
 import { FaWhatsapp } from 'react-icons/fa'
-import { getAnimeById, getAnimeEpisodes, searchAnime, getShinokaiPlayUrl } from '../services/api'
+import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
 import { saveHistory } from '../services/history'
 import { recordWatched, ACHIEVEMENTS } from '../services/achievements'
@@ -31,116 +30,9 @@ import { useAuth } from '../context/AuthContext'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Workers / Servidores ─────────────────────────────────────────────────────
-// SK = proxy seguro da Shinokai (chave AES e URL base ficam no worker, não aqui)
-const isNativeApp = Capacitor.isNativePlatform()
 const DA      = 'https://drivea.masterotaku487.workers.dev'  // Srv 1 – AnimesDrive
 const AQ      = 'https://aq.masterotaku487.workers.dev'      // Srv 2 – AnimeQ
 const AT      = 'https://at.masterotaku487.workers.dev'      // Srv 3 – Anitube
-
-// ── Shinokai (Fonte Principal — chave e URL ficam no worker, não aqui) ───────
-
-// Normaliza os formatos que o Worker pode devolver: array, { data }, { results } ou { episodes }
-const shinokaiList = (payload) => {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.data)) return payload.data
-  if (Array.isArray(payload?.results)) return payload.results
-  if (Array.isArray(payload?.episodes)) return payload.episodes
-  return []
-}
-
-const shinokaiTitle = (media) => {
-  if (typeof media?.title === 'string') return media.title
-  if (media?.title && typeof media.title === 'object') {
-    return media.title.romaji || media.title.english || media.title.native || ''
-  }
-  return media?.name || ''
-}
-
-const normalizeTitle = (value) => String(value || '')
-  .toLowerCase()
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^a-z0-9\s]/g, ' ')
-  .replace(/\s+/g, ' ')
-  .trim()
-
-// Busca o mediaId da Shinokai pelo título do anime.
-// A busca pode devolver itens sem título/MAL ID; nesse caso, não podemos
-// simplesmente usar o primeiro resultado, pois ele pode ser outra temporada.
-async function findShinokaiId(anime, epNum, dub) {
-  const queries = [...new Set([anime.title_english, anime.title, anime.title_japanese].filter(Boolean))]
-  let items = []
-  for (const query of queries) {
-    const data = await searchAnime(query)
-    items = Array.isArray(data?.data) ? data.data : []
-    if (items.length) break
-  }
-  if (!items.length) throw new Error('Anime não encontrado na Shinokai')
-
-  const wanted = normalizeTitle(anime.title_english || anime.title)
-  const score = (item) => {
-    const title = normalizeTitle(shinokaiTitle(item))
-    const exact = title && title === wanted ? 100 : 0
-    const overlap = wanted.split(' ').filter(t => t.length > 2 && title.includes(t)).length
-    const malMatch = anime.mal_id && item.mal_id && String(anime.mal_id) === String(item.mal_id) ? 1000 : 0
-    return malMatch + exact + overlap
-  }
-  const ranked = [...items].sort((a, b) => score(b) - score(a))
-
-  // Quando a resposta traz metadados, a correspondência de título/MAL é suficiente.
-  if (score(ranked[0]) > 0) return ranked[0].shinokai_id || ranked[0].id
-
-  // Quando os metadados vêm vazios, confirma a temporada pelo total de episódios
-  // e pela existência do episódio/áudio solicitado. As consultas são sequenciais
-  // para evitar o ThrottlerException do upstream.
-  for (const item of ranked) {
-    const mediaId = item.shinokai_id || item.id
-    if (!mediaId) continue
-    try {
-      const data = await getAnimeEpisodes(mediaId)
-      const list = Array.isArray(data?.data) ? data.data : []
-      const episode = list.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
-      const variants = Array.isArray(episode?.variants) ? episode.variants : []
-      const hasWantedAudio = variants.some(v => dub
-        ? /dub|dublado|pt[- ]?br|portuguese/i.test(JSON.stringify(v))
-        : /sub|leg|legendado|japanese/i.test(JSON.stringify(v)))
-      const countMatches = !anime.episodes || list.length === Number(anime.episodes)
-      if (episode && hasWantedAudio && countMatches) return mediaId
-    } catch { /* tenta o próximo candidato */ }
-  }
-
-  // Último fallback: preserva o primeiro candidato somente quando não foi
-  // possível confirmar a temporada devido a falha temporária do upstream.
-  return ranked[0].shinokai_id || ranked[0].id
-}
-
-// Busca os episódios e pega o epId + melhor variantId pro ep desejado
-async function getShinokaiEp(mediaId, epNum, dub) {
-  const data = await getAnimeEpisodes(mediaId)
-  const episodes = Array.isArray(data?.data) ? data.data : []
-
-  const ep = episodes.find(e => Number(e.number ?? e.episodeNumber) === Number(epNum))
-  if (!ep) throw new Error(`EP ${epNum} não encontrado na Shinokai`)
-
-  const variants = Array.isArray(ep.variants) ? ep.variants : []
-  const hasDub = (variant) => /dub|dublado|pt[- ]?br|portuguese/i.test(JSON.stringify(variant))
-  const hasLeg = (variant) => /sub|leg|legendado|japanese/i.test(JSON.stringify(variant))
-  const chosen = (dub ? variants.find(hasDub) : variants.find(hasLeg)) || variants[0]
-
-  if (!chosen) throw new Error('Nenhuma variante disponível')
-  return {
-    epId: ep.id,
-    varId: chosen.id || chosen.variantId || ep.id,
-    label: chosen.label || chosen.audioType || (dub ? 'Dublado' : 'Legendado'),
-  }
-}
-
-// Resolve tudo e devolve { url, label }
-async function resolveShinokai(anime, ep, dub) {
-  const mediaId = await findShinokaiId(anime, ep, dub)
-  const { epId, varId, label } = await getShinokaiEp(mediaId, ep, dub)
-  const url = await getShinokaiPlayUrl(mediaId, epId, varId)
-  return { url, label }
-}
 
 // Sites
 const AD_BASE = 'https://animesdrive.online'
@@ -695,7 +587,7 @@ export default function WatchPage() {
   const [serverStatus,    setServerStatus]    = useState({ driveA: null, animeQ: null, aniTube: null })
 
   useEffect(() => {
-    if (!isNativeApp) checkServers().then(setServerStatus)
+    checkServers().then(setServerStatus)
   }, [])
 
   useEffect(() => {
@@ -724,34 +616,11 @@ export default function WatchPage() {
       const overrides = await loadOverrides()
       const ov = overrides[String(animeObj.mal_id)]
       const fbUrl = ov?.fallback?.[String(ep)]
-      if (fbUrl && !isNativeApp) {
+      if (fbUrl) {
         console.log('[fallback imediato]', fbUrl)
         setFallbackUrl(fbUrl); setError(true); setLoading(false); return
       }
     } catch {}
-
-    // ── FONTE 0: Shinokai (Nova Fonte Principal) ─────────────────────────────
-    try {
-      setStatus('📡 Conectando diretamente ao Shinokai...')
-      const skResult = await resolveShinokai(animeObj, ep, dub)
-      
-      setSources([{ label: skResult.label, url: skResult.url }])
-      setCurrentSrc(skResult.url)
-      setStatus(`✅ Shinokai — ${dub ? '🎙️ Dublado' : '🇧🇷 Legendado'}`)
-      setProvider('Shinokai')
-      setLoading(false)
-      trackView(animeObj, ep)
-      return
-    } catch (skErr) {
-      console.warn('[Shinokai direto] falhou:', skErr.message)
-      if (isNativeApp) {
-        setErrorMsg(skErr.message || 'Falha na conexão direta com a Shinokai')
-        setStatus('❌ Shinokai indisponível')
-        setLoading(false)
-        setError(true)
-        return
-      }
-    }
 
     // ── FONTE 1: DriveA → animesdrive.online ─────────────────────────────────
     try {
@@ -1084,7 +953,6 @@ export default function WatchPage() {
 
   // Badge de provider para mostrar na UI
   const providerLabel = {
-    'Shinokai':          '🔥 S0 Shinokai',
     'DriveA':            '🚀 S1 AnimesDrive',
     'AnimeQ':            '⚡ S2 AnimeQ',
     'AniTube':           '📺 S3 AniTube',
