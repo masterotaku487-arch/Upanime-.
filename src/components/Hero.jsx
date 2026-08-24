@@ -1,21 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { FiPlay, FiInfo, FiChevronLeft, FiChevronRight, FiStar } from 'react-icons/fi'
-import { useTranslatedSynopsis } from '../services/translate'
+import { FiPlay, FiPlus, FiCheck, FiStar } from 'react-icons/fi'
+import { useFavorites } from '../context/FavoritesContext'
 import { translateGenre, translateStatus } from '../utils/genreLabels'
 import './Hero.css'
-
-// Sub-componente para sinopse traduzida de cada slide
-function HeroSynopsis({ synopsis }) {
-  const translated = useTranslatedSynopsis(synopsis)
-  if (!translated) return null
-  const text = translated.slice(0, 220)
-  return <p className="hero-synopsis">{text}{translated.length > 220 ? '...' : ''}</p>
-}
 
 export default function Hero({ animes }) {
   const [current, setCurrent] = useState(0)
   const [animating, setAnimating] = useState(false)
+  const { toggle, isFav } = useFavorites()
 
   const items = animes?.slice(0, 6) || []
 
@@ -29,7 +22,7 @@ export default function Hero({ animes }) {
     if (animating || idx === current) return
     setAnimating(true)
     setCurrent(idx)
-    setTimeout(() => setAnimating(false), 600)
+    setTimeout(() => setAnimating(false), 500)
   }
 
   if (!items.length) return <div className="hero-skeleton skeleton" />
@@ -37,6 +30,7 @@ export default function Hero({ animes }) {
   const anime = items[current]
   const image = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url
   const linkBase = anime._isFanDub ? `/fandub/${anime.mal_id}` : `/anime/${anime.mal_id}`
+  const favorited = isFav ? isFav(anime.mal_id) : false
 
   return (
     <section className="hero">
@@ -48,13 +42,14 @@ export default function Hero({ animes }) {
             style={{ backgroundImage: `url(${a.images?.jpg?.large_image_url})` }}
           />
         ))}
+        <div className="hero-slash" />
         <div className="hero-grad" />
       </div>
 
-      <div className={`hero-content container ${animating ? 'animating' : ''}`}>
+      <div className={`hero-content ${animating ? 'animating' : ''}`}>
         <div className="hero-meta">
-          <span className="hero-badge">🔥 EM DESTAQUE</span>
-          {anime._isFanDub && <span className="hero-badge hero-badge-dub">🎙️ FAN-DUB</span>}
+          <span className="hero-badge">EM DESTAQUE</span>
+          {anime._isFanDub && <span className="hero-badge hero-badge-dub">FAN-DUB</span>}
           {anime.score && (
             <span className="hero-score"><FiStar /> {anime.score.toFixed(1)}</span>
           )}
@@ -62,41 +57,33 @@ export default function Hero({ animes }) {
         <h1 className="hero-title">
           {anime.title_english || anime.title}
         </h1>
-        {anime.title_english && anime.title !== anime.title_english && (
-          <p className="hero-jp">{anime.title}</p>
-        )}
-        <div className="hero-tags">
-          {anime.genres?.slice(0, 4).map(g => (
-            <span key={g.mal_id} className="hero-tag">{translateGenre(g.name)}</span>
+        <div className="hero-sub">
+          {anime.genres?.slice(0, 2).map(g => (
+            <span key={g.mal_id}>{translateGenre(g.name)}</span>
           ))}
-          {anime.episodes && <span className="hero-tag">{anime.episodes} eps</span>}
-          {anime.status && <span className="hero-tag">{translateStatus(anime.status)}</span>}
+          {anime.episodes && <span>Ep. {anime.episodes}</span>}
+          {anime.status && <span>{translateStatus(anime.status)}</span>}
         </div>
-        {anime.synopsis && <HeroSynopsis synopsis={anime.synopsis} />}
         <div className="hero-actions">
-          <Link to={linkBase} className="btn btn-primary">
-            <FiPlay /> Assistir Agora
+          <Link to={linkBase} className="btn-play">
+            <FiPlay /> Assistir
           </Link>
-          <Link to={linkBase} className="btn btn-ghost">
-            <FiInfo /> Detalhes
-          </Link>
+          <button
+            className={`btn-add ${favorited ? 'added' : ''}`}
+            onClick={() => toggle && toggle(anime)}
+            title={favorited ? 'Remover da lista' : 'Adicionar à lista'}
+          >
+            {favorited ? <FiCheck /> : <FiPlus />}
+          </button>
         </div>
       </div>
 
       {items.length > 1 && (
-        <>
-          <button className="hero-nav prev" onClick={() => goTo((current - 1 + items.length) % items.length)}>
-            <FiChevronLeft />
-          </button>
-          <button className="hero-nav next" onClick={() => goTo((current + 1) % items.length)}>
-            <FiChevronRight />
-          </button>
-          <div className="hero-dots">
-            {items.map((_, i) => (
-              <button key={i} className={`dot ${i === current ? 'active' : ''}`} onClick={() => goTo(i)} />
-            ))}
-          </div>
-        </>
+        <div className="hero-dots">
+          {items.map((_, i) => (
+            <button key={i} className={`dot ${i === current ? 'active' : ''}`} onClick={() => goTo(i)} />
+          ))}
+        </div>
       )}
     </section>
   )
