@@ -37,7 +37,8 @@ export default function ExplorarPage() {
   const loadMore = async () => {
     const next = page + 1
     const d = await searchAnimeFilter({ genres, type, year, sort, page: next })
-    setAnimes(p => [...p, ...(await filterDubbed(d.data || []))])
+    const filtered = await filterDubbed(d.data || [])
+    setAnimes(p => [...p, ...filtered])
     setHasMore(d.pagination?.has_next_page || false)
     setPage(next)
   }
