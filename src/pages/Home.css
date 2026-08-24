@@ -1,5 +1,70 @@
 .home { padding-top: 0; }
 
+/* ── Chips de categoria (topo, estilo app) ───────────────── */
+.chips-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 18px 24px 16px;
+  scrollbar-width: none;
+}
+.chips-row::-webkit-scrollbar { display: none; }
+
+.chip {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 9px 16px;
+  border-radius: 20px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all var(--transition);
+}
+.chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+.chip-active,
+.chip-active:hover {
+  background: linear-gradient(135deg, var(--red), var(--red-dark));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px -4px var(--red-glow);
+}
+
+/* ── Tipografia impactante na Home (estilo do mockup) ───── */
+.home .hero-title,
+.home .section-title {
+  font-family: var(--font-hero);
+  letter-spacing: 0.5px;
+}
+.home .section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.home .section-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background: var(--red);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Slash diagonal crimson sutil sobre o hero, como no mockup */
+.home .hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 42%, rgba(226,27,44,0.16) 43%, rgba(226,27,44,0.02) 46%, transparent 47%),
+    linear-gradient(115deg, transparent 55%, rgba(255,255,255,0.04) 56%, transparent 58%);
+}
+
 /* ── Continuar Assistindo ───────────────────────────────── */
 .continue-section { padding-bottom: 0; }
 
