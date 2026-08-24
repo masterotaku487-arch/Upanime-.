@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { Link } from 'react-router-dom'
 import {
-  FiHeart, FiLogOut, FiUser, FiInfo, FiShield, FiBell,
-  FiExternalLink, FiClock, FiTrash2, FiActivity, FiAward,
+  FiUser, FiCreditCard, FiBell, FiHeadphones, FiDownload,
+  FiHelpCircle, FiLogOut, FiInfo, FiShield, FiActivity, FiAward,
+  FiHeart, FiClock, FiTrash2, FiChevronRight, FiExternalLink,
 } from 'react-icons/fi'
 import { getHistory, clearHistory, getEpProgress } from '../services/history'
 import { loadAchievements, ACHIEVEMENTS } from '../services/achievements'
@@ -12,7 +13,7 @@ import { requestNotifPermission } from '../services/notifications'
 import './ConfigPage.css'
 
 export default function ConfigPage() {
-  const { user, logout, openLogin } = useAuth()
+  const { user, logout, openLogin, isVip } = useAuth()
   const { favorites } = useFavorites()
   const [notif,    setNotif]    = useState(() => localStorage.getItem('upanime_notif') === '1')
   const [history,  setHistory]  = useState([])
@@ -45,51 +46,34 @@ export default function ConfigPage() {
   }
 
   return (
-    <div className="config-page container">
+    <div className="config-page">
 
-      {/* Perfil */}
-      <div className="config-profile">
+      {/* ── Cabeçalho do perfil ─────────────────────────────── */}
+      <div className="profile-header">
         {user ? (
-          <>
-            <img src={user.picture} alt={user.name} className="config-avatar" />
-            <div style={{ flex: 1 }}>
-              <h2 className="config-name">{user.name}</h2>
-              <p className="config-email">{user.email}</p>
-            </div>
-            <Link to="/perfil" className="edit-profile-btn" title="Editar perfil">
-              <FiUser size={16} />
-            </Link>
-          </>
+          <img src={user.avatar || user.picture} alt={user.name} className="avatar avatar-img" />
         ) : (
-          <>
-            <div className="config-avatar-placeholder"><FiUser size={32} /></div>
-            <div>
-              <h2 className="config-name">Visitante</h2>
-              <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={openLogin}>
-                Entrar com Google
-              </button>
-            </div>
-          </>
+          <div className="avatar"><FiUser size={30} /></div>
+        )}
+        <div className="profile-name">{user ? user.name : 'Visitante'}</div>
+        {user ? (
+          <div className="profile-plan">{isVip ? '💎 Upanime+ VIP' : '🎌 Otaku'}</div>
+        ) : (
+          <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={openLogin}>
+            Entrar com Google
+          </button>
+        )}
+
+        {user && (
+          <div className="stats-row">
+            <div className="stat"><b>{history.length}</b><span>Assistidos</span></div>
+            <div className="stat"><b>{favorites.length}</b><span>Na Lista</span></div>
+            <div className="stat"><b>{achCount}/{ACHIEVEMENTS.length}</b><span>Conquistas</span></div>
+          </div>
         )}
       </div>
 
-      {/* Stats */}
-      <div className="config-stats">
-        <div className="stat-card">
-          <span className="stat-num">{favorites.length}</span>
-          <span className="stat-label">Favoritos</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-num">{history.length}</span>
-          <span className="stat-label">Assistidos</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-num">{achCount}/{ACHIEVEMENTS.length}</span>
-          <span className="stat-label">Conquistas</span>
-        </div>
-      </div>
-
-      {/* Histórico de assistidos */}
+      {/* ── Histórico de assistidos ─────────────────────────── */}
       {history.length > 0 && (
         <div className="config-section">
           <div className="config-section-header" onClick={() => setShowHist(o => !o)}>
@@ -133,39 +117,95 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {/* Menu */}
-      <div className="config-menu">
-        {user && (
-          <Link to="/favoritos" className="config-item">
-            <FiHeart /> Meus Favoritos
-            {favorites.length > 0 && <span className="config-badge">{favorites.length}</span>}
-          </Link>
-        )}
+      {/* ── Menu agrupado (estilo do mockup) ────────────────── */}
+      <div className="menu-list">
 
-        <Link to="/conquistas" className="config-item">
-          <FiAward /> Minhas Conquistas
-          {achCount > 0 && <span className="config-badge">{achCount}</span>}
+        <div className="menu-section-title">Conta</div>
+
+        <Link to="/perfil" className="menu-item">
+          <div className="menu-ic"><FiUser /></div>
+          <div className="menu-label">Editar Perfil</div>
+          <FiChevronRight className="chev" />
         </Link>
 
-        <button className="config-item" onClick={toggleNotif}>
-          <FiBell /> Notificações de Novos EPs
+        <div className="menu-item menu-item-soon">
+          <div className="menu-ic"><FiCreditCard /></div>
+          <div className="menu-label">Assinatura e VIP</div>
+          <span className="menu-soon-tag">Em breve</span>
+        </div>
+
+        <button className="menu-item" onClick={toggleNotif}>
+          <div className="menu-ic"><FiBell /></div>
+          <div className="menu-label">Notificações de Novos EPs</div>
           <div className={`config-toggle ${notif ? 'on' : ''}`} />
         </button>
 
-        <Link to="/api-status" className="config-item config-item-status">
-          <FiActivity /> Status dos Serviços
+        <div className="menu-section-title">Preferências</div>
+
+        <Link to="/perfil" className="menu-item">
+          <div className="menu-ic"><FiHeadphones /></div>
+          <div className="menu-label">Idioma de Áudio e Legenda</div>
+          <FiChevronRight className="chev" />
+        </Link>
+
+        <div className="menu-item menu-item-soon">
+          <div className="menu-ic"><FiDownload /></div>
+          <div className="menu-label">Download e Armazenamento</div>
+          <span className="menu-soon-tag">Em breve</span>
+        </div>
+
+        <div className="menu-section-title">Outros</div>
+
+        {user && (
+          <Link to="/favoritos" className="menu-item">
+            <div className="menu-ic"><FiHeart /></div>
+            <div className="menu-label">Meus Favoritos</div>
+            {favorites.length > 0 && <span className="config-badge">{favorites.length}</span>}
+            <FiChevronRight className="chev" />
+          </Link>
+        )}
+
+        <Link to="/conquistas" className="menu-item">
+          <div className="menu-ic"><FiAward /></div>
+          <div className="menu-label">Minhas Conquistas</div>
+          {achCount > 0 && <span className="config-badge">{achCount}</span>}
+          <FiChevronRight className="chev" />
+        </Link>
+
+        <Link to="/api-status" className="menu-item">
+          <div className="menu-ic"><FiActivity /></div>
+          <div className="menu-label">Status dos Serviços</div>
           <span className="config-status-indicator" />
         </Link>
 
-        <Link to="/termos" className="config-item"><FiInfo /> Termos de Uso</Link>
-        <Link to="/privacidade" className="config-item"><FiShield /> Política de Privacidade</Link>
-        <Link to="/sobre" className="config-item">
-          <FiExternalLink /> Sobre o Up Anime+
+        <div className="menu-item menu-item-soon">
+          <div className="menu-ic"><FiHelpCircle /></div>
+          <div className="menu-label">Ajuda e Suporte</div>
+          <span className="menu-soon-tag">Em breve</span>
+        </div>
+
+        <Link to="/termos" className="menu-item">
+          <div className="menu-ic"><FiInfo /></div>
+          <div className="menu-label">Termos de Uso</div>
+          <FiChevronRight className="chev" />
+        </Link>
+
+        <Link to="/privacidade" className="menu-item">
+          <div className="menu-ic"><FiShield /></div>
+          <div className="menu-label">Política de Privacidade</div>
+          <FiChevronRight className="chev" />
+        </Link>
+
+        <Link to="/sobre" className="menu-item">
+          <div className="menu-ic"><FiExternalLink /></div>
+          <div className="menu-label">Sobre o Up Anime+</div>
+          <FiChevronRight className="chev" />
         </Link>
 
         {user && (
-          <button className="config-item config-logout" onClick={logout}>
-            <FiLogOut /> Sair da conta
+          <button className="menu-item menu-item-danger" onClick={logout}>
+            <div className="menu-ic menu-ic-danger"><FiLogOut /></div>
+            <div className="menu-label">Sair da Conta</div>
           </button>
         )}
       </div>
@@ -173,5 +213,4 @@ export default function ConfigPage() {
       <p className="config-version">Up Anime+ v2.0.0</p>
     </div>
   )
-            }
-              
+}
