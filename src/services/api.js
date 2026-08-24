@@ -1,242 +1,362 @@
 import axios from 'axios'
 
-// Integração direta Shinokai para o APK Capacitor.
-// O restante do frontend continua consumindo as mesmas exportações e formatos.
-// Fan-Dubs próprios permanecem nos módulos studio-proxy/FanDubs.
-const SHINOKAI_BASE = 'https://api-prod.shinokai.online'
-const AES_KEY_B64 = 'LClZ5k9139ypHE4c863iIrMALnupsPH+4TUF6zhA6nk='
-const CLIENT_UA = 'Shinokai/1.0.19 (Android)'
+// ══════════════════════════════════════════════════════════════
+// CATÁLOGO — AniList GraphQL direto (https://graphql.anilist.co)
+// Sem worker no meio: o front chama a AniList direto (ela aceita
+// CORS de qualquer origem). Shape de retorno continua igual ao
+// da Jikan (mal_id, images.jpg.image_url, genres, etc.) pra não
+// precisar mexer em mais nada no resto do app.
+// ══════════════════════════════════════════════════════════════
 
-let accessToken = null
-let loginPromise = null
-const responseCache = new Map()
-const pendingRequests = new Map()
+const ANILIST_URL = 'https://graphql.anilist.co'
 
-const decodeB64 = (value) => {
-  const normalized = String(value).replace(/-/g, '+').replace(/_/g, '/')
-  const binary = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4))
-  return Uint8Array.from(binary, char => char.charCodeAt(0))
+async function anilistQuery(query, variables) {
+  const { data } = await axios.post(ANILIST_URL, { query, variables }, {
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    timeout: 12000,
+  })
+  if (data.errors?.length) throw new Error(data.errors.map(e => e.message).join('; '))
+  return data.data
 }
 
-const decryptEnvelope = async (envelope) => {
-  if (!envelope?.iv || !envelope?.tag || !envelope?.payload) return envelope
-  const key = await crypto.subtle.importKey('raw', decodeB64(AES_KEY_B64), 'AES-GCM', false, ['decrypt'])
-  const payload = decodeB64(envelope.payload)
-  const tag = decodeB64(envelope.tag)
-  const ciphertext = new Uint8Array(payload.length + tag.length)
-  ciphertext.set(payload)
-  ciphertext.set(tag, payload.length)
-  const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decodeB64(envelope.iv), tagLength: 128 }, key, ciphertext)
-  return JSON.parse(new TextDecoder().decode(clear))
+const MEDIA_FIELDS = `
+  id idMal
+  title { romaji english native }
+  description(asHtml: false)
+  format status season seasonYear episodes duration
+  averageScore popularity favourites genres
+  tags { name }
+  studios(isMain: true) { nodes { name } }
+  startDate { year month day }
+  endDate { year month day }
+  coverImage { extraLarge large medium }
+  trailer { id site }
+`
+
+const FORMAT_MAP = { TV: 'TV', TV_SHORT: 'TV', MOVIE: 'Movie', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'Special', MUSIC: 'Music' }
+const STATUS_MAP = {
+  RELEASING: 'Currently Airing', FINISHED: 'Finished Airing', NOT_YET_RELEASED: 'Not yet aired',
+  CANCELLED: 'Cancelled', HIATUS: 'On Hiatus',
 }
+const pad = (n) => String(n).padStart(2, '0')
+const fuzzyToIso = (d) => (d?.year ? `${d.year}-${pad(d.month || 1)}-${pad(d.day || 1)}` : null)
+const stripHtml = (s) => (s ? s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim() : '')
 
-const readBody = async (response) => {
-  const text = await response.text()
-  let parsed
-  try { parsed = JSON.parse(text) } catch { throw new Error(`Shinokai HTTP ${response.status}`) }
-  if (!response.ok) {
-    const message = parsed?.message || parsed?.error || `Shinokai HTTP ${response.status}`
-    throw new Error(message)
-  }
-  return parsed?.iv && parsed?.tag && parsed?.payload ? decryptEnvelope(parsed) : parsed
-}
-
-const login = async () => {
-  if (accessToken) return accessToken
-  if (!loginPromise) {
-    loginPromise = axios.post(`${SHINOKAI_BASE}/auth/anonymous`, {}, {
-      timeout: 15000,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': CLIENT_UA },
-      transformResponse: [(text) => text],
-    }).then(async response => {
-      const raw = typeof response.data === 'string' ? JSON.parse(response.data) : response.data
-      const data = await decryptEnvelope(raw)
-      const token = data?.accessToken || data?.access_token || data?.token
-      if (!token) throw new Error('Token anônimo ausente na resposta Shinokai')
-      accessToken = token
-      return token
-    }).finally(() => { loginPromise = null })
-  }
-  return loginPromise
-}
-
-const directGet = async (path, { ttl = 0, retryAuth = true } = {}) => {
-  const cacheKey = path
-  const now = Date.now()
-  const cached = responseCache.get(cacheKey)
-  if (cached && cached.expiresAt > now) return cached.value
-  if (pendingRequests.has(cacheKey)) return pendingRequests.get(cacheKey)
-
-  const request = (async () => {
-    const token = await login()
-    const response = await axios.get(`${SHINOKAI_BASE}${path}`, {
-      timeout: 20000,
-      responseType: 'text',
-      transformResponse: [(text) => text],
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-        'User-Agent': CLIENT_UA,
-      },
-      validateStatus: () => true,
-    })
-    if (response.status === 401 && retryAuth) {
-      accessToken = null
-      return directGet(path, { ttl, retryAuth: false })
-    }
-    const value = await readBody(new Response(response.data, { status: response.status, headers: response.headers }))
-    if (ttl > 0) responseCache.set(cacheKey, { value, expiresAt: Date.now() + ttl })
-    return value
-  })().finally(() => pendingRequests.delete(cacheKey))
-
-  pendingRequests.set(cacheKey, request)
-  return request
-}
-
-const listOf = (value) => {
-  if (Array.isArray(value)) return value
-  if (Array.isArray(value?.data)) return value.data
-  if (Array.isArray(value?.results)) return value.results
-  if (Array.isArray(value?.items)) return value.items
-  if (Array.isArray(value?.episodes)) return value.episodes
-  return []
-}
-
-const titleOf = (m) => typeof m?.title === 'object'
-  ? (m.title.romaji || m.title.english || m.title.native || '')
-  : (m?.title || m?.name || '')
-
-const mapMedia = (m) => {
+function mapMedia(m) {
   if (!m) return null
-  const id = m.id || m.shinokai_id
-  const poster = m.posterUrl || m.cover || m.coverImage?.large || m.thumbnail || null
-  const banner = m.bannerUrl || m.banner || m.backgroundUrl || null
   return {
-    mal_id: id,
-    shinokai_id: id,
-    url: `/anime/${id}`,
-    images: { jpg: { image_url: poster, large_image_url: poster } },
-    banner_image: banner,
-    title: titleOf(m),
-    title_english: m.title_english || m.originalTitle || null,
-    title_japanese: m.originalTitle || null,
-    type: m.type || m.format || null,
-    episodes: m.episodes || m.episodeCount || null,
-    status: m.status || null,
-    aired: { from: m.startDate || null, to: m.endDate || null },
-    duration: m.duration ? (typeof m.duration === 'number' ? `${m.duration} min per ep` : m.duration) : null,
-    score: m.score ?? null,
+    mal_id: m.idMal || m.id,
+    url: `https://myanimelist.net/anime/${m.idMal || m.id}`,
+    images: {
+      jpg: {
+        image_url: m.coverImage?.medium || m.coverImage?.large,
+        large_image_url: m.coverImage?.extraLarge || m.coverImage?.large,
+      },
+    },
+    title: m.title?.romaji || m.title?.english || m.title?.native,
+    title_english: m.title?.english || null,
+    title_japanese: m.title?.native || null,
+    type: FORMAT_MAP[m.format] || m.format || null,
+    episodes: m.episodes || null,
+    status: STATUS_MAP[m.status] || m.status || null,
+    aired: { from: fuzzyToIso(m.startDate), to: fuzzyToIso(m.endDate) },
+    duration: m.duration ? `${m.duration} min per ep` : null,
+    score: m.averageScore != null ? Math.round(m.averageScore) / 10 : null,
     scored_by: null,
     popularity: m.popularity || null,
-    synopsis: m.synopsis || m.description || '',
-    season: m.season || null,
-    year: m.year || m.releaseYear || m.seasonYear || null,
-    genres: (m.genres || []).map((g, i) => typeof g === 'string' ? { mal_id: 1000 + i, name: g } : g),
+    synopsis: stripHtml(m.description),
+    season: m.season ? m.season.toLowerCase() : null,
+    year: m.seasonYear || null,
+    genres: (m.genres || []).map((g, i) => ({ mal_id: 1000 + i, name: g })),
     explicit_genres: [],
-    themes: [],
-    studios: m.studios || [],
-    trailer: {},
+    themes: (m.tags || []).slice(0, 6).map((t, i) => ({ mal_id: 2000 + i, name: t.name })),
+    studios: (m.studios?.nodes || []).map(s => ({ name: s.name })),
+    trailer: m.trailer
+      ? {
+          youtube_id: m.trailer.site === 'youtube' ? m.trailer.id : null,
+          embed_url: m.trailer.site === 'youtube' ? `https://www.youtube.com/embed/${m.trailer.id}?rel=0` : null,
+        }
+      : {},
   }
 }
 
-const mapPage = (items, page = 1, perPage = 24) => {
-  const data = items.slice((page - 1) * perPage, page * perPage).map(mapMedia).filter(Boolean)
-  return { data, pagination: { current_page: page, has_next_page: items.length > page * perPage, last_visible_page: Math.max(1, Math.ceil(items.length / perPage)), items: { count: data.length, total: items.length, per_page: perPage } } }
+function mapPagination(pageInfo, perPage) {
+  return {
+    last_visible_page: pageInfo.lastPage,
+    has_next_page: pageInfo.hasNextPage,
+    current_page: pageInfo.currentPage,
+    items: { count: pageInfo.total ? Math.min(perPage, pageInfo.total) : 0, total: pageInfo.total, per_page: perPage },
+  }
 }
 
-const homeLists = async () => {
-  const body = await directGet('/home', { ttl: 120000 })
-  return body?.data && !Array.isArray(body.data) ? body.data : body?.results && !Array.isArray(body.results) ? body.results : body
+// Tabela própria de gêneros/tags (ids sintéticos, uso interno do app)
+const GENRE_TABLE = [
+  ['Action', 'genre'], ['Adventure', 'genre'], ['Comedy', 'genre'], ['Drama', 'genre'],
+  ['Fantasy', 'genre'], ['Horror', 'genre'], ['Mystery', 'genre'], ['Romance', 'genre'],
+  ['Sci-Fi', 'genre'], ['Slice of Life', 'genre'], ['Sports', 'genre'], ['Supernatural', 'genre'],
+  ['Thriller', 'genre'], ['Mecha', 'genre'], ['Music', 'genre'], ['Psychological', 'genre'],
+  ['Ecchi', 'genre'],
+  ['Isekai', 'tag'], ['Shounen', 'tag'], ['Shoujo', 'tag'], ['Seinen', 'tag'], ['Josei', 'tag'],
+  ['Historical', 'tag'], ['Military', 'tag'], ['Harem', 'tag'], ['School', 'tag'], ['Magic', 'tag'],
+  ['Demons', 'tag'], ['Vampire', 'tag'], ['Samurai', 'tag'], ['Space', 'tag'], ['Video Game', 'tag'],
+  ['Cars', 'tag'], ['Parody', 'tag'], ['Martial Arts', 'tag'], ['Super Power', 'tag'], ['Kids', 'tag'],
+  ['Girls Love', 'genre'], ['Boys Love', 'genre'], ['Avant Garde', 'genre'], ['Award Winning', 'genre'],
+  ['Gourmet', 'genre'], ['Gore', 'tag'], ['Erotica', 'tag'],
+].map(([name, kind], i) => ({ mal_id: i + 1, name, kind }))
+const genreById = (id) => GENRE_TABLE.find(g => g.mal_id === Number(id))
+
+function currentSeason(date = new Date()) {
+  const m = date.getUTCMonth() + 1, year = date.getUTCFullYear()
+  if (m <= 3) return { season: 'WINTER', year }
+  if (m <= 6) return { season: 'SPRING', year }
+  if (m <= 9) return { season: 'SUMMER', year }
+  return { season: 'FALL', year }
 }
 
+const LIST_QUERY = `
+query ($page: Int, $perPage: Int, $search: String, $sort: [MediaSort], $genre_in: [String], $tag_in: [String], $format: MediaFormat, $status: MediaStatus, $season: MediaSeason, $seasonYear: Int, $startDate_greater: FuzzyDateInt, $startDate_lesser: FuzzyDateInt) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo { total currentPage lastPage hasNextPage }
+    media(
+      type: ANIME, isAdult: false,
+      search: $search, sort: $sort,
+      genre_in: $genre_in, tag_in: $tag_in,
+      format: $format, status: $status,
+      season: $season, seasonYear: $seasonYear,
+      startDate_greater: $startDate_greater, startDate_lesser: $startDate_lesser
+    ) { ${MEDIA_FIELDS} }
+  }
+}`
+
+async function listAnime(vars, perPage) {
+  const data = await anilistQuery(LIST_QUERY, vars)
+  return { pagination: mapPagination(data.Page.pageInfo, perPage), data: data.Page.media.map(mapMedia) }
+}
+
+// Mantido só por compatibilidade — filtro de adulto já é feito na query (isAdult:false)
 export const isBlocked = () => false
 
-export const getSeasonNow = async (page = 1) => {
-  const h = await homeLists()
-  return mapPage(listOf(h.trendingAnimes || h.featured || h.recent), page)
+export const getSeasonNow = (page = 1) => {
+  const { season, year } = currentSeason()
+  return listAnime({ page, perPage: 24, season, seasonYear: year, sort: ['POPULARITY_DESC'] }, 24)
 }
 
-export const getTopAnime = async (filter = 'airing', page = 1) => {
-  const h = await homeLists()
-  const source = filter === 'movie' ? h.trendingMovies
-    : filter === 'ova' || filter === 'special' ? h.trendingOvas
-    : filter === 'upcoming' ? h.recent
-    : filter === 'favorite' || filter === 'bypopularity' ? h.top
-    : h.trendingAnimes || h.featured
-  return mapPage(listOf(source), page)
+export const getTopAnime = (filter = 'airing', page = 1) => {
+  const vars = { page, perPage: 24, sort: ['POPULARITY_DESC'] }
+  if (filter === 'airing') vars.status = 'RELEASING'
+  else if (filter === 'upcoming') vars.status = 'NOT_YET_RELEASED'
+  else if (filter === 'favorite') vars.sort = ['FAVOURITES_DESC']
+  else if (['movie', 'tv', 'ova', 'special'].includes(filter)) vars.format = filter.toUpperCase()
+  return listAnime(vars, 24)
 }
 
-export const searchAnime = async (q, page = 1) => {
-  const body = await directGet(`/medias?q=${encodeURIComponent(q)}`, { ttl: 120000 })
-  return mapPage(listOf(body), page, 20)
-}
+export const searchAnime = (q, page = 1) =>
+  listAnime({ page, perPage: 20, search: q, sort: ['SEARCH_MATCH'] }, 20)
 
 export const getAnimeById = async (id) => {
-  const body = await directGet(`/medias/${encodeURIComponent(id)}`, { ttl: 120000 })
-  const item = body?.data && !Array.isArray(body.data) ? body.data : body?.results && !Array.isArray(body.results) ? body.results : body
-  return { data: mapMedia(item) }
+  const data = await anilistQuery(`query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { ${MEDIA_FIELDS} } }`, { idMal: parseInt(id) })
+  return { data: mapMedia(data.Media) }
 }
 
 export const getAnimeEpisodes = async (id, page = 1) => {
-  const body = await directGet(`/medias/${encodeURIComponent(id)}/episodes`, { ttl: 300000 })
-  const raw = listOf(body)
-  const data = raw.map((ep, index) => ({
-    mal_id: Number(ep.number || ep.episode || ep.ep || index + 1),
-    title: ep.title || ep.name || null,
-    aired: ep.aired || null,
-    filler: false,
-    recap: false,
-    shinokai_id: ep.id || ep.episodeId || null,
-    variants: ep.variants || ep.sources || [],
-  }))
-  return { pagination: { current_page: page, has_next_page: false, last_visible_page: 1 }, data }
+  const data = await anilistQuery(`query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { episodes } }`, { idMal: parseInt(id) })
+  const total = data.Media?.episodes || 0
+  const perPage = 100
+  const start = (page - 1) * perPage + 1
+  const end = Math.min(start + perPage - 1, total)
+  const list = []
+  for (let n = start; n <= end; n++) list.push({ mal_id: n, title: null, aired: null, filler: false, recap: false })
+  return {
+    pagination: { has_next_page: end < total, last_visible_page: Math.max(1, Math.ceil(total / perPage)), current_page: page },
+    data: list,
+  }
 }
 
-export const getGenres = async () => {
-  const body = await directGet('/genres', { ttl: 300000 })
-  return { data: listOf(body).map((g, i) => ({ mal_id: g.id || i + 1, name: g.name, count: g.count ?? null })) }
+export const getGenres = async () => ({ data: GENRE_TABLE.map(g => ({ mal_id: g.mal_id, name: g.name, count: null })) })
+
+export const getAnimeByGenre = (genreId, page = 1) => {
+  const g = genreById(genreId)
+  const vars = { page, perPage: 20, sort: ['SCORE_DESC'] }
+  if (g?.kind === 'genre') vars.genre_in = [g.name]
+  else if (g?.kind === 'tag') vars.tag_in = [g.name]
+  return listAnime(vars, 20)
 }
 
-export const getAnimeByGenre = async (genreId, page = 1) => {
-  const h = await homeLists()
-  const wanted = String(genreId)
-  const all = Object.values(h?.byGenre || {}).flatMap(listOf)
-  const filtered = all.filter(m => (m.genres || []).some(g => String(g.id || g.mal_id || g) === wanted || String(g.name || g).toLowerCase() === wanted.toLowerCase()))
-  return mapPage(filtered.length ? filtered : listOf(h.trendingAnimes), page)
+export const getSeasonUpcoming = () => {
+  let { season, year } = currentSeason()
+  const order = ['WINTER', 'SPRING', 'SUMMER', 'FALL']
+  let idx = order.indexOf(season) + 1
+  if (idx > 3) { idx = 0; year += 1 }
+  return listAnime({ page: 1, perPage: 16, season: order[idx], seasonYear: year, sort: ['POPULARITY_DESC'] }, 16)
 }
 
-export const getSeasonUpcoming = async () => getTopAnime('upcoming', 1)
+export const searchAnimeFilter = ({ genres = [], type, year, sort, page = 1 }) => {
+  const ids = genres.map(id => genreById(id)).filter(Boolean)
+  const genre_in = ids.filter(g => g.kind === 'genre').map(g => g.name)
+  const tag_in = ids.filter(g => g.kind === 'tag').map(g => g.name)
 
-export const searchAnimeFilter = async ({ genres = [], type, year, sort, page = 1 }) => {
-  const h = await homeLists()
-  let items = Object.values(h || {}).flatMap(listOf).filter(Boolean)
-  if (type) items = items.filter(m => String(m.type || '').toLowerCase() === String(type).toLowerCase())
-  if (year) items = items.filter(m => String(m.year || m.releaseYear || '') === String(year))
-  if (genres.length) items = items.filter(m => (m.genres || []).some(g => genres.includes(g.id) || genres.includes(g.mal_id)))
-  return mapPage(items, page)
+  const format = type ? FORMAT_MAP[type.toUpperCase()] && type.toUpperCase() : undefined
+
+  const sortMap = {
+    bypopularity: ['POPULARITY_DESC'],
+    favorite: ['SCORE_DESC'],
+    airing: ['START_DATE_DESC'],
+    upcoming: ['START_DATE_DESC'],
+  }
+
+  const vars = {
+    page, perPage: 24,
+    sort: sortMap[sort] || sortMap.bypopularity,
+    genre_in: genre_in.length ? genre_in : undefined,
+    tag_in: tag_in.length ? tag_in : undefined,
+    format,
+  }
+  if (year) {
+    vars.startDate_greater = parseInt(`${year}0101`)
+    vars.startDate_lesser = parseInt(`${year}1231`)
+  }
+  return listAnime(vars, 24)
 }
 
-// STREAMING NORMAL — API Shinokai direta. Fan-Dubs próprios permanecem separados.
-export const getShinokaiPlayUrl = async (mediaId, episodeId, variantId) => {
-  const suffix = variantId ? `?variantId=${encodeURIComponent(variantId)}` : ''
-  const body = await directGet(`/medias/${encodeURIComponent(mediaId)}/episodes/${encodeURIComponent(episodeId)}/play${suffix}`)
-  const videoUrl = typeof body === 'string' ? body : body?.url || body?.videoUrl || body?.playUrl || body?.sources?.find(s => s.url)?.url
-  if (!videoUrl) throw new Error('A Shinokai não retornou uma URL de vídeo')
-  return videoUrl
+// ══════════════════════════════════════════════════════════════
+// STREAMING — AnimeFire via Vercel proxy (/api/animefire)
+//
+// Documentação AnimeFire:
+//   Página anime:    /animes/<slug>
+//   Página ep:       /animes/<slug>/<numero-ep>
+//   JSON vídeo:      /video/<slug>/<numero-ep>
+//
+// Slug = slugify(anime.title romaji), sem sufixo de temporada
+//   "Sousou no Frieren 2nd Season" → "sousou-no-frieren"
+// ══════════════════════════════════════════════════════════════
+
+const AF_PROXY = '/api/animefire'
+
+const afFetch = async (params) => {
+  const qs = new URLSearchParams(params).toString()
+  const res = await fetch(`${AF_PROXY}?${qs}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Proxy ${res.status}`)
+  }
+  return res.json()
 }
 
+// Converte string em slug
+const slugify = (s) =>
+  s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/['"`]/g, '').replace(/:/g, '')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .trim().replace(/\s+/g, '-').replace(/-+/g, '-')
+
+// Remove sufixos de temporada ("2nd Season", "Season 7", "The Final Season", etc.)
+const stripSeason = (s) =>
+  s.replace(/\s*[-–:]\s*(season|parte?|part|cour)\s*\d*/gi, '')
+   .replace(/\s+\d+(st|nd|rd|th)\s*(season|cour)/gi, '')
+   .replace(/\s+(the\s+)?(final|last|new)\s+season/gi, '')
+   .replace(/\s+(season|parte?|part)\s*\d*/gi, '')
+   .replace(/\s+\d+$/g, '')
+   .trim()
+
+// Remove subtítulo após ':' ou '–' (ex: ": The Final Season" → "")
+const stripSubtitle = (s) => s.replace(/\s*[:–]\s*.+$/, '').trim()
+
+// Gera candidatos de slug em ordem de probabilidade
+// AnimeFire usa slug curto sem temporada: "sousou-no-frieren"
+const buildSlugCandidates = (anime, dub = false) => {
+  const titles = [
+    anime.title,              // Romaji — é o que AnimeFire usa nos slugs
+    anime.title_english,
+    anime.title_portuguese,
+    ...(anime.titles || []).map(t => t.title),
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
+
+  const variants = new Set()
+  for (const t of titles) {
+    const noSeason   = stripSeason(t)
+    const noSubtitle = stripSubtitle(noSeason)
+    for (const v of [noSeason, noSubtitle, t]) {
+      const s = slugify(v)
+      if (s && s.length > 1) variants.add(s)
+    }
+  }
+
+  const list = [...variants]
+  if (!dub) return list
+  return [...list.map(s => s + '-dublado'), ...list]
+}
+
+// Testa se um slug existe no AnimeFire
+const probeSlug = async (slug) => {
+  try {
+    const data = await afFetch({ action: 'info', slug })
+    // Considera válido se retornou episódios OU se o título veio (page existe)
+    if (data.episodes?.length > 0 || data.title) {
+      console.log(`[AnimeFire] ✅ ${slug}`)
+      return slug
+    }
+  } catch { /* slug inválido, tenta próximo */ }
+  return null
+}
+
+// Resolve slug testando candidatos em sequência
+const resolveSlug = async (anime, dub = false) => {
+  const candidates = buildSlugCandidates(anime, dub)
+  console.log(`[AnimeFire] testando slugs:`, candidates.join(', '))
+
+  for (const slug of candidates) {
+    const found = await probeSlug(slug)
+    if (found) return found
+  }
+
+  throw new Error(
+    `"${anime.title}" não encontrado no AnimeFire. Slugs tentados: ${candidates.slice(0,3).join(', ')}`
+  )
+}
+
+// ── API pública ──────────────────────────────────────────────
+
+/**
+ * Busca sources de vídeo no AnimeFire.
+ * @param {object} anime  - Objeto Jikan completo
+ * @param {number} epNum  - Número do episódio (1-based)
+ * @param {boolean} dub   - true = dublado PT-BR
+ * @param {object} cache  - { afSlug? } para evitar re-resolução
+ */
 export const fetchSourcesWithFallback = async (anime, epNum, dub = false, cache = {}) => {
-  const mediaId = anime.shinokai_id || anime.mal_id
-  const episodes = listOf(await directGet(`/medias/${encodeURIComponent(mediaId)}/episodes`, { ttl: 300000 }))
-  const episode = episodes.find(e => Number(e.number || e.episode || e.ep) === Number(epNum)) || episodes[Number(epNum) - 1]
-  if (!episode) throw new Error(`Episódio ${epNum} não encontrado na Shinokai`)
-  const variants = episode.variants || episode.sources || []
-  const variant = variants.find(v => String(v.type || v.audio || v.lang || v.label || v.audioType || '').toLowerCase().includes(dub ? 'dub' : 'sub')) || variants[0]
-  const episodeId = episode.id || episode.episodeId || episode._id
-  const variantId = variant?.id || variant?.variantId || episodeId
-  const videoUrl = await getShinokaiPlayUrl(mediaId, episodeId, variantId)
-  return { sources: [{ url: videoUrl, label: variant?.label || (dub ? 'Dublado' : 'Legendado'), isM3U8: videoUrl.includes('.m3u8') }], provider: 'Shinokai', cache: { ...cache, mediaId, episodeId, variantId } }
+  const ids = { ...cache }
+
+  if (!ids.afSlug) {
+    ids.afSlug = await resolveSlug(anime, dub)
+  }
+
+  const data = await afFetch({ action: 'video', slug: ids.afSlug, ep: epNum })
+
+  if (!data.sources?.length)
+    throw new Error(`Ep ${epNum} sem sources (slug: ${ids.afSlug})`)
+
+  return {
+    sources: data.sources,
+    headers: { Referer: data.domain + '/' },
+    provider: data.provider || '🇧🇷 AnimeFire',
+    cache: ids,
+  }
 }
 
-export const pickBestSource = (sources = []) => sources[0] || null
-export const getAnimeFireEpisodes = async () => ({ slug: null, episodes: [], title: null, domain: null })
+// Escolhe a melhor qualidade disponível
+export const pickBestSource = (sources = []) => {
+  const order = ['fullhd', 'full hd', 'fhd', '1080', 'hd', '720', 'sd', '480', '360']
+  return [...sources].sort((a, b) => {
+    const ai = order.findIndex(o => (a.label || '').toLowerCase().includes(o))
+    const bi = order.findIndex(o => (b.label || '').toLowerCase().includes(o))
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })[0] || sources[0] || null
+}
+
+// Retorna episódios + slug resolvido (para cache no componente)
+export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null) => {
+  const slug = cachedSlug || await resolveSlug(anime, dub)
+  const data = await afFetch({ action: 'info', slug })
+  return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
+    }
