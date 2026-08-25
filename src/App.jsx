@@ -15,6 +15,7 @@ import ExplorarPage from './pages/ExplorarPage'
 import LegalPage from './pages/LegalPage'
 import FavoritesPage from './pages/FavoritesPage'
 import NoticiasPage from './pages/NoticiasPage'
+import NotificationsPage from './pages/NotificationsPage'
 import ConfigPage from './pages/ConfigPage'
 import ApiStatusPage from './pages/ApiStatusPage'
 import SobrePage from './pages/SobrePage'
@@ -24,10 +25,11 @@ import FanDubsPage from './pages/FanDubsPage'
 import FanDubDetailPage from './pages/FanDubDetailPage'
 import StudioPage from './pages/StudioPage'
 import AdminPage from './pages/AdminPage'
+import AdminNotificacoesPage from './pages/AdminNotificacoesPage'
 import ResgateRecompensa from './pages/ResgateRecompensa'
 import AdminRecompensas from './pages/AdminRecompensas'
 import FeedbackModal from './components/FeedbackModal'
-import { checkNewEpisodes, notifEnabled } from './services/notifications'
+import { checkNewEpisodes } from './services/notifications'
 import { loadAchievements, saveAchievements } from './services/achievements'
 import { FiAlertTriangle } from "react-icons/fi"
 import WelcomeBanner from './components/WelcomeBanner'
@@ -40,7 +42,7 @@ import './App.css'
 function NotifChecker() {
   const { favorites } = useFavorites()
   useEffect(() => {
-    if (!notifEnabled() || !favorites?.length) return
+    if (!favorites?.length) return
     const timer = setTimeout(() => checkNewEpisodes(favorites), 5000)
     return () => clearTimeout(timer)
   }, [favorites])
@@ -83,6 +85,7 @@ function AppInner() {
           <Route path="/privacidade"       element={<LegalPage />} />
           <Route path="/favoritos"         element={<FavoritesPage />} />
           <Route path="/novidades"         element={<NoticiasPage />} />
+          <Route path="/notificacoes"      element={<NotificationsPage />} />
           <Route path="/config"            element={<ConfigPage />} />
           <Route path="/api-status"        element={<ApiStatusPage />} />
           <Route path="/sobre"             element={<SobrePage />} />
@@ -95,6 +98,7 @@ function AppInner() {
           <Route path="/fandub/:id"        element={<FanDubDetailPage />} />
           <Route path="/studio"            element={<StudioPage />} />
           <Route path="/admin"             element={<AdminPage />} />
+          <Route path="/admin/notificacoes" element={<AdminNotificacoesPage />} />
           <Route path="/resgatar"          element={<ResgateRecompensa />} />
           <Route path="/admin/recompensas"  element={<AdminRecompensas />} />
         </Routes>
