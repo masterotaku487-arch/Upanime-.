@@ -252,16 +252,24 @@ export default function AnimePage() {
         {episodes.length > 0 && (
           <div className="anime-section">
             <h2 className="section-title">Episódios <span>({anime.episodes || '?'})</span></h2>
-            <div className="ep-grid">
+            <div className="ep-list">
               {episodes.map(ep => (
                 <Link
                   key={ep.mal_id}
                   to={`/watch/${id}?ep=${ep.mal_id}`}
-                  className="ep-card"
+                  className="ep-row"
                 >
-                  <span className="ep-num">{ep.mal_id}</span>
-                  <span className="ep-title">{ep.title || `Episódio ${ep.mal_id}`}</span>
-                  {ep.aired && <span className="ep-date">{new Date(ep.aired).toLocaleDateString('pt-BR')}</span>}
+                  <div className="ep-thumb">
+                    {banner && <img src={banner} alt="" loading="lazy" />}
+                    <div className="ep-playmini"><FiPlay /></div>
+                  </div>
+                  <div className="ep-info">
+                    <div className="ep-name">Ep. {ep.mal_id} — {ep.title || `Episódio ${ep.mal_id}`}</div>
+                    <div className="ep-meta-row">
+                      {ep.aired && <span>{new Date(ep.aired).toLocaleDateString('pt-BR')}</span>}
+                      {anime.duration && <span>{anime.duration.replace(' per ep', '')}</span>}
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -276,8 +284,3 @@ export default function AnimePage() {
     </div>
   )
                   }
-
-
-
-
-    
