@@ -100,40 +100,60 @@
 }
 .show-more:hover { opacity: 0.7; }
 
-/* Episode grid */
-.ep-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 8px;
+/* Episode list — linha com thumbnail, nome e meta (estilo mockup) */
+.ep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.ep-card {
+.ep-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 14px;
+  padding: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   transition: all var(--transition);
 }
-.ep-card:hover {
-  background: rgba(232,0,28,0.1);
+.ep-row:hover {
+  background: rgba(232,0,28,0.08);
   border-color: rgba(232,0,28,0.3);
 }
-.ep-num {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  color: var(--red);
-  min-width: 32px;
+.ep-thumb {
+  position: relative;
+  width: 96px;
+  min-width: 96px;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg3);
 }
-.ep-title {
-  font-size: 0.82rem;
-  flex: 1;
+.ep-thumb img {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: brightness(0.75);
+}
+.ep-playmini {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1rem;
+  background: rgba(0,0,0,0.25);
+}
+.ep-info { flex: 1; min-width: 0; }
+.ep-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 4px;
 }
-.ep-date { font-size: 0.72rem; color: var(--text-dim); flex-shrink: 0; }
+.ep-row:hover .ep-name { color: var(--red); }
+.ep-meta-row {
+  display: flex; gap: 10px;
+  font-size: 0.72rem; color: var(--text-dim);
+}
 
 @media (max-width: 768px) {
   .anime-header { grid-template-columns: 1fr; }
