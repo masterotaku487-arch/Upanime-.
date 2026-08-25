@@ -1,122 +1,152 @@
-// shinokaiService.js
-// Cliente da fonte própria (seu backend). Troque BASE_URL pelo seu domínio real.
+// shinokaiService.js - Adaptado para o WatchPage.jsx
 
 const BASE_URL = 'https://api-prod.shinokai.online'
-
-// ============================================================
-// CONFIGURAÇÃO
-// ============================================================
+const AES_KEY_B64 = 'LClZ5k9139ypHE4c863iIrMALnupsPH+4TUF6zhA6nk='
 
 const HEADERS = {
   'Accept': 'application/json',
-  'Content-Type': 'application/json'
+  'Content-Type': 'application/json',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Referer': 'https://shinokai.online/',
+  'Origin': 'https://shinokai.online'
 }
 
-// ============================================================
-// FUNÇÃO AUXILIAR
-// ============================================================
+let accessToken = null
 
+// Converte Base64 para Uint8Array sem bibliotecas externas
+function b64ToUint8(b64) {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
+// Obtém a API de Criptografia
+function getSubtleCrypto() {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.subtle) {
+    return globalThis.crypto.subtle
+  }
+  try {
+    const nodeCrypto = require('node:crypto')
+    return nodeCrypto.webcrypto.subtle
+  } catch (_) {
+    throw new Error('Ambiente sem suporte a SubtleCrypto')
+  }
+}
+
+// Descriptografia AES-256-GCM Universal
+async function decryptEnvelope(envelope) {
+  if (!envelope?.iv || !envelope?.tag || !envelope?.payload) return envelope
+
+  const subtle = getSubtleCrypto()
+  const keyBytes = b64ToUint8(AES_KEY_B64)
+  const ivBytes = b64ToUint8(envelope.iv)
+  const tagBytes = b64ToUint8(envelope.tag)
+  const payloadBytes = b64ToUint8(envelope.payload)
+
+  const combined = new Uint8Array(payloadBytes.length + tagBytes.length)
+  combined.set(payloadBytes, 0)
+  combined.set(tagBytes, payloadBytes.length)
+
+  const key = await subtle.importKey(
+    'raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']
+  )
+
+  const decryptedBuffer = await subtle.decrypt(
+    { name: 'AES-GCM', iv: ivBytes }, key, combined
+  )
+
+  const text = new TextDecoder().decode(decryptedBuffer)
+  return JSON.parse(text)
+}
+
+async function unwrapJson(parsed) {
+  if (parsed?.iv && parsed?.tag && parsed?.payload) {
+    return await decryptEnvelope(parsed)
+  }
+  if (parsed && typeof parsed.data === 'object' && !Array.isArray(parsed.data)) {
+    return parsed.data
+  }
+  return parsed
+}
+
+// Extrai arrays independente de onde venham na resposta
 function extrairLista(dados) {
   if (Array.isArray(dados)) return dados
-
   if (dados && typeof dados === 'object') {
     for (const chave of ['data', 'episodes', 'items', 'results', 'list']) {
-      if (Array.isArray(dados[chave])) {
-        return dados[chave]
-      }
+      if (Array.isArray(dados[chave])) return dados[chave]
     }
   }
-
   return []
 }
 
-// ============================================================
-// REQUISIÇÃO À SUA API
-// ============================================================
-
-async function apiPropria(endpoint) {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    method: 'GET',
+async function login() {
+  const res = await fetch(`${BASE_URL}/auth/anonymous`, {
+    method: 'POST',
     headers: HEADERS
   })
+  const text = await res.text()
+  const data = await unwrapJson(JSON.parse(text))
 
-  if (!res.ok) {
-    throw new Error(`Erro da API: HTTP ${res.status}`)
+  accessToken = data?.accessToken || data?.access_token || data?.token
+  if (!accessToken) throw new Error('Falha ao obter token de acesso')
+  return accessToken
+}
+
+async function apiShinokai(endpoint) {
+  if (!accessToken) await login()
+
+  const res = await fetch(`${BASE_URL}${endpoint}`, {
+    headers: {
+      ...HEADERS,
+      'Authorization': `Bearer ${accessToken}`
+    }
+  })
+
+  if (res.status === 401) {
+    await login()
+    return apiShinokai(endpoint)
   }
 
   const text = await res.text()
-  if (!text) return null
-
-  try {
-    return JSON.parse(text)
-  } catch {
-    return text
-  }
+  const parsed = JSON.parse(text)
+  return await unwrapJson(parsed)
 }
 
-// ============================================================
-// 1. BUSCAR ANIME
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// MÉTODOS EXPORTADOS EXIGIDOS PELO WATCHPAGE.JSX
+// ─────────────────────────────────────────────────────────────────────────────
 
-export async function buscarAnimePorNome(nomeAnime) {
-  const busca = await apiPropria(`/medias?q=${encodeURIComponent(nomeAnime)}`)
+export async function buscarAnimePorNome(nome) {
+  const busca = await apiShinokai(`/medias?q=${encodeURIComponent(nome)}`)
   const listaAnimes = extrairLista(busca)
-
-  if (!listaAnimes.length) {
-    throw new Error('Anime não encontrado.')
-  }
-
+  if (!listaAnimes.length) throw new Error('Anime não encontrado na busca.')
   return listaAnimes[0]
 }
 
-// ============================================================
-// 1b. BUSCAR ANIME POR ID (usado pelo WatchPage, que já sabe o id)
-// ============================================================
-
-export async function buscarAnimePorId(animeId) {
-  const dados = await apiPropria(`/medias/${encodeURIComponent(animeId)}`)
-  if (!dados) throw new Error('Anime não encontrado.')
-  return dados?.data || dados
-}
-
-// ============================================================
-// 2. CARREGAR EPISÓDIOS PAGINADOS
-// ============================================================
-
-export async function carregarEpisodiosPaginados(animeId, pagina = 1, limite = 30) {
-  const epData = await apiPropria(`/medias/${encodeURIComponent(animeId)}/episodes`)
-  const todosEpis = extrairLista(epData)
-
-  const inicio = (pagina - 1) * limite
-  const fim = inicio + limite
-  const episodiosBloco = todosEpis.slice(inicio, fim)
+export async function carregarEpisodiosPaginados(animeId, page = 1, limit = 30) {
+  const epData = await apiShinokai(`/medias/${encodeURIComponent(animeId)}/episodes`)
+  const epis = extrairLista(epData)
+  
+  // Realiza o corte de paginação caso a API traga todos os episódios de uma vez
+  const inicio = (page - 1) * limit
+  const fim = inicio + limit
+  const episodiosPagina = epis.slice(inicio, fim)
+  const temMais = fim < epis.length
 
   return {
-    episodios: episodiosBloco,
-    totalGeral: todosEpis.length,
-    paginaAtual: pagina,
-    temMais: fim < todosEpis.length
+    episodios: episodiosPagina,
+    temMais: temMais
   }
 }
 
-// ============================================================
-// 3. OBTER LINK DE PLAY
-// ============================================================
-
-export async function obterLinkPlay(animeId, episodioId) {
-  const playData = await apiPropria(
-    `/medias/${encodeURIComponent(animeId)}/episodes/${encodeURIComponent(episodioId)}/play`
-  )
-
-  const streamUrl =
-    playData?.url ||
-    playData?.videoUrl ||
-    playData?.playUrl ||
-    (typeof playData === 'string' ? playData : null)
-
+export async function obterLinkPlay(animeId, epId) {
+  const playData = await apiShinokai(`/medias/${encodeURIComponent(animeId)}/episodes/${encodeURIComponent(epId)}/play`)
+  const streamUrl = playData?.url || playData?.videoUrl || playData?.playUrl || (typeof playData === 'string' ? playData : null)
+  
   if (!streamUrl) {
     throw new Error('Link do vídeo não encontrado.')
   }
-
   return streamUrl
-    }
+}
