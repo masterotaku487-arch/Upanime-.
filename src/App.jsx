@@ -62,6 +62,7 @@ function BetaAchievement() {
 
 function AppInner() {
   const { pathname } = useLocation()
+  const isHome = pathname === '/'
   const isWatch = pathname.startsWith('/watch/')
   useVidmolySync()
   useReferral()
@@ -69,7 +70,7 @@ function AppInner() {
 
   return (
     <div className="app">
-      {!isWatch && <Navbar />}
+      {isHome && <Navbar />}
       <main>
         <Routes>
           <Route path="/"                  element={<Home />} />
