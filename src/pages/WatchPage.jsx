@@ -259,7 +259,7 @@ export default function WatchPage() {
                     setTimeout(() => setNewAchievements([]), 5000)
                   }
                 }}
-                onError={() => setError(true)}
+                onError={() => {}}
               />
             ) : null}
           </div>
@@ -380,4 +380,4 @@ export default function WatchPage() {
       </div>
     </div>
   )
-      }
+  }
