@@ -162,4 +162,20 @@
   80%  { opacity: 1; }
   100% { opacity: 0; }
   }
-                
+
+/* Fallback MX Player — cobre o player quando o vídeo não reproduz no navegador */
+.vp-mx-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  cursor: pointer;
+}
+.vp-mx-fallback img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+                   }
