@@ -1,0 +1,58 @@
+.notifications-page { padding-bottom: 100px; max-width: 600px; margin: 0 auto; }
+
+.list-top { padding: 16px 18px 6px; }
+.list-title {
+  font-family: var(--font-hero, var(--font-display));
+  font-size: 1.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.list-sub { margin-top: 4px; font-size: 0.75rem; color: var(--text-dim); font-weight: 500; }
+
+.notif-section-title {
+  padding: 18px 18px 6px;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.6px;
+  text-transform: uppercase; color: var(--text-dim);
+}
+
+.notif-row {
+  display: flex; gap: 12px; padding: 14px 18px; align-items: flex-start;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  color: var(--text); text-decoration: none;
+  transition: background var(--transition);
+}
+.notif-row:hover { background: rgba(255,255,255,0.03); }
+.notif-row.unread { background: rgba(229,57,53,0.06); }
+
+.notif-ic {
+  width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto;
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--red);
+}
+.notif-ic svg { width: 16px; height: 16px; }
+
+.notif-body { flex: 1; min-width: 0; }
+.notif-title { font-size: 0.83rem; font-weight: 600; line-height: 1.4; }
+.notif-title b { color: var(--red); font-weight: 800; }
+.notif-time { font-size: 0.68rem; color: var(--text-dim); margin-top: 5px; font-weight: 600; }
+
+.notif-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--red);
+  margin-top: 5px; flex: 0 0 auto;
+  box-shadow: 0 0 6px var(--red-glow);
+}
+
+/* ── Vazio ────────────────────────────────────────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 70px 34px 0; color: var(--text-dim);
+}
+.empty-icon {
+  width: 64px; height: 64px; border-radius: 50%; margin-bottom: 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--red); font-size: 1.4rem;
+}
+.empty-title { font-size: 0.95rem; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+.empty-text { font-size: 0.78rem; line-height: 1.6; max-width: 260px; }
