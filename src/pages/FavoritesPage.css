@@ -67,6 +67,54 @@
   display: flex; flex-wrap: wrap; gap: 4px 10px;
   font-size: .7rem; color: var(--text-dim); margin-bottom: 8px;
 }
+.favs-filters {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.favs-chip {
+  font-size: .72rem; font-weight: 700; letter-spacing: .3px;
+  text-transform: uppercase;
+  padding: 8px 14px; border-radius: 20px;
+  background: var(--surface); color: var(--text-dim);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all .15s ease;
+}
+.favs-chip.active {
+  background: linear-gradient(135deg, var(--red), #7a0c15);
+  color: #fff; border-color: transparent;
+}
+.favs-empty-filter {
+  text-align: center; color: var(--text-dim);
+  padding: 40px 0; font-size: .9rem;
+}
+
+.fav-remove-x {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(0,0,0,.55); border: none; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; backdrop-filter: blur(2px);
+  transition: background .15s;
+}
+.fav-remove-x:hover { background: var(--red); }
+
+.badge-ep {
+  font-size: .65rem; font-weight: 700; padding: 3px 7px;
+  border-radius: 5px; background: rgba(0,0,0,.6); color: #fff;
+}
+
+.fav-progress-track {
+  height: 3px; background: var(--border); width: 100%;
+}
+.fav-progress-fill {
+  height: 100%; background: var(--red);
+}
+
+.fav-status-tag {
+  font-size: .65rem; font-weight: 700; color: var(--red);
+}
+.fav-status-tag.done { color: #7fd97f; }
+
 .fav-remove {
   display: flex; align-items: center; gap: 5px;
   font-size: .7rem; color: var(--text-dim);
