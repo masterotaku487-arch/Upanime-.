@@ -3,46 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Player</title>
+  <title>Teste HLS</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <style>
-    body{
-      margin:0;
-      background:#000;
+    body {
+      margin: 0;
+      background: #000;
     }
 
-    .player{
-      position:relative;
-      width:100%;
-      padding-top:56.25%;
-      overflow:hidden;
-    }
-
-    .player iframe,
-    .player video{
-      position:absolute;
-      top:0;
-      left:0;
-      width:100%;
-      height:100%;
-      border:none;
+    video {
+      width: 100%;
+      height: auto;
     }
   </style>
 </head>
+
 <body>
 
-  <div class="player">
-    <iframe
-      src="https://streamhubflux.base44.app/embed/6a13a2eed11d5938a40a88a0?url=https%3A%2F%2Fbase44.app%2Fapi%2Fapps%2F6a10719436bfc4d60c8c75aa%2Ffiles%2Fmp%2Fpublic%2F6a10719436bfc4d60c8c75aa%2Fd30ee69d7_1001395548.mp4&title=Jujutsu%20kaisen%20-%20Temporada%201%2Fep1&domains=zenkatu.base44.app%2Czarumi.base44.app%2Cupanime-nine.vercel.app"
-      allow="autoplay; fullscreen; picture-in-picture"
-      allowfullscreen
-      loading="lazy">
-    </iframe>
-  </div>
+  <video id="video" controls playsinline></video>
 
-  <video controls width="100%">
-    <source src="https://www.blogger.com/video.g?token=AD6v5dwiTvwyCzNlmd-7WnVXRBq8f2urU4CsU2JzeMP6YItAUBcKXBwzJto0Dad2q5ABnoLVQCB-rslO2R6GGCGdHtEgb2luHwaUr5F6UqaUxGlzpdjHfkT8bSIUzO6JsyYuhlu2Hrny" type="video/mp4">
-    Seu navegador não suporta vídeo HTML5.
-  </video>
+  <script>
+    const video = document.getElementById('video');
+
+    const url =
+      'https://watch.4nm-cdn-0483964.com/b-02/kimi-no-na-wa-your-name-3050ce44/dubbed/1/46cf9bdd-98ff-41ae-babc-1be3cf2343fb/stream.m3u8?type=anime&expires=1787700149&signature=33fd7248b0122ce998da5a44522abcbc874abee78ccc9e8e0fc82aafeb989569';
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+
+      hls.loadSource(url);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('M3U8 carregado!');
+        video.play().catch(() => {});
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('Erro HLS:', data);
+      });
+
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari/iOS
+      video.src = url;
+
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch(() => {});
+      });
+
+    } else {
+      document.body.innerHTML =
+        '<p style="color:white">Este navegador não suporta HLS.</p>';
+    }
+  </script>
 
 </body>
 </html>
