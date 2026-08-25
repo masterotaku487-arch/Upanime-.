@@ -117,15 +117,15 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         // Safari/iOS: suporte nativo
         video.src = src
       } else if (Hls.isSupported()) {
-        hls = new Hls({
-          maxBufferLength: 30,
-          enableWorker: true,
-        })
+        hls = new Hls()
         hls.loadSource(src)
         hls.attachMedia(video)
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {})
+        })
         hls.on(Hls.Events.ERROR, (_evt, data) => {
+          console.error('[hls.js] erro:', data)
           if (data.fatal) {
-            console.error('[hls.js] erro fatal:', data)
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 hls.startLoad()
@@ -414,4 +414,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-  }
+      }
