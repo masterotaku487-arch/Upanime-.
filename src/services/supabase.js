@@ -190,6 +190,16 @@ export async function getUserPublicProfile(userId) {
   }
 }
 
+// ── Broadcasts (avisos do admin) ────────────────────────────────────────────────
+
+export async function getBroadcasts(limit = 20) {
+  try {
+    return await sbFetch(`broadcasts?order=created_at.desc&limit=${limit}`)
+  } catch {
+    return []
+  }
+}
+
 // ── Referrals (VIP) ───────────────────────────────────────────────────────────
 
 export async function getReferralCount(referrerId) {
