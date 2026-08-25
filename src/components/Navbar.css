@@ -96,3 +96,19 @@
   flex-shrink: 0;
 }
 .search-bar button:hover { color: var(--red); }
+
+.notif-btn { position: relative; }
+.notif-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 16px; height: 16px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--bg);
+  line-height: 1;
+}
