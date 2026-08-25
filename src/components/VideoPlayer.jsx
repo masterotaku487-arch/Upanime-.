@@ -65,6 +65,29 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const [showVolume, setShowVolume]     = useState(false)
   const [showWatermark, setShowWatermark] = useState(false)
   const wmTimer = useRef(null)
+  const [showFallback, setShowFallback] = useState(false)
+
+  // Detecta erro de reprodução (ex.: HLS não suportado no navegador do
+  // celular) e mostra a opção de abrir no MX Player em vez de travar.
+  const handleVideoError = useCallback((e) => {
+    setShowFallback(true)
+    onError?.(e)
+  }, [onError])
+
+  const openInMxPlayer = () => {
+    if (!src) return
+    const isAndroid = /android/i.test(navigator.userAgent)
+    if (isAndroid) {
+      const intentUrl =
+        `intent:${src}#Intent;` +
+        `package=com.mxtech.videoplayer.ad;` +
+        `S.title=${encodeURIComponent(title || 'Episódio')};` +
+        `end`
+      window.location.href = intentUrl
+    } else {
+      window.open(src, '_blank')
+    }
+  }
 
   // Restaurar progresso ao carregar
   useEffect(() => {
@@ -84,6 +107,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     const video = videoRef.current
     if (!video || !src) return
 
+    setShowFallback(false)
     let hls
 
     if (isM3u8(src)) {
@@ -110,7 +134,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
                 hls.recoverMediaError()
                 break
               default:
-                onError?.(data)
+                handleVideoError(data)
                 break
             }
           }
@@ -271,8 +295,16 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         onTimeUpdate={onTimeUpdate}
         onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
         onEnded={() => saveProgress(animeId, epNum, duration, duration)}
-        onError={onError}
+        onError={handleVideoError}
       />
+
+      {/* Fallback: quando o vídeo não consegue reproduzir no navegador,
+          mostra uma imagem que abre o mesmo episódio no MX Player */}
+      {showFallback && (
+        <div className="vp-mx-fallback" onClick={openInMxPlayer}>
+          <img src="/mxplayer-fallback.png" alt="Abrir no MX Player" />
+        </div>
+      )}
 
       {/* Toque na área do vídeo: primeiro toque só revela os controles,
           só alterna play/pause quando os controles já estão visíveis
