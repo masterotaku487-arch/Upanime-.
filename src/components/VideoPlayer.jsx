@@ -4,7 +4,10 @@ import {
   FiMaximize, FiMinimize, FiSkipForward,
 } from 'react-icons/fi'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
+import Hls from 'hls.js'
 import './VideoPlayer.css'
+
+const isM3u8 = (url = '') => /\.m3u8($|\?)/i.test(url)
 
 const fmt = (s) => {
   if (!s || isNaN(s)) return '0:00'
@@ -73,6 +76,61 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       videoRef.current?.addEventListener('loadedmetadata', restore, { once: true })
     }
   }, [src, animeId, epNum])
+
+  // Carrega a fonte de vídeo. Se for .m3u8 (HLS), usa hls.js — necessário
+  // pra tocar em Chrome/Firefox/Android, que não suportam HLS nativamente.
+  // Safari/iOS tocam .m3u8 nativamente e não passam por aqui.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !src) return
+
+    let hls
+
+    if (isM3u8(src)) {
+      const nativeHls = video.canPlayType('application/vnd.apple.mpegurl')
+
+      if (nativeHls) {
+        // Safari/iOS: suporte nativo
+        video.src = src
+      } else if (Hls.isSupported()) {
+        hls = new Hls({
+          maxBufferLength: 30,
+          enableWorker: true,
+        })
+        hls.loadSource(src)
+        hls.attachMedia(video)
+        hls.on(Hls.Events.ERROR, (_evt, data) => {
+          if (data.fatal) {
+            console.error('[hls.js] erro fatal:', data)
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                hls.startLoad()
+                break
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError()
+                break
+              default:
+                onError?.(data)
+                break
+            }
+          }
+        })
+      } else {
+        // Navegador sem suporte a HLS nem hls.js disponível
+        console.error('[VideoPlayer] navegador sem suporte a HLS')
+        onError?.(new Error('Navegador sem suporte a HLS'))
+      }
+    } else {
+      // MP4 e outros formatos diretos
+      video.src = src
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy()
+      }
+    }
+  }, [src])
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true)
@@ -206,7 +264,6 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     >
       <video
         ref={videoRef}
-        src={src}
         className="vp-video"
         autoPlay playsInline
         onPlay={() => setPlaying(true)}
@@ -325,4 +382,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-                                                   }
+  }
