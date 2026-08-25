@@ -25,7 +25,6 @@ import FanDubsPage from './pages/FanDubsPage'
 import FanDubDetailPage from './pages/FanDubDetailPage'
 import StudioPage from './pages/StudioPage'
 import AdminPage from './pages/AdminPage'
-import AdminNotificacoesPage from './pages/AdminNotificacoesPage'
 import ResgateRecompensa from './pages/ResgateRecompensa'
 import AdminRecompensas from './pages/AdminRecompensas'
 import FeedbackModal from './components/FeedbackModal'
@@ -98,7 +97,6 @@ function AppInner() {
           <Route path="/fandub/:id"        element={<FanDubDetailPage />} />
           <Route path="/studio"            element={<StudioPage />} />
           <Route path="/admin"             element={<AdminPage />} />
-          <Route path="/admin/notificacoes" element={<AdminNotificacoesPage />} />
           <Route path="/resgatar"          element={<ResgateRecompensa />} />
           <Route path="/admin/recompensas"  element={<AdminRecompensas />} />
         </Routes>
