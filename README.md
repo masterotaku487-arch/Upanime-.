@@ -1,4 +1,4 @@
-# 🔥 Up Anime+
+# 🔥 Up Anime+ 
 
 Site de streaming de animes gratuito, construído com React + Vite.
 
