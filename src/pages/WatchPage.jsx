@@ -466,22 +466,34 @@ export default function WatchPage() {
             {episodes.length > 0 && <span className="ep-count-badge">{episodes.length}</span>}
           </div>
           <div className="ep-scroll">
-            {episodes.map(ep => {
-              const num = ep.number ?? ep.episode ?? ep.id
-              return (
-                <button key={ep.id} className={`wsb-row ${num === epNum ? 'playing' : ''}`} onClick={() => goEp(num)}>
-                  <span className="wsb-row-num">{num}</span>
-                  <div className="wsb-row-info">
-                    <span className="wsb-row-title">{ep.title || `Episódio ${num}`}</span>
-                  </div>
-                  {num === epNum && <span className="now-playing">▶</span>}
-                </button>
-              )
-            })}
+            <div className="ep-list">
+              {episodes.map(ep => {
+                const num = ep.number ?? ep.episode ?? ep.id
+                const isPlaying = num === epNum
+                return (
+                  <button key={ep.id} className={`ep-row ${isPlaying ? 'ep-row-playing' : ''}`} onClick={() => goEp(num)}>
+                    <div className="ep-thumb">
+                      {anime?.images?.jpg?.large_image_url && (
+                        <img src={anime.images.jpg.large_image_url} alt="" loading="lazy" />
+                      )}
+                      <div className="ep-playmini">{isPlaying ? '▶' : <FiChevronRight />}</div>
+                    </div>
+                    <div className="ep-info">
+                      <div className="ep-name">Ep. {num} — {ep.title || `Episódio ${num}`}</div>
+                      <div className="ep-meta-row">
+                        {isPlaying && <span className="now-playing-tag">Assistindo agora</span>}
+                      </div>
+                    </div>
+                  </button>
+                  )
+              })}
+            </div>
             {hasMoreEps && <button className="load-more-btn" onClick={carregarMaisEpisodios}>⬇ Carregar mais</button>}
           </div>
         </aside>
       </div>
     </div>
   )
-      }
+  }
+ 
+    
