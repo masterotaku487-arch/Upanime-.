@@ -142,7 +142,7 @@ export default function ConfigPage() {
 
         <div className="menu-section-title">Preferências</div>
 
-        <Link to="/perfil" className="menu-item">
+        <Link to="/audio" className="menu-item">
           <div className="menu-ic"><FiHeadphones /></div>
           <div className="menu-label">Idioma de Áudio e Legenda</div>
           <FiChevronRight className="chev" />
