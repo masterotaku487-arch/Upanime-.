@@ -97,6 +97,11 @@
 .ext-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
 .ext-btn span { font-size: 0.75rem; }
 
+.ext-btn-download:disabled { opacity: 1; cursor: default; }
+.dl-ring { flex-shrink: 0; }
+.dl-ring-spin { animation: dlSpin 0.9s linear infinite; transform-origin: center; }
+@keyframes dlSpin { to { transform: rotate(360deg); } }
+
 /* Share */
 .share-container { position: relative; }
 .share-dropdown {
@@ -113,34 +118,82 @@
 }
 .share-dropdown button:hover, .share-dropdown a:hover { background: rgba(255,255,255,0.06); }
 
+/* ── TOPBAR sobre o vídeo (estilo mockup) ── */
+.video-area { position: relative; }
+.player-topbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 15;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+  pointer-events: none;
+}
+.player-topbar > * { pointer-events: auto; }
+.player-back-btn {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(0,0,0,0.45); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.player-title-mini {
+  flex: 1; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.4px;
+  color: rgba(255,255,255,0.85); text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.player-cast-btn {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(0,0,0,0.45); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+
 /* ── NAV ── */
 .ep-navigator {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px;
   background: var(--bg2); border-bottom: 1px solid var(--border);
 }
 .ep-nav-btn {
   display: flex; align-items: center; gap: 4px;
-  padding: 8px 14px; border-radius: 8px;
+  padding: 9px 14px; border-radius: 999px;
   background: var(--surface); border: 1px solid var(--border);
-  color: var(--text-dim); font-size: 0.82rem; font-weight: 600;
+  color: var(--text-dim); font-size: 0.78rem; font-weight: 700;
   transition: all var(--transition); flex-shrink: 0;
+  text-transform: uppercase; letter-spacing: 0.3px;
 }
-.ep-nav-btn:hover:not(:disabled) { background: var(--red); border-color: var(--red); color: #fff; }
-.ep-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.ep-nav-center { flex: 1; text-align: center; }
-.ep-nav-num { font-weight: 700; font-size: 0.88rem; display: block; }
-.ep-nav-title { font-size: 0.72rem; color: var(--text-dim); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ep-nav-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--red), #7a0c15);
+  border-color: transparent; color: #fff;
+}
+.ep-nav-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.ep-nav-center {
+  flex: 1; text-align: center; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.ep-nav-num {
+  font-weight: 800; font-size: 0.72rem;
+  padding: 3px 12px; border-radius: 999px;
+  background: rgba(232,0,28,0.12); color: var(--red);
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.ep-nav-title {
+  font-size: 0.74rem; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
 
 /* ── INFO ── */
-.watch-info-bar { padding: 16px 18px 24px; }
+.watch-info-bar { padding: 18px 18px 24px; }
 .back-link { font-size: 0.78rem; color: var(--red); display: block; margin-bottom: 8px; }
 .back-link:hover { opacity: 0.7; }
 .watch-anime-title {
-  font-family: var(--font-display);
-  font-size: clamp(1.4rem, 3vw, 2.2rem);
-  letter-spacing: 1px; margin-bottom: 10px;
+  font-family: var(--font-hero, var(--font-display));
+  font-size: clamp(1.5rem, 4vw, 2.3rem);
+  text-transform: uppercase;
+  line-height: 1.05;
+  letter-spacing: 0.4px; margin-bottom: 6px;
 }
+.watch-ep-sub {
+  font-size: 0.78rem; color: var(--text-dim); margin-bottom: 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.watch-ep-sub .dot { opacity: 0.5; }
 .watch-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .wbadge {
   font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 4px;
@@ -167,27 +220,33 @@
 }
 .sidebar-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid var(--border);
-  font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+  font-weight: 800; font-size: 0.78rem; flex-shrink: 0;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  position: relative;
+}
+.sidebar-head::after {
+  content: ''; position: absolute; bottom: -1px; left: 16px; width: 26px; height: 2px;
+  background: var(--red);
 }
 .ep-count-badge {
   background: var(--red); color: #fff;
   font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
 }
 .ep-scroll { overflow-y: auto; flex: 1; padding: 4px; }
-.ep-row {
+.wsb-row {
   display: flex; align-items: center; gap: 10px;
   width: 100%; padding: 9px 10px; border-radius: 6px;
   text-align: left; transition: all var(--transition);
   border: 1px solid transparent;
 }
-.ep-row:hover { background: rgba(255,255,255,0.04); }
-.ep-row.playing { background: rgba(232,0,28,0.1); border-color: rgba(232,0,28,0.25); }
-.ep-row-num { font-family: var(--font-display); font-size: 1.1rem; color: var(--red); min-width: 28px; flex-shrink: 0; }
-.ep-row-info { flex: 1; overflow: hidden; }
-.ep-row-title { font-size: 0.78rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ep-row.playing .ep-row-title { color: var(--text); font-weight: 600; }
-.ep-row-date { font-size: 0.68rem; color: var(--text-dim); }
+.wsb-row:hover { background: rgba(255,255,255,0.04); }
+.wsb-row.playing { background: rgba(232,0,28,0.1); border-color: rgba(232,0,28,0.25); }
+.wsb-row-num { font-family: var(--font-display); font-size: 1.1rem; color: var(--red); min-width: 28px; flex-shrink: 0; }
+.wsb-row-info { flex: 1; overflow: hidden; }
+.wsb-row-title { font-size: 0.78rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsb-row.playing .wsb-row-title { color: var(--text); font-weight: 600; }
+.wsb-row-date { font-size: 0.68rem; color: var(--text-dim); }
 .now-playing { color: var(--red); font-size: 0.7rem; flex-shrink: 0; }
 .load-more-btn {
   width: 100%; padding: 10px; text-align: center;
