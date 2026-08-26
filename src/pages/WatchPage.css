@@ -234,20 +234,24 @@
   font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
 }
 .ep-scroll { overflow-y: auto; flex: 1; padding: 4px; }
-.wsb-row {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 9px 10px; border-radius: 6px;
-  text-align: left; transition: all var(--transition);
-  border: 1px solid transparent;
+
+/* .ep-list/.ep-row/.ep-thumb/etc já vêm de AnimePage.css (CSS global no
+   build). Aqui só resetamos o <button> pra parecer o <Link> de lá, e
+   adicionamos o estado "tocando agora". */
+.ep-sidebar .ep-list { padding: 4px; gap: 8px; }
+.ep-sidebar .ep-row {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  text-align: left; color: inherit; font: inherit; cursor: pointer;
 }
-.wsb-row:hover { background: rgba(255,255,255,0.04); }
-.wsb-row.playing { background: rgba(232,0,28,0.1); border-color: rgba(232,0,28,0.25); }
-.wsb-row-num { font-family: var(--font-display); font-size: 1.1rem; color: var(--red); min-width: 28px; flex-shrink: 0; }
-.wsb-row-info { flex: 1; overflow: hidden; }
-.wsb-row-title { font-size: 0.78rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wsb-row.playing .wsb-row-title { color: var(--text); font-weight: 600; }
-.wsb-row-date { font-size: 0.68rem; color: var(--text-dim); }
-.now-playing { color: var(--red); font-size: 0.7rem; flex-shrink: 0; }
+.ep-sidebar .ep-row-playing {
+  background: rgba(232,0,28,0.1); border-color: rgba(232,0,28,0.3);
+}
+.ep-sidebar .ep-row-playing .ep-name { color: var(--red); }
+.ep-sidebar .ep-row-playing .ep-thumb img { filter: brightness(0.5); }
+.now-playing-tag {
+  font-size: 0.66rem; font-weight: 700; color: var(--red);
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
 .load-more-btn {
   width: 100%; padding: 10px; text-align: center;
   font-size: 0.8rem; font-weight: 600; color: var(--red);
