@@ -19,6 +19,7 @@ import NoticiasPage from './pages/NoticiasPage'
 import NotificationsPage from './pages/NotificationsPage'
 import ConfigPage from './pages/ConfigPage'
 import ApiStatusPage from './pages/ApiStatusPage'
+import PartnershipsPage from './pages/PartnershipsPage'
 import SobrePage from './pages/SobrePage'
 import AchievementsPage from './pages/AchievementsPage'
 import ProfilePage from './pages/ProfilePage'
@@ -91,6 +92,7 @@ function AppInner() {
           <Route path="/notificacoes"      element={<NotificationsPage />} />
           <Route path="/config"            element={<ConfigPage />} />
           <Route path="/api-status"        element={<ApiStatusPage />} />
+          <Route path="/parcerias"         element={<PartnershipsPage />} />
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
           <Route path="/perfil"            element={<ProfilePage />} />
@@ -137,4 +139,4 @@ export default function App() {
       </FavoritesProvider>
     </AuthProvider>
   )
-}
+      }
