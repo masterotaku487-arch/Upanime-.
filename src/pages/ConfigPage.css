@@ -28,8 +28,9 @@
   color: var(--red); font-size: 0.7rem; font-weight: 800;
   padding: 5px 12px; border-radius: 14px; text-transform: uppercase;
 }
-.stats-row { display: flex; justify-content: center; gap: 28px; margin-top: 20px; }
-.stat { text-align: center; }
+.stats-row { display: flex; justify-content: center; gap: 20px; margin-top: 20px; max-width: 100%; padding: 0 8px; }
+.stat { text-align: center; min-width: 0; flex: 1; max-width: 90px; }
+.stat span { white-space: nowrap; }
 .stat b {
   display: block;
   font-family: var(--font-hero, var(--font-display));
