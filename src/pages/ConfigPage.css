@@ -1,7 +1,7 @@
 .config-page { padding: 16px 0 120px; max-width: 500px; }
 
 /* ── Cabeçalho do perfil (estilo do mockup) ──────────────── */
-.profile-header {
+.acc-header {
   padding: 24px 18px 22px;
   text-align: center;
   background: radial-gradient(ellipse at top, var(--red-glow-soft, rgba(229,57,53,0.16)), transparent 60%);
