@@ -38,4 +38,18 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+ (API 30+) esconde por padrão quais apps estão instalados.
+         Sem isso, o sistema finge que MX Player/Web Video Caster/VLC não
+         existem, mesmo estando instalados, e os intents não abrem nada. -->
+    <queries>
+        <package android:name="com.mxtech.videoplayer.ad" />
+        <package android:name="com.mxtech.videoplayer.pro" />
+        <package android:name="com.instantbits.cast.webvideo" />
+        <package android:name="org.videolan.vlc" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 </manifest>
