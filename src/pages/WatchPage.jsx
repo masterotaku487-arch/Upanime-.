@@ -19,6 +19,7 @@ import Comments from '../components/Comments'
 import FeedbackModal from '../components/FeedbackModal'
 import './WatchPage.css'
 import { incrementAnimeViews, addWatchHistory } from '../services/supabase'
+import { addDownload } from '../services/downloads'
 import { useAuth } from '../context/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,41 +30,78 @@ const isAndroid = /Android/i.test(navigator.userAgent)
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
 const isMobile = isAndroid || isIOS
 
+// TWAs (apk gerado via GitHub Action + Bubblewrap) rodam sobre o Chrome, que
+// bloqueia navegação programática (`window.location.href = 'intent://...'`)
+// pra esquemas que não são http/https — só permite quando é um clique real
+// num link <a>. Por isso simulamos um clique de verdade em vez de setar o href.
+const navigateToIntent = (url) => {
+  const a = document.createElement('a')
+  a.href = url
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => a.remove(), 100)
+}
+
 const openVLC = (url, title) => {
-  window.location.href = `vlc://${url}`
+  navigateToIntent(`vlc://${url}`)
   setTimeout(() => { if (!document.hidden) window.open(url, '_blank') }, 1500)
 }
 
 const openMXPlayer = (url, title) => {
   const titleEnc = encodeURIComponent(title)
   const ua = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-  const intentFree = `intent:${url}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_User-Agent=${ua};end`
+  const intentFree = `intent:${url}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_User-Agent=${ua};S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.mxtech.videoplayer.ad')};end`
   const intentPro = `intent:${url}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.pro;S.title=${titleEnc};S.headers_User-Agent=${ua};end`
-  window.location.href = intentFree
-  setTimeout(() => { if (!document.hidden) window.location.href = intentPro }, 1000)
+  navigateToIntent(intentFree)
+  setTimeout(() => { if (!document.hidden) navigateToIntent(intentPro) }, 1000)
 }
 
-const downloadDirect = async (url, fn) => {
+const downloadDirect = async (url, fn, onProgress) => {
   try {
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const blob = await res.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = blobUrl
-    a.download = fn || 'episodio.mp4'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+    const total = Number(res.headers.get('content-length')) || 0
+    const reader = res.body?.getReader()
+
+    if (!reader || !total) {
+      // Sem suporte a stream ou sem content-length: baixa direto sem % exata
+      onProgress?.(-1)
+      const blob = await res.blob()
+      triggerDownload(blob, fn)
+      return
+    }
+
+    let received = 0
+    const chunks = []
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      received += value.length
+      onProgress?.(Math.min(99, Math.round((received / total) * 100)))
+    }
+    onProgress?.(100)
+    triggerDownload(new Blob(chunks), fn)
   } catch (err) {
     console.warn('[download] blob falhou, abrindo em nova aba:', err.message)
     window.open(url, '_blank')
   }
 }
 
+const triggerDownload = (blob, fn) => {
+  const blobUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = fn || 'episodio.mp4'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
+}
+
 const openCastTV = (url) => {
-  window.location.href = `intent:${url}#Intent;package=com.instantbits.cast.webvideo;action=android.intent.action.VIEW;type=video/*;end`
+  navigateToIntent(`intent:${url}#Intent;package=com.instantbits.cast.webvideo;action=android.intent.action.VIEW;type=video/*;S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo')};end`)
   setTimeout(() => {
     if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo', '_blank')
   }, 2000)
@@ -77,6 +115,28 @@ const openTapTap = async (url, title) => {
     } catch { /* usuário cancelou */ }
   }
   window.open('https://play.google.com/store/apps/details?id=com.taptap.client.android.tv', '_blank')
+}
+
+const DownloadRing = ({ progress }) => {
+  const size = 16
+  const stroke = 2
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const indeterminate = progress < 0
+  const pct = indeterminate ? 0.25 : progress / 100
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={`dl-ring ${indeterminate ? 'dl-ring-spin' : ''}`}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={stroke} />
+      <circle
+        cx={size/2} cy={size/2} r={r} fill="none"
+        stroke="currentColor" strokeWidth={stroke}
+        strokeDasharray={circ}
+        strokeDashoffset={circ * (1 - pct)}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`}
+      />
+    </svg>
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,7 +160,7 @@ export default function WatchPage() {
 
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [downloading, setDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(null) // null=parado, -1=indeterminado, 0-100=%
   const [newAchievements, setNewAchievements] = useState([])
   const [showBugReport, setShowBugReport] = useState(false)
 
@@ -282,12 +342,33 @@ export default function WatchPage() {
                 <button className="ext-btn" onClick={() => openTapTap(currentSrc, `${title} EP${epNum}`)}>
                   <FiTv /><span>TapTap</span>
                 </button>
-                <button className="ext-btn" disabled={downloading} onClick={async () => {
-                  setDownloading(true)
-                  await downloadDirect(currentSrc, filename)
-                  setDownloading(false)
-                }}>
-                  <FiDownload /><span>{downloading ? 'Baixando...' : 'Baixar'}</span>
+                <button
+                  className="ext-btn ext-btn-download"
+                  disabled={downloadProgress !== null}
+                  onClick={async () => {
+                    setDownloadProgress(-1)
+                    await downloadDirect(currentSrc, filename, setDownloadProgress)
+                    addDownload({
+                      animeId: id,
+                      ep: epNum,
+                      title,
+                      filename,
+                      image: anime?.images?.jpg?.large_image_url,
+                      url: currentSrc,
+                    })
+                    setDownloadProgress(null)
+                  }}
+                >
+                  {downloadProgress !== null ? (
+                    <DownloadRing progress={downloadProgress} />
+                  ) : (
+                    <FiDownload />
+                  )}
+                  <span>
+                    {downloadProgress === null ? 'Baixar'
+                      : downloadProgress < 0 ? 'Baixando...'
+                      : `${downloadProgress}%`}
+                  </span>
                 </button>
                 <button className="ext-btn"
                   onClick={() => isMobile ? openMXPlayer(currentSrc, `${title} EP${epNum}`) : openVLC(currentSrc, `${title} EP${epNum}`)}>

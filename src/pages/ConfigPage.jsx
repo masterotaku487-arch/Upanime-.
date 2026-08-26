@@ -148,11 +148,11 @@ export default function ConfigPage() {
           <FiChevronRight className="chev" />
         </Link>
 
-        <div className="menu-item menu-item-soon">
+        <Link to="/downloads" className="menu-item">
           <div className="menu-ic"><FiDownload /></div>
           <div className="menu-label">Download e Armazenamento</div>
-          <span className="menu-soon-tag">Em breve</span>
-        </div>
+          <FiChevronRight className="chev" />
+        </Link>
 
         <div className="menu-section-title">Outros</div>
 
