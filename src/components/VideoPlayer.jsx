@@ -123,12 +123,18 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           video.play().catch(() => {})
         })
+        let networkRetries = 0
         hls.on(Hls.Events.ERROR, (_evt, data) => {
           console.error('[hls.js] erro:', data)
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                hls.startLoad()
+                networkRetries++
+                if (networkRetries <= 3) {
+                  hls.startLoad()
+                } else {
+                  handleVideoError(data) // desiste após 3 tentativas, mostra fallback
+                }
                 break
               case Hls.ErrorTypes.MEDIA_ERROR:
                 hls.recoverMediaError()
