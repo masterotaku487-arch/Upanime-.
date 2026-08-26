@@ -3,9 +3,9 @@ import { useAuth } from '../context/AuthContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { Link } from 'react-router-dom'
 import {
-  FiUser, FiCreditCard, FiBell, FiHeadphones, FiDownload,
-  FiHelpCircle, FiLogOut, FiInfo, FiShield, FiActivity, FiAward,
-  FiHeart, FiClock, FiTrash2, FiChevronRight, FiExternalLink,
+  FiUser, FiCreditCard, FiBell, FiHeadphones, FiDownload, FiUsers,
+  FiHelpCircle, FiLogOut, FiInfo, FiShield, FiAward,
+  FiHeart, FiClock, FiTrash2, FiChevronRight,
 } from 'react-icons/fi'
 import { getHistory, clearHistory, getEpProgress } from '../services/history'
 import { loadAchievements, ACHIEVEMENTS } from '../services/achievements'
@@ -49,7 +49,7 @@ export default function ConfigPage() {
     <div className="config-page">
 
       {/* ── Cabeçalho do perfil ─────────────────────────────── */}
-      <div className="profile-header">
+      <div className="acc-header">
         {user ? (
           <img src={user.avatar || user.picture} alt={user.name} className="avatar avatar-img" />
         ) : (
@@ -172,10 +172,10 @@ export default function ConfigPage() {
           <FiChevronRight className="chev" />
         </Link>
 
-        <Link to="/api-status" className="menu-item">
-          <div className="menu-ic"><FiActivity /></div>
-          <div className="menu-label">Status dos Serviços</div>
-          <span className="config-status-indicator" />
+        <Link to="/parcerias" className="menu-item">
+          <div className="menu-ic"><FiUsers /></div>
+          <div className="menu-label">Parcerias</div>
+          <FiChevronRight className="chev" />
         </Link>
 
         <div className="menu-item menu-item-soon">
@@ -193,12 +193,6 @@ export default function ConfigPage() {
         <Link to="/privacidade" className="menu-item">
           <div className="menu-ic"><FiShield /></div>
           <div className="menu-label">Política de Privacidade</div>
-          <FiChevronRight className="chev" />
-        </Link>
-
-        <Link to="/sobre" className="menu-item">
-          <div className="menu-ic"><FiExternalLink /></div>
-          <div className="menu-label">Sobre o Up Anime+</div>
           <FiChevronRight className="chev" />
         </Link>
 
