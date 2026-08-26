@@ -58,7 +58,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const [duration, setDuration]         = useState(0)
   const [buffered, setBuffered]         = useState(0)
   const [volume, setVolume]             = useState(1)
-  const [muted, setMuted]               = useState(false)
+  const [muted, setMuted]               = useState(true) // começa mudo: navegador só deixa autoplay assim
   const [fullscreen, setFullscreen]     = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [showSkip, setShowSkip]         = useState(false)
@@ -139,8 +139,6 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
           video.play().catch(() => {})
         }, { once: true })
       } else if (Hls.isSupported()) {
-        // Igual ao teste que funcionou: config padrão, sem retry/fallback
-        // por enquanto — só carrega e toca.
         hls = new Hls()
         hls.loadSource(src)
         hls.attachMedia(video)
@@ -222,6 +220,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const togglePlay = () => {
     const v = videoRef.current; if (!v) return
     if (v.paused) {
+      if (muted) { setMuted(false); v.muted = false }
       v.play().catch(err => console.warn('[VideoPlayer] play() bloqueado:', err.message))
     } else {
       v.pause()
@@ -294,12 +293,16 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       ref={containerRef}
       className={`vp-wrap ${showControls ? 'show-ctrl' : ''} ${fullscreen ? 'vp-fs' : ''}`}
       onMouseMove={resetHideTimer}
-      onTouchStart={() => { wasVisibleRef.current = showControls; resetHideTimer() }}
+      onTouchStart={() => {
+        wasVisibleRef.current = showControls
+        resetHideTimer()
+        if (muted) { setMuted(false); if (videoRef.current) videoRef.current.muted = false }
+      }}
     >
       <video
         ref={videoRef}
         className="vp-video"
-        autoPlay playsInline
+        autoPlay playsInline muted={muted}
         onPlay={() => { setPlaying(true); setShowFallback(false) }}
         onPause={() => setPlaying(false)}
         onTimeUpdate={onTimeUpdate}
@@ -313,7 +316,6 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       {false && showFallback && (
         <div className="vp-mx-fallback">
           <img src="/mxplayer-fallback.png" alt="Abrir no MX Player" onClick={openInMxPlayer} />
-          {debugInfo && <div className="vp-debug-info">{debugInfo}</div>}
         </div>
       )}
 
@@ -425,4 +427,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-            }
+        }
