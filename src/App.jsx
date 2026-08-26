@@ -14,6 +14,7 @@ import GenresPage from './pages/GenresPage'
 import ExplorarPage from './pages/ExplorarPage'
 import LegalPage from './pages/LegalPage'
 import FavoritesPage from './pages/FavoritesPage'
+import DownloadsPage from './pages/DownloadsPage'
 import NoticiasPage from './pages/NoticiasPage'
 import NotificationsPage from './pages/NotificationsPage'
 import ConfigPage from './pages/ConfigPage'
@@ -84,6 +85,7 @@ function AppInner() {
           <Route path="/termos"            element={<LegalPage />} />
           <Route path="/privacidade"       element={<LegalPage />} />
           <Route path="/favoritos"         element={<FavoritesPage />} />
+          <Route path="/downloads"         element={<DownloadsPage />} />
           <Route path="/novidades"         element={<NoticiasPage />} />
           <Route path="/notificacoes"      element={<NotificationsPage />} />
           <Route path="/config"            element={<ConfigPage />} />
