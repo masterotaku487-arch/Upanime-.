@@ -296,10 +296,10 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         ref={videoRef}
         className="vp-video"
         autoPlay playsInline
-        onPlay={() => setPlaying(true)}
+        onPlay={() => { setPlaying(true); setShowFallback(false) }}
         onPause={() => setPlaying(false)}
         onTimeUpdate={onTimeUpdate}
-        onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+        onLoadedMetadata={() => { setDuration(videoRef.current?.duration || 0); setShowFallback(false) }}
         onEnded={() => saveProgress(animeId, epNum, duration, duration)}
         onError={handleVideoError}
       />
@@ -420,4 +420,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-      }
+  }
