@@ -66,11 +66,24 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
   const [showWatermark, setShowWatermark] = useState(false)
   const wmTimer = useRef(null)
   const [showFallback, setShowFallback] = useState(false)
+  const [debugInfo, setDebugInfo] = useState('')
 
   // Detecta erro de reprodução (ex.: HLS não suportado no navegador do
   // celular) e mostra a opção de abrir no MX Player em vez de travar.
   const handleVideoError = useCallback((e) => {
     setShowFallback(true)
+    // Guarda o motivo exato do erro pra mostrar na tela (facilita diagnosticar
+    // sem precisar abrir o DevTools).
+    try {
+      if (e?.type && e?.details) {
+        setDebugInfo(`hls: ${e.type} / ${e.details}${e.response?.code ? ` (HTTP ${e.response.code})` : ''}`)
+      } else if (videoRef.current?.error) {
+        const codes = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' }
+        setDebugInfo(`video: ${codes[videoRef.current.error.code] || videoRef.current.error.code}`)
+      } else {
+        setDebugInfo('erro desconhecido')
+      }
+    } catch { setDebugInfo('erro ao capturar detalhes') }
     onError?.(e)
   }, [onError])
 
@@ -78,10 +91,16 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     if (!src) return
     const isAndroid = /android/i.test(navigator.userAgent)
     if (isAndroid) {
+      // Formato correto do Android: "intent://" (com barra dupla) + link
+      // SEM o "https://" + "scheme=https;" como campo separado. Sem isso
+      // o Chrome não reconhece como intent e dá ERR_UNKNOWN_URL_SCHEME.
+      const noScheme = src.replace(/^https?:\/\//, '')
       const intentUrl =
-        `intent:${src}#Intent;` +
+        `intent://${noScheme}#Intent;` +
+        `scheme=https;` +
         `package=com.mxtech.videoplayer.ad;` +
         `S.title=${encodeURIComponent(title || 'Episódio')};` +
+        `S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.mxtech.videoplayer.ad')};` +
         `end`
       window.location.href = intentUrl
     } else {
@@ -116,39 +135,24 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       if (nativeHls) {
         // Safari/iOS: suporte nativo
         video.src = src
+        video.addEventListener('loadedmetadata', () => {
+          video.play().catch(() => {})
+        }, { once: true })
       } else if (Hls.isSupported()) {
+        // Igual ao teste que funcionou: config padrão, sem retry/fallback
+        // por enquanto — só carrega e toca.
         hls = new Hls()
         hls.loadSource(src)
         hls.attachMedia(video)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('M3U8 carregado!')
           video.play().catch(() => {})
         })
-        let networkRetries = 0
         hls.on(Hls.Events.ERROR, (_evt, data) => {
-          console.error('[hls.js] erro:', data)
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                networkRetries++
-                if (networkRetries <= 3) {
-                  hls.startLoad()
-                } else {
-                  handleVideoError(data) // desiste após 3 tentativas, mostra fallback
-                }
-                break
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                hls.recoverMediaError()
-                break
-              default:
-                handleVideoError(data)
-                break
-            }
-          }
+          console.error('Erro HLS:', data)
         })
       } else {
-        // Navegador sem suporte a HLS nem hls.js disponível
         console.error('[VideoPlayer] navegador sem suporte a HLS')
-        onError?.(new Error('Navegador sem suporte a HLS'))
       }
     } else {
       // MP4 e outros formatos diretos
@@ -304,11 +308,12 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         onError={handleVideoError}
       />
 
-      {/* Fallback: quando o vídeo não consegue reproduzir no navegador,
-          mostra uma imagem que abre o mesmo episódio no MX Player */}
-      {showFallback && (
-        <div className="vp-mx-fallback" onClick={openInMxPlayer}>
-          <img src="/mxplayer-fallback.png" alt="Abrir no MX Player" />
+      {/* Fallback do MX Player DESLIGADO por enquanto — focando em fazer o
+          player normal funcionar primeiro, igual ao teste HTML que funcionou. */}
+      {false && showFallback && (
+        <div className="vp-mx-fallback">
+          <img src="/mxplayer-fallback.png" alt="Abrir no MX Player" onClick={openInMxPlayer} />
+          {debugInfo && <div className="vp-debug-info">{debugInfo}</div>}
         </div>
       )}
 
@@ -420,4 +425,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-  }
+            }
