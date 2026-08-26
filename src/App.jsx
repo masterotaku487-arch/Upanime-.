@@ -22,6 +22,7 @@ import ApiStatusPage from './pages/ApiStatusPage'
 import SobrePage from './pages/SobrePage'
 import AchievementsPage from './pages/AchievementsPage'
 import ProfilePage from './pages/ProfilePage'
+import AudioPreferencesPage from './pages/AudioPreferencesPage'
 import FanDubsPage from './pages/FanDubsPage'
 import FanDubDetailPage from './pages/FanDubDetailPage'
 import StudioPage from './pages/StudioPage'
@@ -93,6 +94,7 @@ function AppInner() {
           <Route path="/sobre"             element={<SobrePage />} />
           <Route path="/conquistas"        element={<AchievementsPage />} />
           <Route path="/perfil"            element={<ProfilePage />} />
+          <Route path="/audio"             element={<AudioPreferencesPage />} />
           <Route path="/u/:userId"         element={<UserProfilePage />} />
           <Route path="/meu-perfil"        element={<UserProfilePage />} />
           {/* Novas rotas */}
