@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import {
   FiChevronLeft, FiChevronRight, FiCast, FiDownload, FiMonitor, FiExternalLink,
-  FiShare2, FiCopy, FiCheck, FiHeadphones, FiTv, FiStar,
+  FiShare2, FiCopy, FiCheck, FiHeadphones, FiTv, FiStar, FiArrowLeft,
 } from 'react-icons/fi'
 import { BsFillCameraVideoFill } from 'react-icons/bs'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -43,6 +43,11 @@ const navigateToIntent = (url) => {
   setTimeout(() => a.remove(), 100)
 }
 
+// Formato correto do Android: "intent://" (com barra dupla) + link SEM o
+// "https://" + "scheme=https;" como campo separado. Sem isso o Chrome não
+// reconhece como intent e dá ERR_UNKNOWN_URL_SCHEME.
+const stripScheme = (url) => url.replace(/^https?:\/\//, '')
+
 const openVLC = (url, title) => {
   navigateToIntent(`vlc://${url}`)
   setTimeout(() => { if (!document.hidden) window.open(url, '_blank') }, 1500)
@@ -51,8 +56,9 @@ const openVLC = (url, title) => {
 const openMXPlayer = (url, title) => {
   const titleEnc = encodeURIComponent(title)
   const ua = encodeURIComponent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-  const intentFree = `intent:${url}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_User-Agent=${ua};S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.mxtech.videoplayer.ad')};end`
-  const intentPro = `intent:${url}#Intent;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.pro;S.title=${titleEnc};S.headers_User-Agent=${ua};end`
+  const noScheme = stripScheme(url)
+  const intentFree = `intent://${noScheme}#Intent;scheme=https;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.ad;S.title=${titleEnc};S.headers_User-Agent=${ua};S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.mxtech.videoplayer.ad')};end`
+  const intentPro = `intent://${noScheme}#Intent;scheme=https;action=android.intent.action.VIEW;type=video/*;package=com.mxtech.videoplayer.pro;S.title=${titleEnc};S.headers_User-Agent=${ua};end`
   navigateToIntent(intentFree)
   setTimeout(() => { if (!document.hidden) navigateToIntent(intentPro) }, 1000)
 }
@@ -101,7 +107,7 @@ const triggerDownload = (blob, fn) => {
 }
 
 const openCastTV = (url) => {
-  navigateToIntent(`intent:${url}#Intent;package=com.instantbits.cast.webvideo;action=android.intent.action.VIEW;type=video/*;S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo')};end`)
+  navigateToIntent(`intent://${stripScheme(url)}#Intent;scheme=https;package=com.instantbits.cast.webvideo;action=android.intent.action.VIEW;type=video/*;S.browser_fallback_url=${encodeURIComponent('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo')};end`)
   setTimeout(() => {
     if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo', '_blank')
   }, 2000)
@@ -153,6 +159,7 @@ export default function WatchPage() {
   const [hasMoreEps, setHasMoreEps] = useState(false)
 
   const [shinokaiAnime, setShinokaiAnime] = useState(null)
+  const lastPlayedRef = useRef(null)
   const [currentSrc, setCurrentSrc] = useState('')
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('Carregando...')
@@ -227,8 +234,8 @@ export default function WatchPage() {
         setEpisodes(pag.episodios)
         setHasMoreEps(pag.temMais)
         setEpPage(1)
-
-        await reproduzir(sAnime, pag.episodios)
+        // A reprodução em si fica a cargo do efeito abaixo (que também cuida
+        // de trocar de episódio via ?ep=), pra não chamar duas vezes o mesmo link.
       } catch (err) {
         console.error('[Shinokai] erro:', err)
         if (!cancelado) { setError(true); setLoading(false) }
@@ -238,12 +245,15 @@ export default function WatchPage() {
     return () => { cancelado = true }
   }, [title])
 
-  // Troca de episódio (via ?ep= na URL)
+  // Troca de episódio (via ?ep= na URL) — único lugar que chama reproduzir(),
+  // pra nunca disparar o mesmo link 2x.
   useEffect(() => {
-    if (shinokaiAnime && episodes.length) {
-      reproduzir(shinokaiAnime, episodes)
-    }
-  }, [epNum])
+    if (!shinokaiAnime || !episodes.length) return
+    const key = `${shinokaiAnime.id}_${epNum}`
+    if (lastPlayedRef.current === key) return // já tocando esse episódio, evita chamada duplicada
+    lastPlayedRef.current = key
+    reproduzir(shinokaiAnime, episodes)
+  }, [shinokaiAnime, episodes.length, epNum])
 
   const reproduzir = async (animeObj, epsList) => {
     const ep = epsList.find(e => (e.number ?? e.episode ?? e.id) == epNum) || epsList[0]
@@ -291,6 +301,13 @@ export default function WatchPage() {
         <div className="watch-main">
 
           <div className="video-area">
+            <div className="player-topbar">
+              <Link to={`/anime/${id}`} className="player-back-btn"><FiArrowLeft size={16} /></Link>
+              <span className="player-title-mini">{title} · EP {epNum}</span>
+              {currentSrc && (
+                <button className="player-cast-btn" onClick={() => openCastTV(currentSrc)}><FiCast size={15} /></button>
+              )}
+            </div>
             {loading ? (
               <div className="video-status">
                 <p>{status}</p>
@@ -407,7 +424,13 @@ export default function WatchPage() {
           {anime && (
             <div className="watch-info-bar">
               <Link to={`/anime/${id}`} className="back-link">← {title}</Link>
-              <h1 className="watch-anime-title">{title}</h1>
+              <h1 className="watch-anime-title">{epTitle || title}</h1>
+              <div className="watch-ep-sub">
+                <span>Episódio {epNum}</span>
+                <span className="dot">·</span>
+                <span>{title}</span>
+                {isDub && <><span className="dot">·</span><span>Dublado PT-BR</span></>}
+              </div>
               <div className="watch-badges">
                 {anime.score && <span className="wbadge"><FiStar /> {anime.score.toFixed(1)}</span>}
                 {anime.status === 'Currently Airing' && <span className="wbadge live"><span className="live-dot" /> Em Exibição</span>}
@@ -446,10 +469,10 @@ export default function WatchPage() {
             {episodes.map(ep => {
               const num = ep.number ?? ep.episode ?? ep.id
               return (
-                <button key={ep.id} className={`ep-row ${num === epNum ? 'playing' : ''}`} onClick={() => goEp(num)}>
-                  <span className="ep-row-num">{num}</span>
-                  <div className="ep-row-info">
-                    <span className="ep-row-title">{ep.title || `Episódio ${num}`}</span>
+                <button key={ep.id} className={`wsb-row ${num === epNum ? 'playing' : ''}`} onClick={() => goEp(num)}>
+                  <span className="wsb-row-num">{num}</span>
+                  <div className="wsb-row-info">
+                    <span className="wsb-row-title">{ep.title || `Episódio ${num}`}</span>
                   </div>
                   {num === epNum && <span className="now-playing">▶</span>}
                 </button>
@@ -461,4 +484,4 @@ export default function WatchPage() {
       </div>
     </div>
   )
-  }
+      }
