@@ -139,6 +139,8 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
           video.play().catch(() => {})
         }, { once: true })
       } else if (Hls.isSupported()) {
+        // Igual ao teste que funcionou: config padrão, sem retry/fallback
+        // por enquanto — só carrega e toca.
         hls = new Hls()
         hls.loadSource(src)
         hls.attachMedia(video)
@@ -311,6 +313,7 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       {false && showFallback && (
         <div className="vp-mx-fallback">
           <img src="/mxplayer-fallback.png" alt="Abrir no MX Player" onClick={openInMxPlayer} />
+          {debugInfo && <div className="vp-debug-info">{debugInfo}</div>}
         </div>
       )}
 
@@ -422,4 +425,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-    }
+        }
