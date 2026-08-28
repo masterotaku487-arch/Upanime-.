@@ -130,15 +130,10 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     let hls
 
     if (isM3u8(src)) {
-      const nativeHls = video.canPlayType('application/vnd.apple.mpegurl')
-
-      if (nativeHls) {
-        // Safari/iOS: suporte nativo
-        video.src = src
-        video.addEventListener('loadedmetadata', () => {
-          video.play().catch(() => {})
-        }, { once: true })
-      } else if (Hls.isSupported()) {
+      // hls.js primeiro sempre que possível: o teste canPlayType() do
+      // navegador não é confiável — alguns navegadores/WebViews dizem que
+      // sabem tocar HLS nativo, mas na prática falham (erro código 4).
+      if (Hls.isSupported()) {
         hls = new Hls()
         hls.loadSource(src)
         hls.attachMedia(video)
@@ -149,6 +144,13 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         hls.on(Hls.Events.ERROR, (_evt, data) => {
           console.error('Erro HLS:', data)
         })
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Só cai aqui se hls.js REALMENTE não puder rodar (ex: Safari/iOS
+        // antigo sem MSE), usando o suporte nativo do navegador como último recurso.
+        video.src = src
+        video.addEventListener('loadedmetadata', () => {
+          video.play().catch(() => {})
+        }, { once: true })
       } else {
         console.error('[VideoPlayer] navegador sem suporte a HLS')
       }
@@ -422,4 +424,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-                                  }
+    }
