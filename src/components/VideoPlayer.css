@@ -35,12 +35,15 @@
 .vp-skip:hover { background: #e53935; border-color: #e53935; transform: scale(1.05); }
 @keyframes vp-slidein { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* Gradiente */
+/* Gradiente — só aparece junto com os controles, não fica sempre visível */
 .vp-grad {
   position: absolute; bottom: 0; left: 0; right: 0;
   height: 180px; pointer-events: none; z-index: 3;
   background: linear-gradient(to top, rgba(0,0,0,0.92), transparent);
+  opacity: 0;
+  transition: opacity .22s;
 }
+.show-ctrl .vp-grad { opacity: 1; }
 
 /* Controles */
 .vp-controls {
