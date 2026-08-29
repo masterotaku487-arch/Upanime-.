@@ -4,12 +4,12 @@ import './PartnershipsPage.css'
 
 // Edite esse array pra adicionar/remover parcerias que aparecem na página.
 const PARTNERS = [
-  // {
-  //   name: 'Nome do Parceiro',
-  //   logo: '/parceiros/nome-do-parceiro.png',
-  //   desc: 'Uma frase curta explicando a parceria.',
-  //   url: 'https://site-do-parceiro.com',
-  // },
+  {
+    name: 'Kawaii Animes',
+    logo: '/parceiros/kawaii-animes.png',
+    desc: 'O UpAnime+ foi feito para ser acessado de qualquer lugar pelo navegador. Mas, se você quer mais agilidade e facilidade, agora também pode baixar o app graças à nossa parceria com o Kawaii Animes. Acesse o app parceiro e aproveite uma experiência mais rápida no Android.',
+    url: 'https://www.mediafire.com/file/yvk75zgnljq6job/Kawaii_Animes.apk/file',
+  },
 ]
 
 export default function PartnershipsPage() {
