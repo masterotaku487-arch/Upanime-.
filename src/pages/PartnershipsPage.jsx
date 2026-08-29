@@ -1,49 +1,58 @@
-import { Link } from 'react-router-dom'
-import { FiArrowLeft, FiExternalLink } from 'react-icons/fi'
-import './PartnershipsPage.css'
+import { useState, useEffect } from 'react'
+import { FiX } from 'react-icons/fi'
+import './PartnerModal.css'
 
-// Edite esse array pra adicionar/remover parcerias que aparecem na página.
-const PARTNERS = [
-  {
-    name: 'Kawaii Animes',
-    logo: '/parceiros/kawaii-animes.png',
-    desc: 'O UpAnime+ foi feito para ser acessado de qualquer lugar pelo navegador. Mas, se você quer mais agilidade e facilidade, agora também pode baixar o app graças à nossa parceria com o Kawaii Animes. Acesse o app parceiro e aproveite uma experiência mais rápida no Android.',
-    url: 'https://www.mediafire.com/file/yvk75zgnljq6job/Kawaii_Animes.apk/file',
-  },
-]
+// Edite aqui pra trocar qual parceria aparece em destaque na Home.
+// Pra desligar o popup temporariamente, deixe FEATURED_PARTNER = null.
+const FEATURED_PARTNER = {
+  name: 'Kawaii Animes',
+  banner: '/parceiros/kawaii-x-upanime-banner.png',
+  text: 'O UpAnime+ foi feito para oferecer a melhor experiência no Android. Mas se você quer assistir também no iPhone, iPad ou PC, agora também pode, graças à nossa parceria com o Kawaii Animes. Toque aqui para acessar o site parceiro.',
+  buttonLabel: 'ACESSAR',
+  url: 'https://www.mediafire.com/file/yvk75zgnljq6job/Kawaii_Animes.apk/file',
+}
 
-export default function PartnershipsPage() {
+const SEEN_KEY = 'upanime_partner_modal_seen'
+
+export default function PartnerModal() {
+  const [show, setShow] = useState(false)
+
+  useEffect(() => {
+    if (!FEATURED_PARTNER) return
+    // Mostra só uma vez por sessão (sessionStorage some ao fechar a aba/app)
+    if (sessionStorage.getItem(SEEN_KEY)) return
+    const timer = setTimeout(() => setShow(true), 1200)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const close = () => {
+    setShow(false)
+    try { sessionStorage.setItem(SEEN_KEY, '1') } catch {}
+  }
+
+  if (!show || !FEATURED_PARTNER) return null
+
   return (
-    <div className="partnerships-page container">
-      <div className="profile-header partnerships-topbar">
-        <Link to="/config" className="back-btn"><FiArrowLeft /> Voltar</Link>
-        <h1>Parcerias</h1>
+    <div className="pmodal-backdrop" onClick={close}>
+      <div className="pmodal-card" onClick={e => e.stopPropagation()}>
+        <button className="pmodal-close" onClick={close} aria-label="Fechar"><FiX /></button>
+
+        <div className="pmodal-banner">
+          <img src={FEATURED_PARTNER.banner} alt={`Parceria com ${FEATURED_PARTNER.name}`} />
+        </div>
+
+        <p className="pmodal-text">{FEATURED_PARTNER.text}</p>
+
+        <a
+          href={FEATURED_PARTNER.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="pmodal-btn"
+          onClick={close}
+        >
+          {FEATURED_PARTNER.buttonLabel}
+        </a>
       </div>
-
-      <p className="partnerships-intro">
-        Conheça os estúdios, canais e comunidades que colaboram com o Up Anime+.
-      </p>
-
-      {PARTNERS.length === 0 ? (
-        <div className="partnerships-empty">
-          <span className="partnerships-empty-icon">🤝</span>
-          <h3>Nenhuma parceria divulgada ainda</h3>
-          <p>Em breve mostramos aqui quem colabora com o Up Anime+.</p>
-        </div>
-      ) : (
-        <div className="partnerships-grid">
-          {PARTNERS.map(p => (
-            <a key={p.name} href={p.url} target="_blank" rel="noopener noreferrer" className="partner-card">
-              {p.logo && <img src={p.logo} alt={p.name} className="partner-logo" />}
-              <div className="partner-info">
-                <div className="partner-name">{p.name}</div>
-                {p.desc && <div className="partner-desc">{p.desc}</div>}
-              </div>
-              <FiExternalLink className="partner-ext" size={14} />
-            </a>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
