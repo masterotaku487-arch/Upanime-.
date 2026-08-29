@@ -11,7 +11,14 @@ const HEADERS = {
   'Origin': 'https://shinokai.online'
 }
 
-let accessToken = null
+const TOKEN_KEY = 'shinokai_access_token'
+
+// Guarda em memória + sessionStorage: sobrevive a um F5 (recarregar a
+// página), mas some se a aba/navegador for fechado — só aí gera um
+// token novo, economizando chamadas desnecessárias.
+let accessToken = (() => {
+  try { return sessionStorage.getItem(TOKEN_KEY) || null } catch { return null }
+})()
 
 // Converte Base64 para Uint8Array sem bibliotecas externas
 function b64ToUint8(b64) {
@@ -91,6 +98,7 @@ async function login() {
 
   accessToken = data?.accessToken || data?.access_token || data?.token
   if (!accessToken) throw new Error('Falha ao obter token de acesso')
+  try { sessionStorage.setItem(TOKEN_KEY, accessToken) } catch {}
   return accessToken
 }
 
@@ -105,6 +113,8 @@ async function apiShinokai(endpoint) {
   })
 
   if (res.status === 401) {
+    accessToken = null
+    try { sessionStorage.removeItem(TOKEN_KEY) } catch {}
     await login()
     return apiShinokai(endpoint)
   }
