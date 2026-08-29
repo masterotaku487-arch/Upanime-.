@@ -71,6 +71,9 @@ export function AuthProvider({ children }) {
         client_id: GOOGLE_CLIENT_ID,
         callback: handleCredential,
         auto_select: true,
+        use_fedcm_for_prompt: true, // necessário: navegadores modernos bloqueiam
+                                     // cookies de terceiros, que o modo antigo
+                                     // (sem FedCM) precisava pra mostrar o prompt
       })
       setLoading(false)
     }
@@ -100,7 +103,17 @@ export function AuthProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(synced))
   }
 
-  const login = () => window.google?.accounts.id.prompt()
+  const login = () => {
+    window.google?.accounts.id.prompt((notification) => {
+      // Se o prompt não aparecer, isso mostra o motivo exato no console
+      // em vez de falhar silenciosamente sem nenhuma pista.
+      if (notification.isNotDisplayed?.()) {
+        console.warn('[Auth] Google prompt não exibido:', notification.getNotDisplayedReason?.())
+      } else if (notification.isSkippedMoment?.()) {
+        console.warn('[Auth] Google prompt pulado:', notification.getSkippedReason?.())
+      }
+    })
+  }
 
   const loginAsGuest = async (name, avatarUrl = '') => {
     const existing = localStorage.getItem(GUEST_KEY)
@@ -141,6 +154,7 @@ export function AuthProvider({ children }) {
       user, loading,
       login, logout,
       loginAsGuest, promptGuest, closeGuestModal, showGuestModal,
+      openLogin: promptGuest, // várias páginas chamam "openLogin" — alias pra não quebrar
       isVip:   user?.is_vip   || false,
       isAdmin: user?.is_admin || false,
       isGuest: user?.is_guest || false,
