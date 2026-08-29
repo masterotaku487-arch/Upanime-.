@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Hero from '../components/Hero'
 import AnimeCard from '../components/AnimeCard'
 import FanDubsHomeSection from '../components/FanDubsHomeSection'
+import PartnerModal from '../components/PartnerModal'
 import { getSeasonNow, getTopAnime, getSeasonUpcoming } from '../services/api'
 import { getHistory, getEpProgress, removeHistory } from '../services/history'
 import './Home.css'
@@ -174,6 +175,8 @@ export default function Home() {
     <div className="home">
       <h1 style={{ display: 'none' }}>Up Anime+ - Assistir Animes Online Grátis em HD</h1>
 
+      <PartnerModal />
+
       <CategoryChips />
 
       <Hero animes={heroAnimes} />
@@ -205,4 +208,4 @@ export default function Home() {
       </div>
     </div>
   )
-          }
+      }
