@@ -141,18 +141,18 @@ export default function FanDubDetailPage() {
     if (!fileId) return
 
     const videoUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`
-
-    // Tenta abrir no player nativo do Android
-    window.location.href = `intent:${videoUrl}#Intent;action=android.intent.action.VIEW;type=video/mp4;end`
+    // Formato correto: "intent://" (barra dupla) + link SEM "https://" + "scheme=https;"
+    const noScheme = videoUrl.replace(/^https?:\/\//, '')
+    window.location.href = `intent://${noScheme}#Intent;scheme=https;action=android.intent.action.VIEW;type=video/mp4;end`
     setTimeout(() => {
-      // Fallback: abre no Drive se não abrir player
       if (!document.hidden) window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank')
     }, 2000)
   }
 
   const openCastTV = () => {
     const url = window.location.href
-    window.location.href = `intent:${url}#Intent;package=com.instantbits.cast.webvideo;end`
+    const noScheme = url.replace(/^https?:\/\//, '')
+    window.location.href = `intent://${noScheme}#Intent;scheme=https;package=com.instantbits.cast.webvideo;end`
     setTimeout(() => {
       if (!document.hidden) window.open('https://play.google.com/store/apps/details?id=com.instantbits.cast.webvideo', '_blank')
     }, 2000)
@@ -290,9 +290,16 @@ export default function FanDubDetailPage() {
             <div key={e.ep}
               className={`fddetail-ep-item ${epAtual === e.ep ? 'active' : ''}`}
               onClick={() => { setTab('assistir'); goEp(e.ep) }}>
-              <span className="fddetail-ep-num">EP {e.ep}</span>
-              <span className="fddetail-ep-name">{e.titulo || `Episódio ${e.ep}`}</span>
-              {epAtual === e.ep && <span className="fddetail-ep-playing"><FiPlay /></span>}
+              <div className="fddetail-ep-thumb">
+                {(fanDub.capa || fanDub.animeCapa) && (
+                  <img src={fanDub.capa || fanDub.animeCapa} alt="" loading="lazy" />
+                )}
+                <div className="fddetail-ep-playmini">{epAtual === e.ep ? <FiPlay /> : null}</div>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="fddetail-ep-num">EP {e.ep} — {e.titulo || `Episódio ${e.ep}`}</div>
+                {epAtual === e.ep && <span className="fddetail-ep-playing">Assistindo agora</span>}
+              </div>
             </div>
           ))}
         </div>
