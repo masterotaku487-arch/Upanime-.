@@ -1,16 +1,41 @@
 // src/components/GuestModal.jsx
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import './GuestModal.css'
 
 export default function GuestModal() {
-  const { showGuestModal, closeGuestModal, loginAsGuest, login } = useAuth()
+  const { showGuestModal, closeGuestModal, loginAsGuest } = useAuth()
   const [name, setName]       = useState('')
   const [avatar, setAvatar]   = useState('')
   const [preview, setPreview] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const fileRef = useRef()
+  const googleBtnRef = useRef()
+
+  // Renderiza o botão REAL do Google (não o prompt() automático, que os
+  // navegadores modernos costumam bloquear silenciosamente).
+  useEffect(() => {
+    if (!showGuestModal) return
+    let tries = 0
+    const tryRender = () => {
+      if (window.google?.accounts?.id && googleBtnRef.current) {
+        googleBtnRef.current.innerHTML = '' // evita duplicar se re-renderizar
+        window.google.accounts.id.renderButton(googleBtnRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'pill',
+          width: 280,
+        })
+      } else if (tries < 20) {
+        // Script do Google pode ainda não ter carregado — tenta de novo por um tempo
+        tries++
+        setTimeout(tryRender, 250)
+      }
+    }
+    tryRender()
+  }, [showGuestModal])
 
   if (!showGuestModal) return null
 
@@ -65,10 +90,9 @@ export default function GuestModal() {
 
         <div className="guest-modal-divider"><span>ou</span></div>
 
-        <button className="guest-google-btn" onClick={() => { closeGuestModal(); login() }}>
-          <img src="https://www.google.com/favicon.ico" alt="Google" width={16} />
-          Entrar com Google
-        </button>
+        <div className="guest-google-btn-wrap">
+          <div ref={googleBtnRef} className="guest-google-btn-real" />
+        </div>
 
         <p className="guest-modal-note">
           Visitantes podem comentar e curtir, mas conquistas e favoritos são salvos apenas com conta Google.

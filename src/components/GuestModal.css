@@ -70,15 +70,10 @@
   content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.1);
 }
 
-.guest-google-btn {
-  width: 100%; padding: .7rem;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 8px; color: #fff; font-size: .9rem;
-  cursor: pointer; display: flex; align-items: center;
-  justify-content: center; gap: .5rem; transition: background .2s;
-}
-.guest-google-btn:hover { background: rgba(255,255,255,.13); }
+.guest-google-btn-wrap { display: flex; justify-content: center; width: 100%; }
+.guest-google-btn-real { min-height: 44px; display: flex; justify-content: center; }
+.guest-google-btn-real > div { width: 100% !important; }
+.guest-google-btn-real iframe { margin: 0 auto; }
 
 .guest-modal-note {
   font-size: .75rem; color: #555; text-align: center; margin: 0;
