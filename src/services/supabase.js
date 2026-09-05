@@ -91,6 +91,61 @@ export async function removeLike(animeId, ep, userId) {
   )
 }
 
+// ── Nota (estrela) de Fan-Dubs ───────────────────────────────────────────────
+// Fandub não tem "nota" vinda de API nenhuma (não é anime oficial), então
+// calculamos a partir das curtidas somadas de TODOS os episódios. Só que
+// comparar o total bruto contra a escala normal (0-10, tipo MAL) deixaria a
+// nota sempre baixa — fandub tem muito menos curtidas que anime grande.
+// Por isso comparamos o total de curtidas de CADA fandub com o de TODOS os
+// outros fandubs, e a nota vira a posição relativa nesse ranking (0-10).
+
+/** Soma curtidas de todos os episódios de um fandub específico */
+export async function getFanDubLikesTotal(fandubId) {
+  try {
+    const data = await sbFetch(`likes?anime_id=eq.fandub-${fandubId}&select=user_id`)
+    return data?.length || 0
+  } catch { return 0 }
+}
+
+/** Busca as curtidas de TODOS os fandubs de uma vez, já somadas por fandub.
+ *  Uma chamada só serve pra calcular a nota de quantos cards forem precisos
+ *  (ex: grade inteira de fandubs), em vez de uma chamada por card. */
+export async function getAllFanDubLikeCounts() {
+  try {
+    const rows = await sbFetch(`likes?anime_id=like.fandub-*&select=anime_id`)
+    const counts = {}
+    for (const r of rows || []) counts[r.anime_id] = (counts[r.anime_id] || 0) + 1
+    return counts
+  } catch { return {} }
+}
+
+/** Puro: recebe as contagens já buscadas e devolve a nota de um fandub específico */
+export function computeFanDubScore(counts, fandubId) {
+  const key = `fandub-${fandubId}`
+  const merged = { ...counts }
+  if (!(key in merged)) merged[key] = 0
+
+  const values = Object.values(merged).sort((a, b) => a - b)
+  const myCount = merged[key]
+
+  if (values.length <= 1) {
+    return { score: 7.0, totalLikes: myCount, totalFanDubs: values.length || 1 }
+  }
+
+  const rank = values.filter(v => v <= myCount).length
+  const percentile = (rank - 1) / (values.length - 1)
+  const score = Math.round((5 + percentile * 4.8) * 10) / 10
+
+  return { score, totalLikes: myCount, totalFanDubs: values.length }
+}
+
+/** Nota de um único fandub (busca as contagens sozinha) — útil na página de
+ *  detalhes, onde só precisamos calcular a nota de 1 fandub por vez. */
+export async function getFanDubRankedScore(fandubId) {
+  const counts = await getAllFanDubLikeCounts()
+  return computeFanDubScore(counts, fandubId)
+}
+
 // ── Watch History ─────────────────────────────────────────────────────────────
 
 export async function addWatchHistory(userId, animeId, animeTitle, animeImage, ep) {
