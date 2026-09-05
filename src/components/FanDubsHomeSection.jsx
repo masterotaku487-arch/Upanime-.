@@ -4,18 +4,21 @@
 
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { getAllFanDubLikeCounts, computeFanDubScore } from '../services/supabase'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
 
 export default function FanDubsHomeSection() {
   const nav = useNavigate()
   const [fanDubs, setFanDubs] = useState([])
+  const [likeCounts, setLikeCounts] = useState({})
 
   useEffect(() => {
     fetch(`${API}/api/fanDubs`)
       .then(r => r.json())
       .then(d => setFanDubs((d.fanDubs || []).slice(0, 10)))
       .catch(() => {})
+    getAllFanDubLikeCounts().then(setLikeCounts)
   }, [])
 
   if (!fanDubs.length) return null
@@ -31,7 +34,9 @@ export default function FanDubsHomeSection() {
       </div>
 
       <div className="anime-grid">
-        {fanDubs.map((d, i) => (
+        {fanDubs.map((d, i) => {
+          const rating = computeFanDubScore(likeCounts, d.id)
+          return (
           <div
             key={d.id}
             className="anime-card"
@@ -46,10 +51,9 @@ export default function FanDubsHomeSection() {
                 onError={e => { e.target.src = 'https://via.placeholder.com/130x185/111/E53935?text=DUB' }}
               />
 
-              {/* Badge DUB (substitui o badge de rating) */}
               <div className="anime-badges">
-                <span className="badge-score" style={{ background: '#E53935' }}>🇧🇷 DUB</span>
-                {d.genero && <span className="badge-type">{d.genero}</span>}
+                <span className="badge-score">⭐ {rating.score.toFixed(1)}</span>
+                <span className="badge-type" style={{ background: '#E53935' }}>🇧🇷 DUB</span>
               </div>
 
               {/* Nome do estúdio no canto inferior direito (como "N eps") */}
@@ -65,7 +69,8 @@ export default function FanDubsHomeSection() {
               )}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )
