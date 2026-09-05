@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   FiShare2, FiCast, FiSmartphone, FiHeart, FiPlay, FiList, FiMic, FiInfo,
-  FiTv, FiMessageCircle, FiFileText, FiTag, FiShield, FiBarChart2,
+  FiTv, FiMessageCircle, FiFileText, FiTag, FiShield, FiBarChart2, FiStar,
 } from 'react-icons/fi'
 import Comments from '../components/Comments'
 import VideoPlayer from '../components/VideoPlayer'
 import { useFavorites } from '../context/FavoritesContext'
 import { useAuth } from '../context/AuthContext'
+import { getFanDubRankedScore } from '../services/supabase'
 import { saveHistory } from '../services/history'
 import './FanDubDetailPage.css'
 
@@ -40,6 +41,7 @@ export default function FanDubDetailPage() {
   const [studioData, setStudioData] = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [tab,       setTab]       = useState('assistir')
+  const [rating, setRating] = useState(null) // { score, totalLikes, totalFanDubs }
   const { toggle, isFav } = useFavorites()
   const { user, openLogin } = useAuth()
 
@@ -61,6 +63,13 @@ export default function FanDubDetailPage() {
       .then(d => setStudioData(d.studio))
       .catch(() => {})
   }, [fanDub?.studioId])
+
+  // Nota (estrela) calculada a partir das curtidas, comparadas com os
+  // outros fandubs
+  useEffect(() => {
+    if (!id) return
+    getFanDubRankedScore(id).then(setRating)
+  }, [id])
 
   // Salva no histórico (Continuar Assistindo)
   useEffect(() => {
@@ -173,6 +182,11 @@ export default function FanDubDetailPage() {
           <div className="fddetail-anime-tag">{fanDub.animeTitulo}</div>
           <h1 className="fddetail-titulo">{fanDub.titulo}</h1>
           <div className="fddetail-meta">
+            {rating && (
+              <span className="fddetail-badge fddetail-badge-score">
+                <FiStar size={11} /> {rating.score.toFixed(1)}
+              </span>
+            )}
             <span className="fddetail-badge">🇧🇷 {fanDub.idioma}</span>
             <span className="fddetail-badge">{fanDub.qualidade}</span>
             <span className="fddetail-badge"><FiTv /> {totalEps} EP{totalEps > 1 ? 'S' : ''}</span>

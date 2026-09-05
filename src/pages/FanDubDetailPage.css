@@ -21,6 +21,10 @@
   font-size: .68rem; font-weight: 800; padding: 4px 10px; border-radius: 999px;
   background: var(--surface); border: 1px solid var(--border); text-transform: uppercase; letter-spacing: .3px;
 }
+.fddetail-badge-score {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: gold; border-color: rgba(255,215,0,.3); background: rgba(255,215,0,.08);
+}
 .fddetail-fav-btn { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: all .2s; }
 .fddetail-fav-btn:hover { background: rgba(255,255,255,.1); }
 .fddetail-fav-btn.active { color: var(--red); background: rgba(232,0,28,.14); border-color: rgba(232,0,28,.35); }

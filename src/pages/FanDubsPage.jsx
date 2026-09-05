@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { FiStar } from 'react-icons/fi'
+import { getAllFanDubLikeCounts, computeFanDubScore } from '../services/supabase'
 import './FanDubsPage.css'
 
 const API = 'https://studio-proxy.masterotaku487.workers.dev'
@@ -16,6 +18,11 @@ export default function FanDubsPage() {
   const [studioFiltro, setStudioFiltro] = useState(sp.get('studio') || '')
   const generoFiltro = sp.get('genero') || ''
   const [busca, setBusca]       = useState('')
+  const [likeCounts, setLikeCounts] = useState({})
+
+  useEffect(() => {
+    getAllFanDubLikeCounts().then(setLikeCounts)
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -86,13 +93,16 @@ export default function FanDubsPage() {
         </div>
       ) : (
         <div className="fandubs-grid">
-          {filtrados.map(d => (
+          {filtrados.map(d => {
+            const rating = computeFanDubScore(likeCounts, d.id)
+            return (
             <div key={d.id} className="fandub-card" onClick={() => nav(`/fandub/${d.id}`)}>
               <div className="fandub-capa-wrap">
                 <img src={d.capa || d.animeCapa} alt={d.titulo} className="fandub-capa"
                   onError={e => e.target.src='https://via.placeholder.com/200x280/111/fff?text=FD'} />
                 <div className="fandub-overlay" />
                 <div className="fandub-badges">
+                  <span className="fandub-badge-score"><FiStar size={10} /> {rating.score.toFixed(1)}</span>
                   <span className="fandub-badge-idioma">🇧🇷 {d.idioma}</span>
                   <span className="fandub-badge-qual">{d.qualidade}</span>
                 </div>
@@ -107,7 +117,8 @@ export default function FanDubsPage() {
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
