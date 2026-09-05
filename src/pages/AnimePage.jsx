@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { FiStar, FiPlay, FiClock, FiTv, FiCalendar, FiChevronDown, FiChevronUp, FiHeart } from 'react-icons/fi'
+import { FiStar, FiPlay, FiClock, FiTv, FiCalendar, FiChevronDown, FiChevronUp, FiHeart, FiLayers } from 'react-icons/fi'
 import { getAnimeById, getAnimeEpisodes } from '../services/api'
 import { useTranslatedSynopsis } from '../services/translate'
 import { getAniListByMalId, formatNextEp } from '../services/anilist'
@@ -16,6 +16,7 @@ export default function AnimePage() {
   const [loading, setLoading] = useState(true)
   const [epPage, setEpPage] = useState(1)
   const [showMore, setShowMore] = useState(false)
+  const [showCollection, setShowCollection] = useState(false)
   const [alData, setAlData] = useState(null)
   const synopsis = useTranslatedSynopsis(anime?.synopsis)
   const { toggle, isFav } = useFavorites()
@@ -213,9 +214,47 @@ export default function AnimePage() {
                 <FiHeart fill={favorited ? 'currentColor' : 'none'} />
                 {favorited ? 'Favoritado' : 'Favoritar'}
               </button>
+              {anime.collection?.length > 0 && (
+                <button className="btn btn-ghost" onClick={() => setShowCollection(true)}>
+                  <FiLayers /> Coleção ({anime.collection.length})
+                </button>
+              )}
             </div>
           </div>
         </div>
+
+        {showCollection && (
+          <div className="collection-modal-backdrop" onClick={() => setShowCollection(false)}>
+            <div className="collection-modal" onClick={e => e.stopPropagation()}>
+              <div className="collection-modal-head">
+                <h3>Coleção — {anime.title}</h3>
+                <button className="collection-modal-close" onClick={() => setShowCollection(false)}>✕</button>
+              </div>
+              <p className="collection-modal-sub">Filmes, OVAs, temporadas e tudo mais relacionado a essa obra.</p>
+              <div className="collection-list">
+                {anime.collection.map(item => (
+                  <Link
+                    key={item.mal_id}
+                    to={`/anime/${item.mal_id}`}
+                    className="collection-item"
+                    onClick={() => setShowCollection(false)}
+                  >
+                    <div className="collection-item-thumb">
+                      {item.image && <img src={item.image} alt="" loading="lazy" />}
+                    </div>
+                    <div className="collection-item-info">
+                      <span className="collection-item-relation">{item.relation}</span>
+                      <span className="collection-item-title">{item.title}</span>
+                      <span className="collection-item-meta">
+                        {item.type}{item.episodes ? ` · ${item.episodes} eps` : ''}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Synopsis */}
         {synopsis && (

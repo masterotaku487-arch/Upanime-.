@@ -186,3 +186,45 @@
   margin-bottom: 8px;
 }
 .next-ep-badge span { color: var(--text-dim); font-weight: 400; }
+
+/* ── Modal "Coleção" ── */
+.collection-modal-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.75);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.collection-modal {
+  width: 100%; max-width: 520px; max-height: 80vh;
+  background: var(--surface); border-radius: 18px 18px 0 0;
+  padding: 20px; overflow-y: auto;
+  animation: collectionSlideUp .25s ease;
+}
+@media (min-width: 640px) {
+  .collection-modal-backdrop { align-items: center; }
+  .collection-modal { border-radius: 18px; }
+}
+@keyframes collectionSlideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.collection-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.collection-modal-head h3 { font-family: var(--font-display); font-size: 1.2rem; letter-spacing: .3px; }
+.collection-modal-close {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text-dim);
+}
+.collection-modal-sub { font-size: .8rem; color: var(--text-dim); margin-bottom: 16px; }
+
+.collection-list { display: flex; flex-direction: column; gap: 10px; }
+.collection-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  transition: all var(--transition);
+}
+.collection-item:hover { border-color: rgba(232,0,28,.3); background: rgba(232,0,28,.06); }
+.collection-item-thumb {
+  width: 56px; height: 78px; min-width: 56px; border-radius: 8px; overflow: hidden; background: var(--bg3);
+}
+.collection-item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.collection-item-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.collection-item-relation { font-size: .66rem; font-weight: 800; color: var(--red); text-transform: uppercase; letter-spacing: .3px; }
+.collection-item-title { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.collection-item-meta { font-size: .72rem; color: var(--text-dim); }
