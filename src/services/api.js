@@ -31,12 +31,33 @@ const MEDIA_FIELDS = `
   endDate { year month day }
   coverImage { extraLarge large medium }
   trailer { id site }
+  relations {
+    edges {
+      relationType(version: 2)
+      node {
+        id idMal type format status episodes
+        title { romaji english native }
+        coverImage { large medium }
+      }
+    }
+  }
 `
 
 const FORMAT_MAP = { TV: 'TV', TV_SHORT: 'TV', MOVIE: 'Movie', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'Special', MUSIC: 'Music' }
 const STATUS_MAP = {
   RELEASING: 'Currently Airing', FINISHED: 'Finished Airing', NOT_YET_RELEASED: 'Not yet aired',
   CANCELLED: 'Cancelled', HIATUS: 'On Hiatus',
+}
+// Pra ordenar e nomear os itens do botão "Coleção" na página do anime
+const RELATION_LABELS = {
+  PREQUEL: 'Temporada Anterior', SEQUEL: 'Próxima Temporada', PARENT: 'História Principal',
+  SIDE_STORY: 'História Paralela', SUMMARY: 'Recapitulação', ALTERNATIVE: 'Versão Alternativa',
+  SPIN_OFF: 'Spin-off', ADAPTATION: 'Adaptação', OTHER: 'Relacionado',
+  COMPILATION: 'Compilação', CONTAINS: 'Contém', CHARACTER: 'Mesmo Universo', SOURCE: 'Original',
+}
+const RELATION_ORDER = {
+  PREQUEL: 0, PARENT: 1, SEQUEL: 2, SIDE_STORY: 3, SPIN_OFF: 4,
+  ALTERNATIVE: 5, SUMMARY: 6, ADAPTATION: 7, COMPILATION: 8, CONTAINS: 9, CHARACTER: 10, SOURCE: 11, OTHER: 12,
 }
 const pad = (n) => String(n).padStart(2, '0')
 const fuzzyToIso = (d) => (d?.year ? `${d.year}-${pad(d.month || 1)}-${pad(d.day || 1)}` : null)
@@ -77,6 +98,19 @@ function mapMedia(m) {
           embed_url: m.trailer.site === 'youtube' ? `https://www.youtube.com/embed/${m.trailer.id}?rel=0` : null,
         }
       : {},
+    collection: (m.relations?.edges || [])
+      .filter(e => e.node?.type === 'ANIME' && e.node?.idMal)
+      .map(e => ({
+        mal_id: e.node.idMal,
+        title: e.node.title?.romaji || e.node.title?.english || e.node.title?.native,
+        image: e.node.coverImage?.large || e.node.coverImage?.medium,
+        type: FORMAT_MAP[e.node.format] || e.node.format || null,
+        status: STATUS_MAP[e.node.status] || e.node.status || null,
+        episodes: e.node.episodes || null,
+        relation: RELATION_LABELS[e.relationType] || e.relationType,
+        relationOrder: RELATION_ORDER[e.relationType] ?? 99,
+      }))
+      .sort((a, b) => a.relationOrder - b.relationOrder),
   }
 }
 
