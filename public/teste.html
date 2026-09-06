@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Teste DASH</title>
+  <title>Player DASH</title>
 
   <script src="https://cdn.dashjs.org/latest/modern/umd/dash.all.min.js"></script>
 
@@ -23,25 +22,17 @@
 
 <body>
 
-<video id="video" controls playsinline></video>
+  <video id="video" controls playsinline></video>
 
-<script>
-const video = document.getElementById("video");
+  <script>
+    const video = document.getElementById("video");
 
-const mpdUrl =
-  "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd";
+    const mpdUrl = "URL_DO_SEU_MPD";
 
-const player = dashjs.MediaPlayer().create();
+    const player = dashjs.MediaPlayer().create();
 
-player.initialize(video, mpdUrl, true);
-
-player.on(
-  dashjs.MediaPlayer.events.ERROR,
-  function(event) {
-    console.error("DASH ERROR:", event);
-  }
-);
-</script>
+    player.initialize(video, mpdUrl, true);
+  </script>
 
 </body>
 </html>
