@@ -21,6 +21,7 @@
 export const ANIME_OVERRIDES = {
   61316: {
     title: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
+    title_english: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
     // synopsis: '',   // ainda não informado
     // episodes: null, // ainda não informado
     // image: '',
