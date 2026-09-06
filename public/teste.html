@@ -1,38 +1,47 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Player DASH</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste DASH</title>
 
-  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
 
-  <style>
-    video {
-      width: 100%;
-      max-width: 900px;
-      background: #000;
-    }
-  </style>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+        }
+
+        video {
+            width: 100%;
+            max-width: 1000px;
+            display: block;
+            margin: 20px auto;
+            background: #000;
+        }
+    </style>
 </head>
 
 <body>
 
-  <video id="video" controls></video>
+<video id="video" controls playsinline></video>
 
-  <script>
-    const url = "https://akumast.net/i/f0y7bc-d1MpBP5ol4IDoUuBbj5S-1C3lPrwIpU6dARtrwUTjLiEaK4cy7rY5yOw1GU9spB5axQz5B_MqXVsv-A2yqGtuk88wjudJF5vzeuMTTTXfeYEVb2yirFshHcQoONbeMGhFmZry27vyZcEJ5yY5ziwoDxmwhxvCLkEABdNsnP3DyuO_Kwb2_ScH3Gn5qGAAmk-BV5OTtjFyoRGKu_hFk1HLmK-gwAQ3cySIinHMz2auKTw4zBkziKv8uXxMKT0bzL4-wvaQp0b0YjLBA-94hxKdI41UgK03MeRRMCGnRZp4fkSqtg/m.jpg";
+<script>
+const video = document.getElementById("video");
 
-    const video = document.getElementById("video");
+const player = dashjs.MediaPlayer().create();
 
-    const player = dashjs.MediaPlayer().create();
+player.initialize(
+    video,
+    "https://akumast.net/i/f0y7bc-d1MpBP5ol4IDoUuBbj5S-1C3lPrwIpU6dARtrwUTjLiEaK4cy7rY5yOw1GU9spB5axQz5B_MqXVsv-A2yqGtuk88wjudJF5vzeuMTTTXfeYEVb2yirFshHcQoONbeMGhFmZry27vyZcEJ5yY5ziwoDxmwhxvCLkEABdNsnP3DyuO_Kwb2_ScH3Gn5qGAAmk-BV5OTtjFyoRGKu_hFk1HLmK-gwAQ3cySIinHMz2auKTw4zBkziKv8uXxMKT0bzL4-wvaQp0b0YjLBA-94hxKdI41UgK03MeRRMCGnRZp4fkSqtg/m.jpg",
+    true
+);
 
-    player.initialize(
-      video,
-      url,
-      true
-    );
-  </script>
+player.on(dashjs.MediaPlayer.events.ERROR, function(event) {
+    console.error("Erro DASH:", event);
+});
+</script>
 
 </body>
 </html>
