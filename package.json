@@ -16,6 +16,7 @@
     "@capacitor/core": "^5.7.0",
     "axios": "^1.6.7",
     "hls.js": "^1.5.13",
+    "dashjs": "^5.0.0",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
