@@ -3,60 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teste HLS</title>
+  <title>Player DASH</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
 
   <style>
-    body {
-      margin: 0;
-      background: #000;
-    }
-
     video {
       width: 100%;
-      height: auto;
+      max-width: 900px;
+      background: #000;
     }
   </style>
 </head>
 
 <body>
 
-  <video id="video" controls playsinline></video>
+  <video id="video" controls></video>
 
   <script>
-    const video = document.getElementById('video');
+    const url = "https://akumast.net/i/f0y7bc-d1MpBP5ol4IDoUuBbj5S-1C3lPrwIpU6dARtrwUTjLiEaK4cy7rY5yOw1GU9spB5axQz5B_MqXVsv-A2yqGtuk88wjudJF5vzeuMTTTXfeYEVb2yirFshHcQoONbeMGhFmZry27vyZcEJ5yY5ziwoDxmwhxvCLkEABdNsnP3DyuO_Kwb2_ScH3Gn5qGAAmk-BV5OTtjFyoRGKu_hFk1HLmK-gwAQ3cySIinHMz2auKTw4zBkziKv8uXxMKT0bzL4-wvaQp0b0YjLBA-94hxKdI41UgK03MeRRMCGnRZp4fkSqtg/m.jpg";
 
-    const url =
-      'https://watch.4nm-cdn-0483964.com/b-02/kimi-no-na-wa-your-name-3050ce44/dubbed/1/46cf9bdd-98ff-41ae-babc-1be3cf2343fb/stream.m3u8?type=anime&expires=1787700149&signature=33fd7248b0122ce998da5a44522abcbc874abee78ccc9e8e0fc82aafeb989569';
+    const video = document.getElementById("video");
 
-    if (Hls.isSupported()) {
-      const hls = new Hls();
+    const player = dashjs.MediaPlayer().create();
 
-      hls.loadSource(url);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('M3U8 carregado!');
-        video.play().catch(() => {});
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('Erro HLS:', data);
-      });
-
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari/iOS
-      video.src = url;
-
-      video.addEventListener('loadedmetadata', () => {
-        video.play().catch(() => {});
-      });
-
-    } else {
-      document.body.innerHTML =
-        '<p style="color:white">Este navegador não suporta HLS.</p>';
-    }
+    player.initialize(
+      video,
+      url,
+      true
+    );
   </script>
 
 </body>
