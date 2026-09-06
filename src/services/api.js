@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { applyAnimeOverride } from '../data/animeOverrides'
 
 // ══════════════════════════════════════════════════════════════
 // CATÁLOGO — AniList GraphQL direto (https://graphql.anilist.co)
@@ -189,7 +190,7 @@ export const searchAnime = (q, page = 1) =>
 
 export const getAnimeById = async (id) => {
   const data = await anilistQuery(`query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { ${MEDIA_FIELDS} } }`, { idMal: parseInt(id) })
-  return { data: mapMedia(data.Media) }
+  return { data: applyAnimeOverride(mapMedia(data.Media)) }
 }
 
 export const getAnimeEpisodes = async (id, page = 1) => {
@@ -393,4 +394,4 @@ export const getAnimeFireEpisodes = async (anime, dub = false, cachedSlug = null
   const slug = cachedSlug || await resolveSlug(anime, dub)
   const data = await afFetch({ action: 'info', slug })
   return { slug, episodes: data.episodes || [], title: data.title, domain: data.domain }
-    }
+      }
