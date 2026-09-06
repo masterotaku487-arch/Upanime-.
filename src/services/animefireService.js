@@ -1,8 +1,8 @@
-const PROXY = '/api/animefire'
+const PROXY = 'https://jpg.masterotaku487.workers.dev'
 
 async function afFetch(params) {
   const query = new URLSearchParams(params).toString()
-  const response = await fetch(`${PROXY}?${query}`)
+  const response = await fetch(`${PROXY}/?${query}`)
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload.error || `AnimeFire HTTP ${response.status}`)
   return payload
