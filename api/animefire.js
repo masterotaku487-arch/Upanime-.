@@ -13,7 +13,12 @@ const CORS = {
 
 const apiFetch = async (path) => {
   const response = await fetch(`${API}${path}`, {
-    headers: { Accept: 'application/json', 'User-Agent': 'UpAnime/1.0' },
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+      Referer: `${LEGACY_SITE}/`,
+      Origin: LEGACY_SITE,
+    },
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(payload?.message || `AnimeFire API ${response.status}`)
