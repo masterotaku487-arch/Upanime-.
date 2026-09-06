@@ -5,9 +5,11 @@ import {
 } from 'react-icons/fi'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import Hls from 'hls.js'
+import dashjs from 'dashjs'
 import './VideoPlayer.css'
 
 const isM3u8 = (url = '') => /\.m3u8($|\?)/i.test(url)
+const isDash = (url = '') => /\.mpd($|\?)|akumast\.net\/i\//i.test(url)
 
 const fmt = (s) => {
   if (!s || isNaN(s)) return '0:00'
@@ -128,8 +130,21 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
 
     setShowFallback(false)
     let hls
+    let dash
 
-    if (isM3u8(src)) {
+    if (isDash(src)) {
+      if (dashjs.supportsMediaSource()) {
+        dash = dashjs.MediaPlayer().create()
+        dash.initialize(video, src, true)
+        dash.on(dashjs.MediaPlayer.events.ERROR, (event) => {
+          console.error('[VideoPlayer] erro DASH:', event)
+          handleVideoError(event)
+        })
+      } else {
+        console.error('[VideoPlayer] navegador sem suporte a MPEG-DASH')
+        setShowFallback(true)
+      }
+    } else if (isM3u8(src)) {
       // hls.js primeiro sempre que possível: o teste canPlayType() do
       // navegador não é confiável — alguns navegadores/WebViews dizem que
       // sabem tocar HLS nativo, mas na prática falham (erro código 4).
@@ -162,6 +177,9 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     return () => {
       if (hls) {
         hls.destroy()
+      }
+      if (dash) {
+        dash.reset()
       }
     }
   }, [src])
