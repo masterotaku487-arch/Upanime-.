@@ -7,11 +7,14 @@ import {
 import { BsFillCameraVideoFill } from 'react-icons/bs'
 import { FaWhatsapp } from 'react-icons/fa'
 import { getAnimeById } from '../services/api'
-import {
-  buscarAnimePorNome,
-  carregarEpisodiosPaginados,
-  obterLinkPlay,
-} from '../services/shinokaiService'
+import * as shinokaiService from '../services/shinokaiService'
+import * as animefireService from '../services/animefireService'
+import { USE_ANIMEFIRE, AUTO_FALLBACK_PROVIDER } from '../services/providerConfig'
+
+// Troque USE_ANIMEFIRE em providerConfig.js para forçar um provedor.
+// Com AUTO_FALLBACK_PROVIDER=true, o outro provedor entra se este falhar.
+const primaryProvider = USE_ANIMEFIRE ? animefireService : shinokaiService
+const secondaryProvider = USE_ANIMEFIRE ? shinokaiService : animefireService
 import { useTranslatedSynopsis } from '../services/translate'
 import { recordWatched } from '../services/achievements'
 import VideoPlayer from '../components/VideoPlayer'
@@ -159,6 +162,7 @@ export default function WatchPage() {
   const [hasMoreEps, setHasMoreEps] = useState(false)
 
   const [shinokaiAnime, setShinokaiAnime] = useState(null)
+  const providerRef = useRef(primaryProvider)
   const lastPlayedRef = useRef(null)
   const [currentSrc, setCurrentSrc] = useState('')
   const [loading, setLoading] = useState(true)
@@ -216,20 +220,28 @@ export default function WatchPage() {
 
         let sAnime = null
         let ultimoErro = null
-        for (const nome of nomesTentativa) {
-          try {
-            sAnime = await buscarAnimePorNome(nome)
-            break
-          } catch (e) {
-            ultimoErro = e
+        const providers = AUTO_FALLBACK_PROVIDER
+          ? [primaryProvider, secondaryProvider]
+          : [primaryProvider]
+
+        for (const provider of providers) {
+          for (const nome of nomesTentativa) {
+            try {
+              sAnime = await provider.buscarAnimePorNome(nome)
+              providerRef.current = provider
+              break
+            } catch (e) {
+              ultimoErro = e
+            }
           }
+          if (sAnime) break
         }
         if (!sAnime) throw ultimoErro || new Error('Anime não encontrado.')
         if (cancelado) return
         setShinokaiAnime(sAnime)
 
         setStatus('Carregando episódios...')
-        const pag = await carregarEpisodiosPaginados(sAnime.id, 1, 30)
+        const pag = await providerRef.current.carregarEpisodiosPaginados(sAnime.id, 1, 30)
         if (cancelado) return
         setEpisodes(pag.episodios)
         setHasMoreEps(pag.temMais)
@@ -262,11 +274,31 @@ export default function WatchPage() {
     setLoading(true); setError(false); setCurrentSrc('')
     try {
       setStatus(`Carregando episódio ${epNum}...`)
-      const url = await obterLinkPlay(animeObj.id, ep.id)
+      const url = await providerRef.current.obterLinkPlay(animeObj.id, ep.id, true)
       setCurrentSrc(url)
       setStatus('')
     } catch (err) {
-      console.error('[Shinokai] erro ao obter link:', err)
+      console.error('[Player] erro ao obter link:', err)
+      if (AUTO_FALLBACK_PROVIDER && providerRef.current === primaryProvider) {
+        try {
+          setStatus('Tentando o provedor alternativo...')
+          const fallbackAnime = await secondaryProvider.buscarAnimePorNome(title)
+          const fallbackPage = await secondaryProvider.carregarEpisodiosPaginados(fallbackAnime.id, 1, 9999)
+          const fallbackEp = fallbackPage.episodios.find(item => Number(item.number ?? item.episode) === Number(epNum))
+            || fallbackPage.episodios[0]
+          if (!fallbackEp) throw new Error('Episódio não encontrado no provedor alternativo.')
+          const fallbackUrl = await secondaryProvider.obterLinkPlay(fallbackAnime.id, fallbackEp.id, true)
+          providerRef.current = secondaryProvider
+          setShinokaiAnime(fallbackAnime)
+          setEpisodes(fallbackPage.episodios)
+          setCurrentSrc(fallbackUrl)
+          setError(false)
+          setStatus('')
+          return
+        } catch (fallbackError) {
+          console.error('[Player] fallback também falhou:', fallbackError)
+        }
+      }
       setError(true)
     } finally {
       setLoading(false)
@@ -276,7 +308,7 @@ export default function WatchPage() {
   const carregarMaisEpisodios = async () => {
     if (!shinokaiAnime) return
     const proxima = epPage + 1
-    const pag = await carregarEpisodiosPaginados(shinokaiAnime.id, proxima, 30)
+    const pag = await providerRef.current.carregarEpisodiosPaginados(shinokaiAnime.id, proxima, 30)
     setEpisodes(prev => [...prev, ...pag.episodios])
     setHasMoreEps(pag.temMais)
     setEpPage(proxima)
