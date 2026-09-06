@@ -3,22 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teste MPEG-DASH</title>
+
+  <title>Teste DASH</title>
+
   <script src="https://cdn.dashjs.org/latest/modern/umd/dash.all.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+    }
+
+    video {
+      width: 100%;
+      display: block;
+    }
+  </style>
 </head>
 
 <body>
-  <video id="video" controls style="width:100%;"></video>
 
-  <script>
-    const video = document.getElementById("video");
+<video id="video" controls playsinline></video>
 
-    const mpd =
-      "https://akumast.net/i/ldZHniXv0ylnkmS3UDpGXa9C7IYvGy41K9g2149BwSMBFY6c-WfkC_uUcGpJhcY85-RZREC-nLnApqKlAgjM9e2IFbfAi1ugQmzXZF1GLdcfDETfVs20xS4AeEcHla6jakGWyWbb8o9pDbZ9PhFbVFvEe8184UjjzzvvIm3ZL8nogwOJezdMRzbN8bzoy5Xx/m.jpg";
+<script>
+const video = document.getElementById("video");
 
-    const player = dashjs.MediaPlayer().create();
+const mpdUrl =
+  "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd";
 
-    player.initialize(video, mpd, false);
-  </script>
+const player = dashjs.MediaPlayer().create();
+
+player.initialize(video, mpdUrl, true);
+
+player.on(
+  dashjs.MediaPlayer.events.ERROR,
+  function(event) {
+    console.error("DASH ERROR:", event);
+  }
+);
+</script>
+
 </body>
 </html>
