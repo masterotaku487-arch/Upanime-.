@@ -5,7 +5,6 @@ import {
 } from 'react-icons/fi'
 import { MdReplay10, MdForward10 } from 'react-icons/md'
 import Hls from 'hls.js'
-import dashjs from 'dashjs'
 import './VideoPlayer.css'
 
 const isM3u8 = (url = '') => /\.m3u8($|\?)/i.test(url)
@@ -133,7 +132,8 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
     let dash
 
     if (isDash(src)) {
-      if (dashjs.supportsMediaSource()) {
+      const dashjs = window.dashjs
+      if (dashjs?.supportsMediaSource?.()) {
         dash = dashjs.MediaPlayer().create()
         dash.initialize(video, src, true)
         dash.on(dashjs.MediaPlayer.events.ERROR, (event) => {
@@ -141,7 +141,8 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
           handleVideoError(event)
         })
       } else {
-        console.error('[VideoPlayer] navegador sem suporte a MPEG-DASH')
+        console.error('[VideoPlayer] dash.js não foi carregado ou o navegador não suporta MPEG-DASH')
+        setDebugInfo('DASH indisponível neste navegador')
         setShowFallback(true)
       }
     } else if (isM3u8(src)) {
@@ -442,4 +443,5 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-    }
+  }
+    
