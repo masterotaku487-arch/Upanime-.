@@ -1,4 +1,4 @@
-const PROXY = 'https://jpg.masterotaku487.workers.dev'
+const PROXY = 'https://cache.masterotaku487.workers.dev'
 
 async function afFetch(params) {
   const query = new URLSearchParams(params).toString()
@@ -66,4 +66,4 @@ export async function obterStreamPlay(_animeId, epId, preferDub = true) {
   const stream = escolherMelhorStream(result?.data?.streams, preferDub)
   if (!stream) return null
   return { ...stream, url: toProxiedStreamUrl(stream.url) }
-}
+                                }
