@@ -371,7 +371,7 @@ export default function StudioPage() {
           <div className="dubs-list">
             <h3 className="dubs-list-title">Meus Fan-Dubs</h3>
             {fanDubs.length === 0 ? (
-              <p style={{ color: 'var(--muted)', fontSize: '.88rem' }}>Nenhum fan-dub enviado ainda.</p>
+              <p style={{ color: 'var(--text-dim)', fontSize: '.88rem' }}>Nenhum fan-dub enviado ainda.</p>
             ) : fanDubs.map(d => (
               <div key={d.id} className="dub-item">
                 <img src={d.capa || d.animeCapa} alt={d.titulo} className="dub-item-img"
