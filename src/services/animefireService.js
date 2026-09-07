@@ -48,14 +48,22 @@ export async function carregarEpisodiosPaginados(animeId, page = 1, limit = 30) 
   return { episodios: episodes, temMais: start + limit < all.length }
 }
 
+/** Envolve o link do vídeo pra passar pelo proxy do Worker, em vez do
+ *  navegador falar direto com o servidor de vídeo (que bloqueia). */
+function toProxiedStreamUrl(rawUrl) {
+  return `${PROXY}/?action=stream&url=${encodeURIComponent(rawUrl)}`
+}
+
 export async function obterLinkPlay(_animeId, epId, preferDub = true) {
   const result = await afFetch({ action: 'episode', id: epId })
   const stream = escolherMelhorStream(result?.data?.streams, preferDub)
   if (!stream) throw new Error('Nenhuma fonte online encontrada para este episódio.')
-  return stream.url
+  return toProxiedStreamUrl(stream.url)
 }
 
 export async function obterStreamPlay(_animeId, epId, preferDub = true) {
   const result = await afFetch({ action: 'episode', id: epId })
-  return escolherMelhorStream(result?.data?.streams, preferDub)
+  const stream = escolherMelhorStream(result?.data?.streams, preferDub)
+  if (!stream) return null
+  return { ...stream, url: toProxiedStreamUrl(stream.url) }
 }
