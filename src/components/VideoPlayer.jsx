@@ -8,7 +8,7 @@ import Hls from 'hls.js'
 import './VideoPlayer.css'
 
 const isM3u8 = (url = '') => /\.m3u8($|\?)/i.test(url)
-const isDash = (url = '') => /\.mpd($|\?)|akumast\.net\/i\//i.test(url)
+const isDash = (url = '') => /\.mpd($|\?)|akumast\.net\/i\/|akumast\.net%2Fi%2F|action=stream/i.test(url)
 
 const fmt = (s) => {
   if (!s || isNaN(s)) return '0:00'
@@ -327,11 +327,14 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
         onError={handleVideoError}
       />
 
-      {/* Fallback do MX Player DESLIGADO por enquanto — focando em fazer o
-          player normal funcionar primeiro, igual ao teste HTML que funcionou. */}
-      {false && showFallback && (
-        <div className="vp-mx-fallback">
-          <img src="/mxplayer-fallback.png" alt="Abrir no MX Player" onClick={openInMxPlayer} />
+      {/* Mostra o motivo do erro na tela (sem a imagem do MX Player, que
+          está desligada por enquanto) — pra não ficar tela preta sem
+          nenhuma pista do que aconteceu. */}
+      {showFallback && (
+        <div className="vp-mx-fallback" style={{ background: '#000' }}>
+          <div className="vp-debug-info" style={{ position: 'static', margin: 'auto', maxWidth: '80%' }}>
+            {debugInfo || 'Não foi possível carregar este vídeo.'}
+          </div>
         </div>
       )}
 
@@ -443,5 +446,4 @@ export default function VideoPlayer({ src, title, animeId, epNum, onError, sourc
       </div>
     </div>
   )
-  }
-    
+}
