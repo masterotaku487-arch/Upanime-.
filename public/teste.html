@@ -1,38 +1,38 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Player DASH</title>
-
-  <script src="https://cdn.dashjs.org/latest/modern/umd/dash.all.min.js"></script>
-
-  <style>
-    body {
-      margin: 0;
-      background: #111;
-    }
-
-    video {
-      width: 100%;
-      display: block;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dash.js Player Definitivo</title>
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0f0f0f; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        video { width: 100%; max-width: 900px; background: #000; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        #error-log { margin-top: 15px; color: #ff5555; font-family: monospace; max-width: 900px; word-break: break-all; font-size: 14px; text-align: center; }
+    </style>
 </head>
-
 <body>
+    <video id="videoPlayer" controls autoplay></video>
+    <div id="error-log"></div>
 
-  <video id="video" controls playsinline></video>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var url = "https://akumast.net/i/f0y7bc-d1MpBP5ol4IDoUuBbj5S-1C3lPrwIpU6dARtrwUTjLiEaK4cy7rY5yOw1GU9spB5axQz5B_MqXVsv-A2yqGtuk88wjudJF5vzeuMTTTXfeYEVb2yirFshHcQoONbeMGhFmZry27vyZcEJ5yY5ziwoDxmwhxvCLkEABdNsnP3DyuO_Kwb2_ScH3Gn5qGAAmk-BV5OTtjFyoRGKu_hFk1HLmK-gwAQ3cySIinHMz2auKTw4zBkziKv8uXxMKT0bzL4-wvaQp0b0YjLBA-94hxKdI41UgK03MeRRMCGnRZp4fkSqtg/m.jpg";
+            var player = dashjs.MediaPlayer().create();
+            
+            // Captura erros detalhados de CORS ou formato de manifesto no navegador
+            player.on(dashjs.MediaPlayer.events.ERROR, function (e) {
+                console.error("Erro no Dash.js:", e);
+                let errorMessage = "Erro desconhecido";
+                if (e && e.error) {
+                    errorMessage = e.error.message || JSON.stringify(e.error);
+                }
+                document.getElementById("error-loginnerText") = 
+                    "Falha ao reproduzir. Se aparecer um erro de CORS ou Network, o navegador bloqueou o acesso direto que o MX Player aceita. Detalhe: " + errorMessage;
+            });
 
-  <script>
-    const video = document.getElementById("video");
-
-    const mpdUrl = "https://akumast.net/i/ldZHniXv0ylnkmS3UDpGXa9C7IYvGy41K9g2149BwSMBFY6c-WfkC_uUcGpJhcY85-RZREC-nLnApqKlAgjM9e2IFbfAi1ugQmzXZF1GLdcfDETfVs20xS4AeEcHla6jakGWyWbb8o9pDbZ9PhFbVFvEe8184UjjzzvvIm3ZL8nogwOJezdMRzbN8bzoy5Xx/m.jpg";
-
-    const player = dashjs.MediaPlayer().create();
-
-    player.initialize(video, mpdUrl, true);
-  </script>
-
+            player.initialize(document.querySelector("#videoPlayer"), url, true);
+        });
+    </script>
 </body>
 </html>
