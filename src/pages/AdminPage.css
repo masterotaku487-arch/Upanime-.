@@ -85,6 +85,45 @@
 .admin-approve { background: #00E676; color: #000; }
 .admin-reject  { background: rgba(229,57,53,.15); color: #E53935; border: 1px solid rgba(229,57,53,.3); }
 
+/* ── Abas ── */
+.admin-tabs {
+  display: flex; gap: 8px; margin-bottom: 18px;
+}
+.admin-tab {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border, #222);
+  background: var(--card, #111); color: var(--muted, #555);
+  font-size: .82rem; font-weight: 800; cursor: pointer;
+}
+.admin-tab-active { background: #E53935; color: #fff; border-color: #E53935; }
+
+/* ── Senhas ── */
+.admin-section-title-mt { margin-top: 24px; }
+
+.admin-senha-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.04); border-radius: 8px;
+  padding: 8px 10px; font-size: .82rem;
+}
+.admin-senha-label { color: var(--muted, #555); }
+.admin-senha-valor {
+  flex: 1; font-family: monospace; color: #fff; word-break: break-all;
+}
+.admin-mini-btn {
+  background: none; border: 1px solid var(--border, #222); color: var(--muted, #555);
+  padding: 4px 8px; border-radius: 6px; font-size: .72rem; cursor: pointer; flex-shrink: 0;
+}
+.admin-mini-btn:hover { color: #fff; }
+
+.admin-reset-toggle {
+  width: 100%; padding: 9px; border-radius: 10px; border: 1px solid var(--border, #222);
+  background: rgba(255,255,255,.04); color: #fff; font-size: .82rem; font-weight: 700; cursor: pointer;
+}
+
+.admin-msg { font-size: .82rem; }
+.admin-note {
+  font-size: .78rem; color: var(--muted, #555); line-height: 1.6; margin-top: 10px;
+}
+
 .admin-input {
   width: 100%; padding: 12px 14px;
   background: rgba(255,255,255,.06); border: 1px solid var(--border, #222);

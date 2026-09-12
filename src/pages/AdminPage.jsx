@@ -15,6 +15,19 @@ export default function AdminPage() {
   const [msg, setMsg]           = useState('')
   const [secret, setSecret]     = useState(localStorage.getItem(ADMIN_KEY) || '')
 
+  // ── Aba ativa: pendentes de aprovação  ou  senhas de estúdios ─────────
+  const [aba, setAba] = useState('pendentes')
+
+  // ── Reset de senha por email (usa a rota que já existe) ───────────────
+  const [resetEmail, setResetEmail]     = useState('')
+  const [resetSenha, setResetSenha]     = useState('')
+  const [resetMsg, setResetMsg]         = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
+
+  // ── Ver senha (só dá pra decodificar a dos estúdios pendentes, que já
+  //    vêm completos na resposta de /api/admin/pendentes) ───────────────
+  const [senhasVisiveis, setSenhasVisiveis] = useState({})
+
   useEffect(() => { if (authed) carregar() }, [authed])
 
   const login = async () => {
@@ -56,6 +69,46 @@ export default function AdminPage() {
     }
   }
 
+  const decodeSenha = (hash) => {
+    try { return atob(hash || '') } catch { return '(inválida)' }
+  }
+
+  const toggleSenha = (id) => {
+    setSenhasVisiveis(v => ({ ...v, [id]: !v[id] }))
+  }
+
+  const usarEmailNoReset = (email) => {
+    setResetEmail(email)
+    setResetSenha('')
+    setResetMsg('')
+    setAba('estudios')
+  }
+
+  const resetarSenha = async () => {
+    if (!resetEmail || !resetSenha || resetSenha.length < 6) {
+      setResetMsg('❌ Preencha o email e uma senha com pelo menos 6 caracteres')
+      return
+    }
+    setResetLoading(true); setResetMsg('')
+    try {
+      const r = await fetch(`${API}/api/admin/resetarSenha`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${secret}` },
+        body: JSON.stringify({ email: resetEmail, novaSenha: resetSenha }),
+      })
+      const d = await r.json()
+      if (d.ok) {
+        setResetMsg(`✅ Senha do estúdio "${d.nome}" resetada com sucesso!`)
+        setResetSenha('')
+      } else {
+        setResetMsg(`❌ ${d.error || 'Erro ao resetar senha'}`)
+      }
+    } catch {
+      setResetMsg('❌ Erro de conexão')
+    }
+    setResetLoading(false)
+  }
+
   if (!authed) return (
     <div className="admin-login">
       <div className="admin-login-card">
@@ -94,7 +147,89 @@ export default function AdminPage() {
 
       {msg && <div className="admin-toast">{msg}</div>}
 
-      {loading ? (
+      <div className="admin-tabs">
+        <button
+          className={`admin-tab ${aba === 'pendentes' ? 'admin-tab-active' : ''}`}
+          onClick={() => setAba('pendentes')}
+        >
+          ⏳ Pendentes
+        </button>
+        <button
+          className={`admin-tab ${aba === 'estudios' ? 'admin-tab-active' : ''}`}
+          onClick={() => setAba('estudios')}
+        >
+          🔑 Senhas
+        </button>
+      </div>
+
+      {aba === 'estudios' ? (
+        <div className="admin-section">
+          <div className="admin-section-title">🔑 Resetar senha de um estúdio</div>
+          <div className="admin-card">
+            <input
+              className="admin-input"
+              type="email"
+              placeholder="Email do estúdio"
+              value={resetEmail}
+              onChange={e => setResetEmail(e.target.value)}
+            />
+            <input
+              className="admin-input"
+              type="text"
+              placeholder="Nova senha (mín. 6 caracteres)"
+              value={resetSenha}
+              onChange={e => setResetSenha(e.target.value)}
+            />
+            {resetMsg && <div className="admin-msg">{resetMsg}</div>}
+            <button
+              className="admin-btn"
+              onClick={resetarSenha}
+              disabled={resetLoading || !resetEmail || !resetSenha}
+            >
+              {resetLoading ? '⏳ Resetando...' : 'Resetar Senha'}
+            </button>
+          </div>
+
+          <div className="admin-section-title admin-section-title-mt">
+            🎙️ Estúdios pendentes
+            <span className="admin-count">{dados.studios?.length || 0}</span>
+          </div>
+
+          {!dados.studios?.length ? (
+            <div className="admin-empty">Nenhum estúdio pendente</div>
+          ) : dados.studios.map(s => (
+            <div key={s.id} className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-icon">🎙️</div>
+                <div className="admin-card-info">
+                  <div className="admin-card-nome">{s.nome}</div>
+                  <div className="admin-card-email">{s.email}</div>
+                </div>
+              </div>
+
+              <div className="admin-senha-row">
+                <span className="admin-senha-label">Senha:</span>
+                <span className="admin-senha-valor">
+                  {senhasVisiveis[s.id] ? decodeSenha(s.senhaHash) : '••••••••'}
+                </span>
+                <button className="admin-mini-btn" onClick={() => toggleSenha(s.id)}>
+                  {senhasVisiveis[s.id] ? '🙈 Esconder' : '👁️ Ver'}
+                </button>
+              </div>
+
+              <button className="admin-reset-toggle" onClick={() => usarEmailNoReset(s.email)}>
+                Usar este email no reset acima ↑
+              </button>
+            </div>
+          ))}
+
+          <p className="admin-note">
+            A senha só aparece aqui pros estúdios pendentes (é o que a API já retorna).
+            Pra estúdios já aprovados, o reset por email acima funciona normalmente —
+            só não dá pra "ver" a senha atual deles sem mudar o worker.
+          </p>
+        </div>
+      ) : loading ? (
         <div className="admin-loading">Carregando...</div>
       ) : (
         <>
