@@ -7,6 +7,7 @@ import {
 import { BsFillCameraVideoFill } from 'react-icons/bs'
 import { FaWhatsapp } from 'react-icons/fa'
 import { getAnimeById } from '../services/api'
+import { getSearchName } from '../data/animeOverrides'
 import * as shinokaiService from '../services/shinokaiService'
 import * as animefireService from '../services/animefireService'
 import { USE_ANIMEFIRE, AUTO_FALLBACK_PROVIDER } from '../services/providerConfig'
@@ -213,6 +214,7 @@ export default function WatchPage() {
       setLoading(true); setError(false); setStatus('Localizando anime...')
       try {
         const nomesTentativa = [
+          getSearchName(id),
           anime?.title_english,
           anime?.title,
           title,
@@ -282,7 +284,7 @@ export default function WatchPage() {
       if (AUTO_FALLBACK_PROVIDER && providerRef.current === primaryProvider) {
         try {
           setStatus('Tentando o provedor alternativo...')
-          const fallbackAnime = await secondaryProvider.buscarAnimePorNome(title)
+          const fallbackAnime = await secondaryProvider.buscarAnimePorNome(getSearchName(id) || title)
           const fallbackPage = await secondaryProvider.carregarEpisodiosPaginados(fallbackAnime.id, 1, 9999)
           const fallbackEp = fallbackPage.episodios.find(item => Number(item.number ?? item.episode) === Number(epNum))
             || fallbackPage.episodios[0]
