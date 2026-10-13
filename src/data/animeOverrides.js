@@ -11,6 +11,10 @@
 //   title, title_english, title_japanese, synopsis, episodes,
 //   image (capa), season, year, aired: { from, to }, status
 //
+// Campo especial (não altera o que aparece na tela):
+//   search_name — nome EXATO usado pra buscar o anime nas APIs de
+//   streaming (Shinokai/AnimeFire). Quando existe, é tentado primeiro.
+//
 // Exemplo:
 // 61316: {
 //   title: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
@@ -19,6 +23,10 @@
 // },
 
 export const ANIME_OVERRIDES = {
+  // Tensei Shitara Slime Datta Ken (1ª temporada)
+  37430: {
+    search_name: 'Tensei Shitara Slime Datta Ken',
+  },
   61316: {
     title: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
     title_english: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
@@ -26,6 +34,11 @@ export const ANIME_OVERRIDES = {
     // episodes: null, // ainda não informado
     // image: '',
   },
+}
+
+/** Nome a usar na busca das APIs de streaming (ou null se não houver) */
+export function getSearchName(malId) {
+  return ANIME_OVERRIDES[Number(malId)]?.search_name || null
 }
 
 /** Aplica a correção manual (se existir) por cima dos dados vindos da API */
