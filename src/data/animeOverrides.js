@@ -27,12 +27,18 @@ export const ANIME_OVERRIDES = {
   37430: {
     search_name: 'Tensei Shitara Slime Datta Ken',
   },
+
   61316: {
     title: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
     title_english: 'Re:Zero kara Hajimeru Isekai Seikatsu 4th Season',
     // synopsis: '',   // ainda não informado
     // episodes: null, // ainda não informado
     // image: '',
+  },
+
+  // Black Clover 2nd Season (em exibição — MAL retorna Episodes: Unknown)
+  61967: {
+    episodes: 26,
   },
 }
 
