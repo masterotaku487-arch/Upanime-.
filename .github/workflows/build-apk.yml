@@ -25,7 +25,25 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+          if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+            cd /tmp
+            curl -fsSL -o commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q commandlinetools.zip -d "$ANDROID_HOME/cmdline-tools"
+            mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          fi
+
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Instalar dependências
         run: npm install
@@ -117,4 +135,3 @@ jobs:
             APK assinado — baixe `upanime-plus.apk` abaixo.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
