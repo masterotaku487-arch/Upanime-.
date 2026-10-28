@@ -38,6 +38,7 @@ export const ANIME_OVERRIDES = {
 
   // Black Clover 2nd Season (em exibição — MAL retorna Episodes: Unknown)
   61967: {
+    status: 'Currently Airing',
     episodes: 26,
   },
 }
@@ -45,6 +46,11 @@ export const ANIME_OVERRIDES = {
 /** Nome a usar na busca das APIs de streaming (ou null se não houver) */
 export function getSearchName(malId) {
   return ANIME_OVERRIDES[Number(malId)]?.search_name || null
+}
+
+/** Total de episódios corrigido manualmente (ou undefined se não houver) */
+export function getEpisodesOverride(malId) {
+  return ANIME_OVERRIDES[Number(malId)]?.episodes
 }
 
 /** Aplica a correção manual (se existir) por cima dos dados vindos da API */
