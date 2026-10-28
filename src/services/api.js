@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { applyAnimeOverride } from '../data/animeOverrides'
+import { applyAnimeOverride, getEpisodesOverride } from '../data/animeOverrides'
 
 // ══════════════════════════════════════════════════════════════
 // CATÁLOGO — AniList GraphQL direto (https://graphql.anilist.co)
@@ -195,7 +195,7 @@ export const getAnimeById = async (id) => {
 
 export const getAnimeEpisodes = async (id, page = 1) => {
   const data = await anilistQuery(`query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { episodes } }`, { idMal: parseInt(id) })
-  const total = data.Media?.episodes || 0
+  const total = getEpisodesOverride(id) ?? (data.Media?.episodes || 0)
   const perPage = 100
   const start = (page - 1) * perPage + 1
   const end = Math.min(start + perPage - 1, total)
