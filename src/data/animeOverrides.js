@@ -36,6 +36,13 @@ export const ANIME_OVERRIDES = {
     // image: '',
   },
 
+  // Jujutsu Kaisen (1ª temporada)
+  40748: {
+    title: 'Jujutsu Kaisen',
+    title_english: 'Jujutsu Kaisen',
+    search_name: 'Jujutsu Kaisen',
+  },
+
   // Black Clover 2nd Season (em exibição — MAL retorna Episodes: Unknown)
   61967: {
     status: 'Currently Airing',
