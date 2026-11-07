@@ -9,7 +9,7 @@ const FEATURED_PARTNER = {
   banner: '/parceiros/kawaii-x-upanime-banner.png',
   text: 'O UpAnime+ foi feito para oferecer a melhor experiência no Android. Mas se você quer assistir também no iPhone, iPad ou PC, agora também pode, graças à nossa parceria com o Kawaii Animes. Toque aqui para acessar o site parceiro.',
   buttonLabel: 'ACESSAR',
-  url: 'https://www.mediafire.com/file/yvk75zgnljq6job/Kawaii_Animes.apk/file',
+  url: 'https://kawaii-anime-seven.vercel.app/',
 }
 
 const SEEN_KEY = 'upanime_partner_modal_seen'
